@@ -19,5 +19,10 @@ declare namespace StorageType {
     reactFlowNodes: any[];
     /** React Flow edges */
     reactFlowEdges: any[];
+    /** Remember me credentials */
+    rememberMe?: {
+      username: string;
+      password: string;
+    };
   }
 }
