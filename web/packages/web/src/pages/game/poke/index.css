@@ -1,0 +1,854 @@
+.poke-game-container {
+  width: 100%;
+  height: 100%;
+  background: linear-gradient(135deg, #0f4c3a 0%, #1a5c4a 50%, #0f4c3a 100%);
+  display: flex;
+  flex-direction: column;
+  padding: 16px;
+  box-sizing: border-box;
+
+  position: relative;
+}
+
+.game-controls {
+  display: flex;
+  justify-content: center;
+  gap: 8px;
+  margin-bottom: 16px;
+  z-index: 1000;
+  flex-wrap: wrap;
+  position: relative;
+}
+
+.deal-button,
+.reset-button,
+.select-button,
+.quick-deal-button {
+  padding: 10px 20px;
+  font-size: 14px;
+  font-weight: bold;
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.3);
+  white-space: nowrap;
+}
+
+.quick-deal-button {
+  background: linear-gradient(135deg, #ff9800, #f57c00);
+  color: white;
+}
+
+.quick-deal-button:hover:not(:disabled) {
+  background: linear-gradient(135deg, #f57c00, #ff9800);
+  transform: translateY(-2px);
+  box-shadow: 0 6px 8px rgba(0, 0, 0, 0.4);
+}
+
+.quick-deal-button:disabled {
+  background: #9e9e9e;
+  cursor: not-allowed;
+  opacity: 0.6;
+}
+
+.select-button {
+  background: linear-gradient(135deg, #2196f3, #1976d2);
+  color: white;
+}
+
+.select-button:hover {
+  background: linear-gradient(135deg, #1976d2, #2196f3);
+  transform: translateY(-2px);
+  box-shadow: 0 6px 8px rgba(0, 0, 0, 0.4);
+}
+
+.deal-button {
+  background: linear-gradient(135deg, #4caf50, #45a049);
+  color: white;
+}
+
+.deal-button:hover {
+  background: linear-gradient(135deg, #45a049, #4caf50);
+  transform: translateY(-2px);
+  box-shadow: 0 6px 8px rgba(0, 0, 0, 0.4);
+}
+
+.reset-button {
+  background: linear-gradient(135deg, #f44336, #d32f2f);
+  color: white;
+}
+
+.reset-button:hover {
+  background: linear-gradient(135deg, #d32f2f, #f44336);
+  transform: translateY(-2px);
+  box-shadow: 0 6px 8px rgba(0, 0, 0, 0.4);
+}
+
+.game-table {
+  flex: 1;
+  position: relative;
+  width: 100%;
+  height: 100%;
+  display: grid;
+  grid-template-columns: 1fr 4fr 1fr; /* 横向：左 中 右 */
+  grid-template-rows: 1fr 2fr 1fr; /* 纵向：上 中 下 */
+  gap: 0;
+}
+
+.welcome-message {
+  text-align: center;
+  color: white;
+  background: rgba(0, 0, 0, 0.3);
+  padding: 24px;
+  border-radius: 12px;
+  backdrop-filter: blur(10px);
+  max-width: 90%;
+}
+
+.welcome-message h2 {
+  margin: 0 0 8px 0;
+  font-size: 24px;
+}
+
+.welcome-message p {
+  margin: 0;
+  font-size: 14px;
+  opacity: 0.9;
+}
+
+.card-count {
+  font-size: 12px;
+  opacity: 0.9;
+}
+
+/* 玩家基础样式 */
+.player {
+  padding: 10px;
+  z-index: 100;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+}
+
+/* 玩家1 - 底部，占据底部整行 */
+.player-1 {
+  grid-row: 3;
+  grid-column: 1 / -1;
+  width: 100%;
+  z-index: 101;
+}
+
+/* 玩家2 - 右侧，占据右侧整列 */
+.player-2 {
+  grid-column: 3;
+  grid-row: 1 / -1;
+  width: 100%;
+  height: 100%;
+}
+
+/* 玩家3 - 顶部，占据顶部整行 */
+.player-3 {
+  grid-row: 1;
+  grid-column: 1 / -1;
+  width: 100%;
+  z-index: 101;
+}
+
+/* 玩家4 - 左侧，占据左侧整列 */
+.player-4 {
+  grid-column: 1;
+  grid-row: 1 / -1;
+  width: 100%;
+  height: 100%;
+}
+
+.player .cards-container {
+  width: fit-content;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: 0;
+  padding: 8px;
+}
+
+/* 单张扑克牌样式 */
+.card {
+  width: 70px;
+  height: 98px;
+  background: white;
+  border-radius: 8px;
+  box-shadow:
+    0 2px 8px rgba(0, 0, 0, 0.3),
+    0 0 0 1px rgba(0, 0, 0, 0.1);
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  padding: 5px;
+  position: relative;
+  cursor: pointer;
+  transition:
+    transform 0.2s ease,
+    box-shadow 0.2s ease,
+    z-index 0.2s ease;
+  font-family: "Arial", sans-serif;
+  overflow: hidden;
+  box-sizing: border-box;
+  flex-shrink: 0;
+}
+
+.card:hover {
+  transform: translateY(-10px) scale(1.05);
+  box-shadow:
+    0 6px 16px rgba(0, 0, 0, 0.4),
+    0 0 0 1px rgba(0, 0, 0, 0.1);
+}
+
+.card-vertical {
+  width: 98px;
+  height: 70px;
+  transform-origin: center center;
+}
+
+.card-red {
+  color: #d32f2f;
+}
+
+.card-black {
+  color: #212121;
+}
+
+.card-corner {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  line-height: 1;
+  flex-shrink: 0;
+}
+
+.card-corner-top {
+  align-self: flex-start;
+}
+
+.card-corner-bottom {
+  align-self: flex-end;
+  transform: rotate(180deg);
+}
+
+.card-rank {
+  font-size: 14px;
+  font-weight: bold;
+  margin-bottom: 1px;
+  line-height: 1;
+}
+
+.card-suit {
+  font-size: 16px;
+  line-height: 1;
+}
+
+.card-center {
+  flex: 1;
+  line-height: 1;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  min-height: 0;
+  overflow: hidden;
+}
+
+.card-suit-large {
+  font-size: 42px;
+  line-height: 1;
+}
+
+.suit-red {
+  color: #d32f2f;
+}
+
+/* 选牌模态框样式 */
+.card-selector-modal-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.7);
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  z-index: 10000;
+  padding: 20px;
+  box-sizing: border-box;
+}
+
+.card-selector-modal {
+  background: linear-gradient(135deg, #1a5c4a 0%, #0f4c3a 100%);
+  border-radius: 16px;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.5);
+  max-width: 90vw;
+  max-height: 90vh;
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.card-selector-header {
+  padding: 20px;
+  border-bottom: 2px solid rgba(255, 255, 255, 0.2);
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  color: white;
+}
+
+.card-selector-header h3 {
+  margin: 0;
+  font-size: 24px;
+}
+
+.selected-count {
+  font-size: 18px;
+  font-weight: bold;
+  color: #4caf50;
+}
+
+.card-selector-content {
+  flex: 1;
+  overflow-y: auto;
+  padding: 20px;
+}
+
+.available-cards-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(80px, 1fr));
+  gap: 12px;
+  justify-items: center;
+}
+
+.selectable-card {
+  width: 70px;
+  height: 98px;
+  background: white;
+  border-radius: 8px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  padding: 5px;
+  position: relative;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  font-family: "Arial", sans-serif;
+  overflow: hidden;
+  box-sizing: border-box;
+}
+
+.selectable-card:hover {
+  transform: translateY(-4px) scale(1.05);
+  box-shadow: 0 6px 16px rgba(0, 0, 0, 0.4);
+}
+
+.selectable-card.selected {
+  border: 3px solid #4caf50;
+  box-shadow:
+    0 0 0 3px rgba(76, 175, 80, 0.3),
+    0 4px 12px rgba(0, 0, 0, 0.3);
+}
+
+.selected-badge {
+  position: absolute;
+  top: 4px;
+  right: 4px;
+  width: 24px;
+  height: 24px;
+  background: #4caf50;
+  color: white;
+  border-radius: 50%;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  font-size: 16px;
+  font-weight: bold;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
+}
+
+/* 被其他玩家选中的牌 */
+.selectable-card.selected-by-other {
+  opacity: 0.6;
+  border: 2px solid #ff9800;
+}
+
+.other-player-badge {
+  position: absolute;
+  top: 4px;
+  right: 4px;
+  width: 24px;
+  height: 24px;
+  background: #ff9800;
+  color: white;
+  border-radius: 50%;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  font-size: 12px;
+  font-weight: bold;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
+}
+
+/* 更大的选牌模态框 */
+.card-selector-modal-large {
+  max-width: 95vw;
+  width: 1200px;
+}
+
+/* 玩家选择标签 */
+.player-tabs {
+  display: flex;
+  gap: 8px;
+  padding: 0 20px;
+  background: rgba(0, 0, 0, 0.2);
+}
+
+.player-tab {
+  flex: 1;
+  padding: 12px 16px;
+  background: rgba(255, 255, 255, 0.1);
+  border: none;
+  border-bottom: 3px solid transparent;
+  color: rgba(255, 255, 255, 0.7);
+  font-size: 14px;
+  font-weight: bold;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.player-tab:hover {
+  background: rgba(255, 255, 255, 0.15);
+  color: white;
+}
+
+.player-tab.active {
+  background: rgba(255, 255, 255, 0.2);
+  border-bottom-color: #4caf50;
+  color: white;
+}
+
+.tab-count {
+  margin-left: 6px;
+  font-size: 12px;
+  color: #4caf50;
+}
+
+/* 玩家已选牌预览 */
+.players-cards-preview {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 12px;
+  padding: 16px 20px;
+  background: rgba(0, 0, 0, 0.15);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.player-preview {
+  padding: 10px;
+  background: rgba(255, 255, 255, 0.05);
+  border-radius: 8px;
+  border: 2px solid transparent;
+  transition: all 0.2s ease;
+}
+
+.player-preview.active {
+  border-color: #4caf50;
+  background: rgba(76, 175, 80, 0.1);
+}
+
+.preview-label {
+  color: white;
+  font-size: 12px;
+  font-weight: bold;
+  margin-bottom: 8px;
+}
+
+.preview-cards {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  min-height: 24px;
+}
+
+.preview-card {
+  padding: 2px 6px;
+  background: white;
+  border-radius: 4px;
+  font-size: 11px;
+  font-weight: bold;
+}
+
+.preview-card.red {
+  color: #d32f2f;
+}
+
+.preview-card.black {
+  color: #212121;
+}
+
+.no-cards {
+  color: rgba(255, 255, 255, 0.4);
+  font-size: 12px;
+  font-style: italic;
+}
+
+/* 当前选牌信息 */
+.current-selecting-info {
+  color: white;
+  font-size: 14px;
+  margin-bottom: 16px;
+  padding: 10px 16px;
+  background: rgba(76, 175, 80, 0.2);
+  border-radius: 8px;
+  border-left: 4px solid #4caf50;
+}
+
+.current-selecting-info strong {
+  color: #4caf50;
+}
+
+/* 总已选数量 */
+.total-selected-count {
+  font-size: 18px;
+  font-weight: bold;
+  color: #4caf50;
+}
+
+.card-selector-footer {
+  padding: 20px;
+  border-top: 2px solid rgba(255, 255, 255, 0.2);
+  display: flex;
+  justify-content: flex-end;
+  align-items: center;
+  gap: 12px;
+}
+
+.footer-info {
+  flex: 1;
+  color: rgba(255, 255, 255, 0.7);
+  font-size: 14px;
+}
+
+.cancel-button,
+.confirm-button {
+  padding: 12px 24px;
+  font-size: 16px;
+  font-weight: bold;
+  border: none;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.3);
+}
+
+.cancel-button {
+  background: #757575;
+  color: white;
+}
+
+.cancel-button:hover {
+  background: #616161;
+  transform: translateY(-2px);
+}
+
+.confirm-button {
+  background: linear-gradient(135deg, #4caf50, #45a049);
+  color: white;
+}
+
+.confirm-button:hover:not(:disabled) {
+  background: linear-gradient(135deg, #45a049, #4caf50);
+  transform: translateY(-2px);
+  box-shadow: 0 6px 8px rgba(0, 0, 0, 0.4);
+}
+
+.confirm-button:disabled {
+  background: #9e9e9e;
+  cursor: not-allowed;
+  opacity: 0.6;
+}
+
+/* 中央出牌区域 */
+.center-played-cards {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  z-index: 200;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+  pointer-events: none;
+}
+
+.played-by {
+  color: white;
+  font-size: 14px;
+  font-weight: bold;
+  background: rgba(0, 0, 0, 0.5);
+  padding: 6px 16px;
+  border-radius: 20px;
+}
+
+.played-cards-container {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+}
+
+.played-card {
+  box-shadow:
+    0 4px 12px rgba(0, 0, 0, 0.4),
+    0 0 0 1px rgba(0, 0, 0, 0.1);
+}
+
+/* 玩家头部区域 */
+.player-header {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 8px;
+  flex-wrap: wrap;
+  justify-content: center;
+}
+
+/* 玩家标签 */
+.player-label {
+  color: white;
+  font-size: 12px;
+  font-weight: bold;
+  background: rgba(0, 0, 0, 0.4);
+  padding: 4px 10px;
+  border-radius: 12px;
+  white-space: nowrap;
+}
+
+/* 玩家操作按钮区域 */
+.player-actions {
+  display: flex;
+  gap: 6px;
+}
+
+.play-button-small,
+.pass-button-small {
+  padding: 6px 12px;
+  font-size: 12px;
+  font-weight: bold;
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
+  white-space: nowrap;
+}
+
+.play-button-small {
+  background: linear-gradient(135deg, #ff5722, #e64a19);
+  color: white;
+}
+
+.play-button-small:hover:not(:disabled) {
+  background: linear-gradient(135deg, #e64a19, #ff5722);
+  transform: translateY(-1px);
+  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.4);
+}
+
+.play-button-small:disabled {
+  background: #9e9e9e;
+  cursor: not-allowed;
+  opacity: 0.6;
+}
+
+.pass-button-small {
+  background: linear-gradient(135deg, #607d8b, #546e7a);
+  color: white;
+}
+
+.pass-button-small:hover {
+  background: linear-gradient(135deg, #546e7a, #607d8b);
+  transform: translateY(-1px);
+  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.4);
+}
+
+/* 当前玩家高亮 */
+.current-player {
+  background: linear-gradient(135deg, rgba(255, 215, 0, 0.15) 0%, rgba(255, 193, 7, 0.1) 100%);
+  border-radius: 12px;
+  border: 2px solid rgba(255, 215, 0, 0.4);
+  box-shadow: 0 0 20px rgba(255, 215, 0, 0.2);
+  z-index: 200 !important; /* 当前玩家层级最高，避免选不到牌 */
+}
+
+.current-player .player-label {
+  background: linear-gradient(135deg, #ffd700, #ffb300);
+  color: #000;
+}
+
+/* 选中的牌样式 */
+.card-selected {
+  border: 2px solid #ffd700 !important;
+  box-shadow:
+    0 0 10px rgba(255, 215, 0, 0.5),
+    0 4px 12px rgba(0, 0, 0, 0.3) !important;
+}
+
+/* 可点击的牌（当前玩家） */
+.card-clickable {
+  cursor: pointer;
+}
+
+.card-clickable:hover {
+  transform: translateY(-12px) scale(1.05);
+}
+
+/* 非当前玩家的牌不可点击 */
+.player:not(.current-player) .card {
+  cursor: default;
+}
+
+.player:not(.current-player) .card:hover {
+  transform: none;
+}
+
+/* 响应式设计 */
+@media (max-width: 768px) {
+  .card-selector-modal {
+    max-width: 95vw;
+    max-height: 95vh;
+  }
+
+  .card-selector-modal-large {
+    width: 100%;
+  }
+
+  .available-cards-grid {
+    grid-template-columns: repeat(auto-fill, minmax(60px, 1fr));
+    gap: 8px;
+  }
+
+  .selectable-card {
+    width: 55px;
+    height: 77px;
+    padding: 4px;
+  }
+
+  .card-selector-header h3 {
+    font-size: 18px;
+  }
+
+  .selected-count,
+  .total-selected-count {
+    font-size: 14px;
+  }
+
+  /* 玩家标签响应式 */
+  .player-tabs {
+    padding: 0 12px;
+    gap: 4px;
+  }
+
+  .player-tab {
+    padding: 8px 8px;
+    font-size: 12px;
+  }
+
+  .tab-count {
+    display: block;
+    margin-left: 0;
+    margin-top: 2px;
+  }
+
+  /* 玩家预览响应式 */
+  .players-cards-preview {
+    grid-template-columns: repeat(2, 1fr);
+    gap: 8px;
+    padding: 12px;
+  }
+
+  .player-preview {
+    padding: 8px;
+  }
+
+  .preview-label {
+    font-size: 11px;
+  }
+
+  .preview-card {
+    font-size: 10px;
+    padding: 1px 4px;
+  }
+
+  .current-selecting-info {
+    font-size: 12px;
+    padding: 8px 12px;
+  }
+
+  .footer-info {
+    font-size: 12px;
+  }
+
+  .center-played-cards {
+    position: fixed;
+  }
+
+  .played-card {
+    width: 50px;
+    height: 70px;
+  }
+
+  .played-by {
+    font-size: 12px;
+    padding: 4px 12px;
+  }
+
+  /* 玩家区域响应式 */
+  .player-header {
+    gap: 6px;
+  }
+
+  .player-label {
+    font-size: 10px;
+    padding: 3px 8px;
+  }
+
+  .play-button-small,
+  .pass-button-small {
+    padding: 4px 8px;
+    font-size: 10px;
+  }
+}
+
+@media (max-width: 480px) {
+  .player-tabs {
+    flex-wrap: wrap;
+  }
+
+  .player-tab {
+    flex: 1 1 45%;
+    min-width: 0;
+  }
+
+  .players-cards-preview {
+    grid-template-columns: 1fr;
+  }
+
+  .card-selector-footer {
+    flex-wrap: wrap;
+  }
+
+  .footer-info {
+    width: 100%;
+    text-align: center;
+    margin-bottom: 8px;
+  }
+}

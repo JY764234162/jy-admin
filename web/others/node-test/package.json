@@ -1,0 +1,17 @@
+{
+  "name": "@others/node-test",
+  "private": true,
+  "version": "0.0.0",
+  "license": "MIT",
+  "scripts": {
+    "dev": "node index.js"
+  },
+  "devDependencies": {
+    "@types/node": "^22.7.5",
+    "babel": "^6.23.0"
+  },
+  "dependencies": {
+    "fs-extra": "^11.3.0",
+    "minimist": "^1.2.8"
+  }
+}

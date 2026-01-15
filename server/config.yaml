@@ -1,0 +1,36 @@
+system:
+  db-type: sqlite
+  oss-type: local
+  router-prefix: '/api/'
+  port: 7777
+  iplimit-count: 15000
+  iplimit-time: 3600
+  use-strict-auth: false
+  disable-auto-migrate: false
+  read-timeout: 600
+  write-timeout: 600
+jwt:
+  signing-key: JY-Admin
+  expires-time: 7d
+  buffer-time: 1d
+  issuer: JY-Admin
+sqlite:
+  path: './'
+  port: ''
+  config: ''
+  db-name: 'jiangyi'
+  username: ''
+  password: ''
+  max-idle-conns: 10
+  max-open-conns: 100
+  log-mode: ''
+  log-zap: false
+local:
+  path: uploads/file
+  store-path: uploads/file
+captcha:
+  key-long: 10
+  img-width: 300
+  img-height: 100
+  open-captcha: 3
+  open-captcha-timeout: 3600

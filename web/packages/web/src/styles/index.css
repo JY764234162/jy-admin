@@ -1,0 +1,18 @@
+@import "tailwindcss";
+
+/* 亮色模式样式 */
+:root {
+  color: #213547;
+  background-color: #ffffff;
+}
+
+/* 手动切换主题的样式类 */
+.dark {
+  color: rgba(255, 255, 255, 0.87);
+  background-color: #242424;
+}
+
+/* 全局鼠标样式 */
+html {
+  cursor: url("../assets/blue.cur"), auto;
+}
