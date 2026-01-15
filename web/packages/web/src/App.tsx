@@ -26,6 +26,7 @@ export default function App() {
   useUpdateEffect(() => {
     localStg.set("settings", settings);
   }, [settings]);
+
   return (
     <AntdProvider>
       <AppProvider>

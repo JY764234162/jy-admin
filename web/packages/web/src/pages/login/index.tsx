@@ -11,6 +11,7 @@ import { loginApi } from "@/api";
 import { localStg } from "@/utils/storage";
 import type { CaptchaResponse } from "@/api/types";
 import { initConstantRoute } from "@/store/slice/route";
+import { store } from "@/store";
 
 interface LoginFormValues {
   username: string;
@@ -94,7 +95,7 @@ export const Component = () => {
         }
 
         message.success("登录成功！");
-        await initConstantRoute();
+        await store.dispatch(initConstantRoute());
         // 跳转到之前尝试访问的页面或首页
         const redirectPath = getRedirectPath();
         navigate(redirectPath, { replace: true });
@@ -207,7 +208,7 @@ export const Component = () => {
           <Button
             type="default"
             onClick={() => {
-              message.info("注册功能开发中");
+              navigate("/register");
             }}
           >
             注册账号

@@ -29,7 +29,7 @@ local:
   path: uploads/file
   store-path: uploads/file
 captcha:
-  key-long: 10
+  key-long: 6
   img-width: 300
   img-height: 100
   open-captcha: 3

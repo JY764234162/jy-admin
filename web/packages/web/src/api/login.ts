@@ -1,5 +1,5 @@
 import request from "@/utils/request";
-import type { ApiResponse, LoginRequest, LoginResponse, CaptchaResponse } from "./types";
+import type { ApiResponse, LoginRequest, LoginResponse, CaptchaResponse, RegisterRequest } from "./types";
 
 /**
  * 登录 API
@@ -17,6 +17,13 @@ export const loginApi = {
    */
   login: (data: LoginRequest): Promise<ApiResponse<LoginResponse>> => {
     return request.post("/api/login", data);
+  },
+
+  /**
+   * 用户注册
+   */
+  register: (data: RegisterRequest): Promise<ApiResponse> => {
+    return request.post("/api/register", data);
   },
 
   /**

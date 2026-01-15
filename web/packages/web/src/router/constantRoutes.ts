@@ -10,16 +10,21 @@ export const constantRoutes: RouteObject[] = [
     lazy: () => import("@/pages/login"),
   },
   {
+    id: "register",
+    path: "/register",
+    lazy: () => import("@/pages/register"),
+  },
+  {
     id: "layout",
     path: "/",
     Component: Layout,
     children: [],
     loader: () => {
       const token = localStg.get("token");
-      if (token) {
-        return redirect("/home");
+      if (!token) {
+        return redirect("/login");
       }
-      return redirect("/login");
+      return true;
     },
   },
   {

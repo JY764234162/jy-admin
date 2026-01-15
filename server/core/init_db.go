@@ -6,6 +6,7 @@ import (
 	"gorm.io/gorm"
 	"jiangyi.com/model/business"
 	"jiangyi.com/model/system"
+	"jiangyi.com/utils"
 )
 
 func InitDb(db *gorm.DB) error {
@@ -31,7 +32,7 @@ func InitDb(db *gorm.DB) error {
 			// Seed admin user
 			user := system.SysUser{
 				Username:    "admin",
-				Password:    "123456", // In real app should be hashed
+				Password:    utils.BcryptHash("123456"), // 使用 bcrypt 加密密码
 				NickName:    "超级管理员",
 				HeaderImg:   "https://qmplusimg.henrongyi.top/gva_header.jpg",
 				AuthorityId: "888",

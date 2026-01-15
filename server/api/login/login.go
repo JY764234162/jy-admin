@@ -63,10 +63,17 @@ func (l *Api) Login(ctx *gin.Context) {
 		return
 	}
 
+	// 查找用户
 	var user system.SysUser
-	err = global.JY_DB.Where("username = ? AND password = ?", params.Username, params.Password).
-		First(&user).Error
+	err = global.JY_DB.Where("username = ?", params.Username).First(&user).Error
 	if err != nil {
+		global.JY_BlackCache.Increment(key, 1)
+		common.FailWithMsg(ctx, "用户不存在或密码错误")
+		return
+	}
+
+	// 使用 bcrypt 验证密码
+	if !utils.BcryptCheck(params.Password, user.Password) {
 		global.JY_BlackCache.Increment(key, 1)
 		common.FailWithMsg(ctx, "用户不存在或密码错误")
 		return

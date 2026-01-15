@@ -40,6 +40,14 @@ export interface CaptchaResponse {
   openCaptcha: boolean;
 }
 
+export interface RegisterRequest {
+  username: string;
+  password: string;
+  nickName: string;
+  code?: string;
+  code_id?: string;
+}
+
 /**
  * 用户信息
  */

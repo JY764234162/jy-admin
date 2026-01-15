@@ -70,6 +70,7 @@ func registerRouter(Router *gin.Engine) *gin.Engine {
 	{
 		publicGroup.GET("/login/captcha", apiGroup.LoginApi.GetCaptcha)
 		publicGroup.POST("/login", apiGroup.LoginApi.Login)
+		publicGroup.POST("/register", apiGroup.LoginApi.Register)
 	}
 	//客户管理
 	{
