@@ -32,6 +32,7 @@
     "@xyflow/react": "^12.9.3",
     "ahooks": "^3.9.6",
     "antd": "^5.15.2",
+    "axios": "^1.9.0",
     "classnames": "^2.3.1",
     "dagre": "^0.8.5",
     "dayjs": "^1.11.13",

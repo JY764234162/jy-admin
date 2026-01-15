@@ -49,10 +49,7 @@ export const Layout: React.FC = memo(() => {
     }
   }, [location]);
 
-  //持久化设置
-  useUpdateEffect(() => {
-    localStg.set("settings", settings);
-  }, [settings]);
+  
 
   //初始化弱视和灰度
   useEffect(() => {

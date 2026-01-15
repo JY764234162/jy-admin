@@ -21,6 +21,7 @@ export default defineConfig([
       "@typescript-eslint/no-unused-vars": "off", // 这里要设为 off
       "react/react-in-jsx-scope": "off", // 关闭此规则
       "react/no-unknown-property": "off", // 关闭此规则
+      "react/display-name": "off", // 关闭 displayName 检查
     },
     ignores: ["./public/**", "iconfont.js"],
   },

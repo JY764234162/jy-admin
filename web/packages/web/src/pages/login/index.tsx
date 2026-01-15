@@ -1,15 +1,21 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Form, Input, Button, Checkbox, message, Divider, Card } from "antd";
-import { EyeInvisibleOutlined, EyeTwoTone, UserOutlined, LockOutlined } from "@ant-design/icons";
+import { EyeInvisibleOutlined, EyeTwoTone, UserOutlined, LockOutlined, ReloadOutlined } from "@ant-design/icons";
 import { useNavigate } from "react-router-dom";
 import styles from "./styles.module.css";
 import { SwitchThemeButton } from "@/components/SwitchThemeButton";
 import logo from "@/assets/logo.svg";
 import { SvgIcon } from "@/components/SvgIcon";
 import WaveBg from "./waveBg";
+import { loginApi } from "@/api";
+import { localStg } from "@/utils/storage";
+import type { CaptchaResponse } from "@/api/types";
+
 interface LoginFormValues {
   username: string;
   password: string;
+  code?: string;
+  code_id?: string;
   remember: boolean;
 }
 
@@ -22,23 +28,59 @@ export const Component = () => {
   const navigate = useNavigate();
   const [loginType, setLoginType] = useState<"password" | "sms">("password");
   const [loading, setLoading] = useState(false);
+  const [captchaLoading, setCaptchaLoading] = useState(false);
+  const [captchaData, setCaptchaData] = useState<CaptchaResponse | null>(null);
   const [passwordForm] = Form.useForm<LoginFormValues>();
   const [smsForm] = Form.useForm<SmsFormValues>();
+
+  // 获取验证码
+  const fetchCaptcha = async () => {
+    setCaptchaLoading(true);
+    try {
+      const res = await loginApi.getCaptcha();
+      if (res.code === 0 && res.data) {
+        setCaptchaData(res.data);
+        passwordForm.setFieldsValue({ code_id: res.data.captchaId });
+      }
+    } catch (error) {
+      console.error("获取验证码失败:", error);
+    } finally {
+      setCaptchaLoading(false);
+    }
+  };
+
+  // 初始化时获取验证码
+  useEffect(() => {
+    if (loginType === "password") {
+      fetchCaptcha();
+    }
+  }, [loginType]);
 
   // 密码登录
   const handlePasswordLogin = async (values: LoginFormValues) => {
     setLoading(true);
     try {
-      // 模拟登录请求
-      await new Promise((resolve) => setTimeout(resolve, 1000));
+      const res = await loginApi.login({
+        username: values.username,
+        password: values.password,
+        code: values.code,
+        code_id: values.code_id || captchaData?.captchaId || "",
+      });
 
-      console.log("登录信息:", values);
-      message.success("登录成功！");
+      if (res.code === 0 && res.data) {
+        // 存储 token 和用户信息
+        localStg.set("token", res.data.token);
+        localStg.set("userInfo", res.data.user);
 
-      // 跳转到首页
-      navigate("/home");
-    } catch (error) {
-      message.error("登录失败，请重试");
+        message.success("登录成功！");
+
+        // 跳转到首页
+        navigate("/home");
+      }
+    } catch (error: any) {
+      // 登录失败后刷新验证码
+      fetchCaptcha();
+      passwordForm.setFieldsValue({ code: "" });
     } finally {
       setLoading(false);
     }
@@ -132,6 +174,36 @@ export const Component = () => {
                 iconRender={(visible) => (visible ? <EyeTwoTone /> : <EyeInvisibleOutlined />)}
               />
             </Form.Item>
+
+            {captchaData?.openCaptcha && (
+              <Form.Item>
+                <div style={{ display: "flex", gap: "8px", alignItems: "center" }}>
+                  <Form.Item name="code" noStyle rules={[{ required: true, message: "请输入验证码" }]}>
+                    <Input placeholder="请输入验证码" style={{ flex: 1 }} />
+                  </Form.Item>
+                  <div style={{ display: "flex", alignItems: "center", gap: "4px" }}>
+                    {captchaData.picPath && (
+                      <img
+                        src={captchaData.picPath}
+                        alt="验证码"
+                        style={{ height: "32px", cursor: "pointer", border: "1px solid #d9d9d9", borderRadius: "4px" }}
+                        onClick={fetchCaptcha}
+                      />
+                    )}
+                    <Button
+                      type="text"
+                      icon={<ReloadOutlined />}
+                      loading={captchaLoading}
+                      onClick={fetchCaptcha}
+                      style={{ padding: "4px" }}
+                    />
+                  </div>
+                </div>
+                <Form.Item name="code_id" noStyle>
+                  <Input type="hidden" />
+                </Form.Item>
+              </Form.Item>
+            )}
 
             <div className={styles.formOptions}>
               <Form.Item name="remember" valuePropName="checked" style={{ margin: 0 }}>

@@ -3,7 +3,9 @@ package router
 import (
 	"net/http"
 	"os"
+	"time"
 
+	"github.com/gin-contrib/cors"
 	"github.com/gin-gonic/gin"
 	swaggerFiles "github.com/swaggo/files"
 	ginSwagger "github.com/swaggo/gin-swagger"
@@ -39,6 +41,16 @@ func InitGinRouter() *gin.Engine {
 	}
 	//	错误处理
 	Router.Use(gin.Recovery())
+
+	// CORS 配置
+	Router.Use(cors.New(cors.Config{
+		AllowOrigins:     []string{"http://localhost:3000", "http://localhost:5173", "http://127.0.0.1:3000", "http://127.0.0.1:5173"},
+		AllowMethods:     []string{"GET", "POST", "PUT", "DELETE", "OPTIONS", "PATCH"},
+		AllowHeaders:     []string{"Origin", "Content-Type", "Content-Length", "Accept-Encoding", "X-CSRF-Token", "Authorization", "Accept", "Cache-Control", "X-Requested-With"},
+		ExposeHeaders:    []string{"Content-Length"},
+		AllowCredentials: true,
+		MaxAge:           12 * time.Hour,
+	}))
 
 	//注册路由
 	registerRouter(Router)
@@ -97,5 +109,25 @@ func registerRouter(Router *gin.Engine) *gin.Engine {
 	publicGroup.GET("/health", func(c *gin.Context) {
 		c.String(http.StatusOK, "Hello, World!")
 	})
+
+	// 生产环境：提供前端静态文件服务
+	// 注意：在生产环境中，确保前端构建产物位于 ../web/docs 目录
+	// 开发环境可以注释掉这部分，使用前端开发服务器
+	if gin.Mode() == gin.ReleaseMode {
+		// 静态文件服务
+		Router.Static("/static", "../web/docs/assets")
+		Router.StaticFile("/favicon.svg", "../web/docs/favicon.svg")
+		// SPA 路由支持：所有非 API 路由都返回 index.html
+		Router.NoRoute(func(c *gin.Context) {
+			// 如果是 API 路由，返回 404
+			if c.Request.URL.Path[:4] == "/api" {
+				c.JSON(http.StatusNotFound, gin.H{"code": 404, "msg": "接口不存在"})
+				return
+			}
+			// 否则返回前端页面
+			c.File("../web/docs/index.html")
+		})
+	}
+
 	return Router
 }

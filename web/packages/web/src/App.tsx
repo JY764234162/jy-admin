@@ -4,9 +4,11 @@ import AntdProvider from "./context/AntdProvider";
 import { useSelector } from "react-redux";
 import { settingSlice } from "./store/slice/setting";
 import { Watermark, WatermarkProps } from "antd";
+
+import { useUpdateEffect } from "ahooks";
+import { localStg } from "./utils/storage";
 import "@/styles/index.css";
 import "@/styles/scrollbar.scss";
-
 const watermarkProps: WatermarkProps = {
   font: {
     fontSize: 16,
@@ -20,7 +22,10 @@ const watermarkProps: WatermarkProps = {
 
 export default function App() {
   const settings = useSelector(settingSlice.selectors.getSettings);
-  console.log("settings", settings);
+  //持久化设置
+  useUpdateEffect(() => {
+    localStg.set("settings", settings);
+  }, [settings]);
   return (
     <AntdProvider>
       <AppProvider>

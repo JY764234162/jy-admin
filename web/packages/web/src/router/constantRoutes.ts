@@ -1,6 +1,7 @@
 import { RouteObject, redirect } from "react-router-dom";
 import { Layout } from "@/Layout";
 import { NotFound } from "@/components/NotFound";
+import { localStg } from "@/utils/storage";
 //默认路由
 export const constantRoutes: RouteObject[] = [
   {
@@ -13,11 +14,13 @@ export const constantRoutes: RouteObject[] = [
     path: "/",
     Component: Layout,
     children: [],
-  },
-  {
-    id: "root-redirect",
-    path: "/",
-    loader: () => redirect("/home"),
+    loader: () => {
+      const token = localStg.get("token");
+      if (token) {
+        return redirect("/home");
+      }
+      return redirect("/login");
+    },
   },
   {
     id: "not-found",

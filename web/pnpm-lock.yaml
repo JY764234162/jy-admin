@@ -174,6 +174,9 @@ importers:
       antd:
         specifier: ^5.15.2
         version: 5.26.6(react-dom@18.3.1(react@18.3.1))(react@18.3.1)
+      axios:
+        specifier: ^1.9.0
+        version: 1.10.0
       classnames:
         specifier: ^2.3.1
         version: 2.5.1

@@ -7,12 +7,9 @@ import { useDispatch, useSelector } from "react-redux";
 import { settingSlice } from "@/store/slice/setting";
 
 export function SwitchThemeButton() {
-
   const dispatch = useDispatch();
   const settings = useSelector(settingSlice.selectors.getSettings);
   const isDarkMode = settings.themeMode === "dark";
-
-  
   const toggleDark: ButtonProps["onClick"] = (event) => {
     const x = event.clientX;
     const y = event.clientY;

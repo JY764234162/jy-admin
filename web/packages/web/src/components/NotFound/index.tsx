@@ -32,9 +32,9 @@ export const NotFound = () => {
       </div>
       <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} imageStyle={{ height: 60 }} description={<span>页面不存在或无权限</span>}>
         <Space>
-          <a href="/" onClick={goIndex}>
-            <Button type="primary">返回首页</Button>
-          </a>
+          <Button type="primary" onClick={goIndex}>
+            返回首页
+          </Button>
         </Space>
       </Empty>
     </div>
