@@ -8,7 +8,7 @@ import { useNavigate } from "react-router-dom";
 import { useUpdateEffect } from "ahooks";
 import { router } from "@/router/routers";
 
-export const MenuContextProvider: FC<{ children: ReactNode }> = memo(({ children }) => {
+export const MenuContextProvider = memo(({ children }: { children: ReactNode }) => {
   const navigate = useNavigate();
   const settings = useSelector(settingSlice.selectors.getSettings);
   const isOnlyExpandCurrentParentMenu = settings.isOnlyExpandCurrentParentMenu;
@@ -17,12 +17,9 @@ export const MenuContextProvider: FC<{ children: ReactNode }> = memo(({ children
 
   const allRoutes = useSelector(routesSlice.selectors.getAllRoute);
 
-
   const selectedKeys = useMemo(() => {
     return router.state.matches[router.state.matches.length - 1].pathname.split("/").filter(Boolean);
   }, [router.state.matches]);
-
-
 
   const items = useMemo(() => {
     return transformToMenuItems(allRoutes);
@@ -68,6 +65,8 @@ export const MenuContextProvider: FC<{ children: ReactNode }> = memo(({ children
   }, [settings.layout.mode]);
 
   return (
-    <MenuContext.Provider value={{ openKeys,selectedKeys, setOpenKeys, items, handleMenuClick, onMenuOpenChange }}>{children}</MenuContext.Provider>
+    <MenuContext.Provider value={{ openKeys, selectedKeys, setOpenKeys, items, handleMenuClick, onMenuOpenChange }}>
+      {children}
+    </MenuContext.Provider>
   );
 });

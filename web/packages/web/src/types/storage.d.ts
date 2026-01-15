@@ -8,13 +8,23 @@ declare namespace StorageType {
     //  */
     // themeSettings: App.Theme.ThemeSetting;
   }
+  interface UserInfo {
+    ID: number;
+    username: string;
+    nickName: string;
+    headerImg?: string;
+    authorityId: number | string;
+    createdAt?: string;
+    updatedAt?: string;
+  }
+
   interface Local {
     themeMode: App.ThemeMode;
     settings: App.Setting;
     /** The token */
     token: string;
     /** The user info */
-    userInfo: Api.Auth.UserInfo;
+    userInfo: UserInfo;
     /** React Flow nodes */
     reactFlowNodes: any[];
     /** React Flow edges */

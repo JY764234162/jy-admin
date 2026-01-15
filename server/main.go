@@ -19,6 +19,8 @@ func main() {
 	//初始化数据库
 	if global.JY_DB != nil {
 		core.RegisterTables()
+		// 从数据库加载黑名单到内存缓存
+		core.LoadBlacklistFromDB()
 		// close db connection logic if needed
 		sqlDB, _ := global.JY_DB.DB()
 		defer sqlDB.Close()

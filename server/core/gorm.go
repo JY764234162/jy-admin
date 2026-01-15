@@ -40,6 +40,7 @@ func RegisterTables() {
 	err := db.AutoMigrate(
 		system.SysUser{},
 		system.ExaFileUploadAndDownload{},
+		system.JwtBlacklist{},
 		business.Customer{},
 	)
 
@@ -48,4 +49,8 @@ func RegisterTables() {
 	}
 	fmt.Println("注册表成功")
 
+	// 初始化数据库数据
+	if err := InitDb(db); err != nil {
+		fmt.Printf("初始化数据库数据失败: %v\n", err)
+	}
 }

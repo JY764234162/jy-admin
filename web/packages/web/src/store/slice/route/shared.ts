@@ -94,15 +94,17 @@ export const transformToReactRoutes: (route: ElegantConstRoute[]) => RouteObject
 export const transformToMenuItems: (route: ElegantConstRoute[]) => ItemType<MenuItemType>[] = (routes) => {
   // 确保路由已反序列化
   const deserializedRoutes = deserializeRoutes(routes);
-  return deserializedRoutes.map((item) => {
-    const icon = item?.handle?.icon ? createElement(item.handle?.icon) : null;
-    return {
-      key: item.path,
-      label: item.handle.menuTitle,
-      icon,
-      children: item?.children ? transformToMenuItems(item.children) : undefined,
-    };
-  });
+  return deserializedRoutes
+    .filter((item) => !item.handle.hidden)
+    .map((item) => {
+      const icon = item?.handle?.icon ? createElement(item.handle?.icon) : null;
+      return {
+        key: item.path,
+        label: item.handle.menuTitle,
+        icon,
+        children: item?.children ? transformToMenuItems(item.children) : undefined,
+      };
+    });
 };
 
 //转化为可搜索的菜单结构（所有叶子结点）
@@ -116,19 +118,21 @@ export const transformMenuToSearchMenus = (
   // 确保路由已反序列化
   const deserializedRoutes = deserializeRoutes(route);
 
-  deserializedRoutes.forEach((item) => {
-    const currentPath = parentPath ? `${parentPath}/${item.path}` : `/${item.path}`;
-    if (!item.children || item.children.length === 0) {
-      // 叶子节点，添加到结果
-      result.push({
-        route: item,
-        fullPath: currentPath,
-      });
-    } else {
-      // 有子节点，递归处理
-      transformMenuToSearchMenus(item.children, currentPath, result);
-    }
-  });
+  deserializedRoutes
+    .filter((item) => item.handle.menuTitle)
+    .forEach((item) => {
+      const currentPath = parentPath ? `${parentPath}/${item.path}` : `/${item.path}`;
+      if (!item.children || item.children.length === 0) {
+        // 叶子节点，添加到结果
+        result.push({
+          route: item,
+          fullPath: currentPath,
+        });
+      } else {
+        // 有子节点，递归处理
+        transformMenuToSearchMenus(item.children, currentPath, result);
+      }
+    });
   return result;
 };
 

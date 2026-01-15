@@ -72,6 +72,10 @@ func registerRouter(Router *gin.Engine) *gin.Engine {
 		publicGroup.POST("/login", apiGroup.LoginApi.Login)
 		publicGroup.POST("/register", apiGroup.LoginApi.Register)
 	}
+	//登出接口（需要认证）
+	{
+		privateGroup.POST("/logout", apiGroup.LoginApi.Logout)
+	}
 	//客户管理
 	{
 		privateGroup.GET("/customer/list", apiGroup.CustomerApi.GetCustomerList)
@@ -82,8 +86,10 @@ func registerRouter(Router *gin.Engine) *gin.Engine {
 	//用户管理
 	{
 		privateGroup.GET("/user/list", apiGroup.UserApi.GetUserList)
+		privateGroup.GET("/user/current", apiGroup.UserApi.GetCurrentUser)
 		privateGroup.POST("/user", apiGroup.UserApi.CreateUser)
 		privateGroup.PUT("/user", apiGroup.UserApi.UpdateUser)
+		privateGroup.PUT("/user/profile", apiGroup.UserApi.UpdateProfile)
 		privateGroup.DELETE("/user/:id", apiGroup.UserApi.DeleteUser)
 		privateGroup.POST("/user/changePassword", apiGroup.UserApi.ChangePassword)
 	}

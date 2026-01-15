@@ -28,7 +28,7 @@ export interface LoginRequest {
 }
 
 export interface LoginResponse {
-  user: UserInfo;
+  user: StorageType.UserInfo;
   token: string;
   expiresAt: number;
 }
@@ -46,18 +46,6 @@ export interface RegisterRequest {
   nickName: string;
   code?: string;
   code_id?: string;
-}
-
-/**
- * 用户信息
- */
-export interface UserInfo {
-  ID: number;
-  username: string;
-  nickName: string;
-  authorityId: number;
-  createdAt?: string;
-  updatedAt?: string;
 }
 
 /**
@@ -87,9 +75,15 @@ export interface User {
   username: string;
   password?: string;
   nickName: string;
-  authorityId: number;
+  headerImg?: string;
+  authorityId: number | string;
   createdAt?: string;
   updatedAt?: string;
+}
+
+export interface UpdateProfileRequest {
+  nickName: string;
+  headerImg?: string;
 }
 
 export interface UserListParams {
@@ -108,11 +102,17 @@ export interface ChangePasswordRequest {
  */
 export interface FileInfo {
   ID?: number;
-  fileName: string;
-  filePath: string;
+  name?: string;
+  fileName?: string;
+  url: string;
+  filePath?: string;
   fileSize?: number;
   fileType?: string;
+  tag?: string;
+  key?: string;
+  classId?: number;
   createdAt?: string;
+  updatedAt?: string;
 }
 
 export interface FileListParams {
@@ -132,4 +132,3 @@ export interface Authority {
   createdAt?: string;
   updatedAt?: string;
 }
-

@@ -349,4 +349,12 @@ export const authRoutes: ElegantConstRoute[] = [
       icon: "FileMarkdownOutlined",
     },
   },
+  // 个人信息页面（不在菜单中显示）
+  {
+    path: "profile",
+    handle: {
+      menuTitle: "个人信息",
+      hidden: true,
+    },
+  },
 ];

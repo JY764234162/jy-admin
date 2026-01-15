@@ -12,6 +12,8 @@ import { SettingButton } from "@/components/SettingDrawerButton";
 import { MenuFoldOutlined, MenuUnfoldOutlined } from "@ant-design/icons";
 import { layoutSlice } from "@/store/slice/layout";
 import { GlobalBreadcrumb } from "../global-breadcrumb";
+import { UserAvatar } from "@/components/UserAvatar";
+import { localStg } from "@/utils/storage";
 // console.log(Object.entries(modules));
 
 export const GlobalHeader = memo(() => {
@@ -23,6 +25,8 @@ export const GlobalHeader = memo(() => {
     dispatch(layoutSlice.actions.setIsCollapsed(!layoutSetting.isCollapsed));
   };
 
+  const userInfo = (localStg.get("userInfo") as StorageType.UserInfo) || null;
+
   const ButtonListRender = useMemo(() => {
     return (
       <>
@@ -30,9 +34,10 @@ export const GlobalHeader = memo(() => {
         <FullScreenButton />
         <SwitchThemeButton />
         <SettingButton />
+        <UserAvatar userInfo={userInfo} />
       </>
     );
-  }, []);
+  }, [userInfo]);
 
   return settings.layout.mode === "vertical" ? (
     <Header
@@ -46,9 +51,7 @@ export const GlobalHeader = memo(() => {
       }}
     >
       <Button type="text" icon={layoutSetting.isCollapsed ? <MenuUnfoldOutlined /> : <MenuFoldOutlined />} onClick={toggleCollapsed} />
-      <div style={{ flex: 1 }}>
-       {layoutSetting.isMobile ? null : <GlobalBreadcrumb />}
-      </div>
+      <div style={{ flex: 1 }}>{layoutSetting.isMobile ? null : <GlobalBreadcrumb />}</div>
       {ButtonListRender}
     </Header>
   ) : (

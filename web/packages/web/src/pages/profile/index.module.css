@@ -1,0 +1,61 @@
+.profileContainer {
+  padding: 24px;
+  min-height: 100%;
+  background: var(--ant-color-bg-container);
+}
+
+.profileCard {
+  max-width: 800px;
+  margin: 0 auto;
+}
+
+.userInfoSection {
+  display: flex;
+  align-items: center;
+  gap: 24px;
+  padding: 16px 0;
+}
+
+.avatarWrapper {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  flex-shrink: 0;
+}
+
+.avatar {
+  flex-shrink: 0;
+}
+
+.userInfo {
+  flex: 1;
+}
+
+.username {
+  font-size: 20px;
+  font-weight: 600;
+  color: var(--ant-color-text);
+  margin-bottom: 8px;
+}
+
+.nickname {
+  font-size: 14px;
+  color: var(--ant-color-text-secondary);
+}
+
+.formSection {
+  margin-bottom: 24px;
+}
+
+.formSection h3 {
+  margin-bottom: 16px;
+  font-size: 16px;
+  font-weight: 600;
+  color: var(--ant-color-text);
+}
+
+.form {
+  max-width: 500px;
+}
+

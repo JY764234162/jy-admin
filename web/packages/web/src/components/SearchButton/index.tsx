@@ -20,7 +20,6 @@ export function SearchButton() {
   const [open, setOpen] = useState(false);
   const [selectedIndex, setSelectedIndex] = useState(0);
   const inputRef = useRef<any>(null);
-
   // 获取所有可搜索的菜单项
   const searchableMenus = useMemo(() => {
     return transformMenuToSearchMenus(allRoutes);
@@ -38,13 +37,11 @@ export function SearchButton() {
     searchableMenus.forEach(({ route, fullPath }) => {
       const menuTitle = route.handle?.menuTitle || "";
       const keyWords = route.handle?.keyWords || [];
-      
+
       // 搜索菜单标题
       const titleMatch = menuTitle.toLowerCase().includes(keyword);
       // 搜索关键词
-      const keywordMatch = keyWords.some((kw: string) => 
-        kw.toLowerCase().includes(keyword)
-      );
+      const keywordMatch = keyWords.some((kw: string) => kw.toLowerCase().includes(keyword));
 
       if (titleMatch || keywordMatch) {
         results.push({
@@ -163,11 +160,7 @@ export function SearchButton() {
           {/* 搜索结果列表 */}
           <div style={{ minHeight: "300px", maxHeight: "400px", overflowY: "auto" }}>
             {searchValue.trim() && options.length === 0 ? (
-              <Empty
-                description="暂无数据"
-                image={Empty.PRESENTED_IMAGE_SIMPLE}
-                style={{ marginTop: "60px" }}
-              />
+              <Empty description="暂无数据" image={Empty.PRESENTED_IMAGE_SIMPLE} style={{ marginTop: "60px" }} />
             ) : options.length > 0 ? (
               <List
                 dataSource={options}
@@ -188,11 +181,7 @@ export function SearchButton() {
                 )}
               />
             ) : (
-              <Empty
-                description="请输入关键词搜索"
-                image={Empty.PRESENTED_IMAGE_SIMPLE}
-                style={{ marginTop: "60px" }}
-              />
+              <Empty description="请输入关键词搜索" image={Empty.PRESENTED_IMAGE_SIMPLE} style={{ marginTop: "60px" }} />
             )}
           </div>
 
@@ -211,10 +200,7 @@ export function SearchButton() {
             }}
           >
             <span>
-              <kbd style={{ padding: "2px 6px", background: "#f5f5f5", borderRadius: "3px" }}>
-                Enter
-              </kbd>{" "}
-              确认
+              <kbd style={{ padding: "2px 6px", background: "#f5f5f5", borderRadius: "3px" }}>Enter</kbd> 确认
             </span>
             <span>
               <kbd style={{ padding: "2px 6px", background: "#f5f5f5", borderRadius: "3px" }}>
@@ -226,10 +212,7 @@ export function SearchButton() {
               切换
             </span>
             <span>
-              <kbd style={{ padding: "2px 6px", background: "#f5f5f5", borderRadius: "3px" }}>
-                ESC
-              </kbd>{" "}
-              关闭
+              <kbd style={{ padding: "2px 6px", background: "#f5f5f5", borderRadius: "3px" }}>ESC</kbd> 关闭
             </span>
           </div>
         </div>

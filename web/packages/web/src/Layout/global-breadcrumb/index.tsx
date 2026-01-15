@@ -7,13 +7,13 @@ import { getTreeItemByProperty } from "@/utils/tree";
 
 export const GlobalBreadcrumb = memo(() => {
   const { items, selectedKeys, handleMenuClick } = useContext(MenuContext);
-
   const breadcrumb: { icon: React.ReactNode; label: string; children: { icon: React.ReactNode; label: string; key: string }[] }[] =
     useMemo(() => {
       return selectedKeys.map((key) => getTreeItemByProperty(items, "key", key));
     }, [selectedKeys]);
 
-  const breadcrumbItems: BreadcrumbProps["items"] = breadcrumb.map((item, index) => {
+  const breadcrumbItems: BreadcrumbProps["items"] = breadcrumb.map((item) => {
+    if (!item) return {};
     return {
       title: (
         <>

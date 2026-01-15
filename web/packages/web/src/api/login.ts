@@ -9,28 +9,28 @@ export const loginApi = {
    * 获取验证码
    */
   getCaptcha: (): Promise<ApiResponse<CaptchaResponse>> => {
-    return request.get("/api/login/captcha");
+    return request.get("/login/captcha");
   },
 
   /**
    * 用户登录
    */
   login: (data: LoginRequest): Promise<ApiResponse<LoginResponse>> => {
-    return request.post("/api/login", data);
+    return request.post("/login", data);
   },
 
   /**
    * 用户注册
    */
   register: (data: RegisterRequest): Promise<ApiResponse> => {
-    return request.post("/api/register", data);
+    return request.post("/register", data);
   },
 
   /**
    * 用户登出
    */
   logout: (): Promise<ApiResponse> => {
-    return request.post("/api/logout");
+    return request.post("/logout");
   },
 };
 

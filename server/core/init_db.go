@@ -17,6 +17,7 @@ func InitDb(db *gorm.DB) error {
 			&system.SysAuthority{},
 			&system.SysBaseMenu{},
 			&system.ExaFileUploadAndDownload{},
+			&system.JwtBlacklist{},
 			&business.Customer{},
 		); err != nil {
 			return err
