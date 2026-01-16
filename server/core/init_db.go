@@ -29,6 +29,25 @@ func InitDb(db *gorm.DB) error {
 			return err
 		}
 
+		// 初始化默认角色
+		var authorityTotal int64
+		if err := tx.Model(&system.SysAuthority{}).Count(&authorityTotal).Error; err != nil {
+			return err
+		}
+		if authorityTotal == 0 {
+			// 创建超级管理员角色
+			adminAuthority := system.SysAuthority{
+				AuthorityId:   "888",
+				AuthorityName: "超级管理员",
+				ParentId:      "0",
+				DefaultRouter: "dashboard",
+			}
+			if err := tx.Create(&adminAuthority).Error; err != nil {
+				return err
+			}
+			fmt.Println("InitSysAuthority success")
+		}
+
 		if total == 0 {
 			// Seed admin user
 			user := system.SysUser{

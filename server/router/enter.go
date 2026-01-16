@@ -105,6 +105,15 @@ func registerRouter(Router *gin.Engine) *gin.Engine {
 		privateGroup.POST("/authority", apiGroup.AuthorityApi.CreateAuthority)
 		privateGroup.PUT("/authority", apiGroup.AuthorityApi.UpdateAuthority)
 		privateGroup.DELETE("/authority", apiGroup.AuthorityApi.DeleteAuthority)
+		privateGroup.GET("/authority/getMenus", apiGroup.AuthorityApi.GetAuthorityMenus)
+		privateGroup.POST("/authority/setMenus", apiGroup.AuthorityApi.SetAuthorityMenus)
+	}
+	//菜单管理
+	{
+		privateGroup.GET("/menu/list", apiGroup.MenuApi.GetMenuList)
+		privateGroup.POST("/menu", apiGroup.MenuApi.CreateMenu)
+		privateGroup.PUT("/menu", apiGroup.MenuApi.UpdateMenu)
+		privateGroup.DELETE("/menu/:id", apiGroup.MenuApi.DeleteMenu)
 	}
 
 	Router.GET("/swagger/*any", ginSwagger.WrapHandler(swaggerFiles.Handler))

@@ -4,6 +4,7 @@ import (
 	"jiangyi.com/api/authority"
 	"jiangyi.com/api/customer"
 	"jiangyi.com/api/login"
+	"jiangyi.com/api/menu"
 	"jiangyi.com/api/upload"
 	"jiangyi.com/api/user"
 )
@@ -16,4 +17,5 @@ type Api struct {
 	UploadApi    upload.Api
 	LoginApi     login.Api
 	AuthorityApi authority.Api
+	MenuApi      menu.Api
 }

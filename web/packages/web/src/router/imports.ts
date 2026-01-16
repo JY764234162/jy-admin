@@ -72,6 +72,11 @@ export const dynamicLazyMap: Record<string, () => Promise<any>> = {
   // ========== 其他 ==========
   resume: () => import("@/pages/other/resume"),
 
+  // ========== 系统管理 ==========
+  user: () => import("@/pages/user"),
+  authority: () => import("@/pages/authority"),
+  menu: () => import("@/pages/menu"),
+
   // ========== 顶级页面 ==========
   home: () => import("@/pages/home"),
   ai: () => import("@/pages/ai"),

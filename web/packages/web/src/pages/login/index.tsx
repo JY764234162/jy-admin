@@ -12,7 +12,7 @@ import { localStg } from "@/utils/storage";
 import type { CaptchaResponse } from "@/api/types";
 import { initConstantRoute } from "@/store/slice/route";
 import { store } from "@/store";
-import { userSlice } from "@/store/slice/user";
+import { userSlice, getCurrentUserInfo } from "@/store/slice/user";
 
 interface LoginFormValues {
   username: string;
@@ -97,6 +97,9 @@ export const Component = () => {
         }
 
         message.success("登录成功！");
+        // 获取用户信息和菜单权限
+        await store.dispatch(getCurrentUserInfo());
+        // 初始化路由（会根据权限过滤）
         await store.dispatch(initConstantRoute());
         // 跳转到之前尝试访问的页面或首页
         const redirectPath = getRedirectPath();

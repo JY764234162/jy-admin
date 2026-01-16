@@ -51,6 +51,28 @@ export const authRoutes: ElegantConstRoute[] = [
       icon: "HomeOutlined",
     },
   },
+  // ========== 系统管理 ==========
+  {
+    path: "system",
+    handle: {
+      menuTitle: "系统管理",
+      icon: "SettingOutlined",
+    },
+    children: [
+      createLeafRoute("user", {
+        menuTitle: "用户管理",
+        keyWords: ["用户", "管理", "CRUD"],
+      }),
+      createLeafRoute("authority", {
+        menuTitle: "角色管理",
+        keyWords: ["角色", "权限", "RBAC"],
+      }),
+      createLeafRoute("menu", {
+        menuTitle: "菜单管理",
+        keyWords: ["菜单", "权限", "路由"],
+      }),
+    ],
+  },
   // ========== UI组件 ==========
   {
     path: "ui",
