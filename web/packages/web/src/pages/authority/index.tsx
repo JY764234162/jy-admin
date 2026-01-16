@@ -180,6 +180,60 @@ export const Component = () => {
     }));
   };
 
+  // 扩展Authority类型以支持树形结构
+  type AuthorityWithChildren = Authority & {
+    children?: AuthorityWithChildren[];
+  };
+
+  // 将角色列表转换为树形数据（用于Table树状显示）
+  const convertAuthoritiesToTableTreeData = (authorities: Authority[]): AuthorityWithChildren[] => {
+    // 构建角色映射
+    const authorityMap = new Map<string, AuthorityWithChildren>();
+    authorities.forEach((auth) => {
+      authorityMap.set(auth.authorityId, { ...auth });
+    });
+
+    // 构建树形结构
+    const treeData: AuthorityWithChildren[] = [];
+    authorities.forEach((auth) => {
+      const authority = authorityMap.get(auth.authorityId)!;
+      if (!auth.parentId || auth.parentId === "0" || auth.parentId === "") {
+        // 根节点
+        treeData.push(authority);
+      } else {
+        // 子节点
+        const parent = authorityMap.get(auth.parentId);
+        if (parent) {
+          if (!parent.children) {
+            parent.children = [];
+          }
+          parent.children.push(authority);
+        } else {
+          // 如果找不到父节点，也作为根节点处理
+          treeData.push(authority);
+        }
+      }
+    });
+
+    // 清理空的 children 数组，确保没有子节点的节点不显示展开按钮
+    const cleanChildren = (nodes: AuthorityWithChildren[]): AuthorityWithChildren[] => {
+      return nodes.map((node) => {
+        if (node.children && node.children.length > 0) {
+          return {
+            ...node,
+            children: cleanChildren(node.children),
+          };
+        } else {
+          // 如果没有子节点，移除 children 属性
+          const { children, ...rest } = node;
+          return rest;
+        }
+      });
+    };
+
+    return cleanChildren(treeData);
+  };
+
   // 将角色列表转换为树形数据（用于TreeSelect）
   const convertAuthoritiesToTreeData = (authorities: Authority[], excludeId?: string): any[] => {
     // 过滤掉当前编辑的角色，避免选择自己作为父级
@@ -237,7 +291,14 @@ export const Component = () => {
       dataIndex: "parentId",
       key: "parentId",
       width: 120,
-      render: (text: string) => text || "-",
+      render: (text: string) => {
+        if (!text || text === "0") {
+          return "根角色";
+        }
+        // 查找父角色名称
+        const parent = authorities.find((auth) => auth.authorityId === text);
+        return parent ? `${parent.authorityName} (${text})` : text;
+      },
     },
     {
       title: "默认路由",
@@ -285,7 +346,15 @@ export const Component = () => {
           </Button>
         </div>
 
-        <Table columns={columns} dataSource={authorities} rowKey="authorityId" loading={loading} scroll={{ x: 1000 }} />
+        <Table
+          columns={columns}
+          dataSource={convertAuthoritiesToTableTreeData(authorities)}
+          rowKey="authorityId"
+          loading={loading}
+          scroll={{ x: 1000 }}
+          pagination={false}
+          defaultExpandAllRows
+        />
       </Card>
 
       {/* 创建/编辑角色弹窗 */}
