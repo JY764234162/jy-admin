@@ -198,7 +198,7 @@ export const Component = () => {
     authorities.forEach((auth) => {
       const authority = authorityMap.get(auth.authorityId)!;
       if (!auth.parentId || auth.parentId === "0" || auth.parentId === "") {
-        // 根节点
+        // 根节点（parentId为"0"或空），直接作为顶级节点显示
         treeData.push(authority);
       } else {
         // 子节点
@@ -240,14 +240,10 @@ export const Component = () => {
     const filteredAuthorities = excludeId ? authorities.filter((auth) => auth.authorityId !== excludeId) : authorities;
 
     // 递归构建树形结构
-    const buildTree = (parentId: string | undefined): any[] => {
+    const buildTree = (parentId: string): any[] => {
       return filteredAuthorities
         .filter((auth) => {
-          // 如果parentId为空或"0"，查找根节点
-          if (!parentId || parentId === "0") {
-            return !auth.parentId || auth.parentId === "0" || auth.parentId === "";
-          }
-          // 否则查找指定parentId的子节点
+          // 查找指定parentId的子节点
           return auth.parentId === parentId;
         })
         .map((auth) => ({
@@ -258,17 +254,17 @@ export const Component = () => {
         }));
     };
 
-    // 构建树形结构，从根节点开始
-    const treeData = buildTree(undefined);
+    // 构建根角色的子节点（所有parentId为"0"或空的角色）
+    const rootChildren = buildTree("0");
 
-    // 在最前面添加"根角色"选项
+    // 返回根角色节点，其子节点是所有parentId为"0"的角色
     return [
       {
-        title: "根角色（无父级）",
+        title: "根角色",
         value: "0",
         key: "0",
+        children: rootChildren,
       },
-      ...treeData,
     ];
   };
 
@@ -404,11 +400,6 @@ export const Component = () => {
               treeData={convertAuthoritiesToTreeData(authorities, modalType === "edit" ? editingAuthority?.authorityId : undefined)}
               showSearch
               treeDefaultExpandAll
-              disabled={
-                modalType === "edit" && editingAuthority
-                  ? !editingAuthority.parentId || editingAuthority.parentId === "0"
-                  : false
-              }
               filterTreeNode={(inputValue, treeNode) => {
                 return (treeNode.title as string)?.toLowerCase().includes(inputValue.toLowerCase()) || false;
               }}
