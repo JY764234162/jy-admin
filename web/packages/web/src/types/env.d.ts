@@ -15,5 +15,11 @@ declare namespace Env {
     readonly VITE_BASENAME: string;
     //路由模式
     readonly VITE_ROUTE_MODE: "hash" | "history" | "memory";
+    //是否使用代理
+    readonly VITE_USE_PROXY: string;
+    //API基础地址
+    readonly VITE_API_BASE_URL: string;
+    //API路径前缀
+    readonly VITE_API_PREFIX: string;
   }
 }

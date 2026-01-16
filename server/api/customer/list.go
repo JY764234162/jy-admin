@@ -62,9 +62,9 @@ func (c *Api) GetCustomerList(ctx *gin.Context) {
 	}
 
 	common.OkWithDetailed(ctx, common.PageResult{
-		List:     customers,
-		Total:    count,
-		Page:     params.Page,
-		PageSize: params.PageSize,
+			List:     customers,
+			Total:    count,
+			Page:     params.Page,
+			PageSize: params.PageSize,
 	}, "查询成功")
 }

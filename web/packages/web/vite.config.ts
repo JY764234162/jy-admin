@@ -42,10 +42,21 @@ export default defineConfig(({ mode }: ConfigEnv) => {
     },
     server: {
       open: true,
+      port: 3000,
       hmr: {
         // 配置 HMR 连接
         host: "localhost",
         port: 3000,
+      },
+      proxy: {
+        // 代理 /api 路径到后端服务器
+        "/api": {
+          target: "http://localhost:7777",
+          changeOrigin: true,
+          rewrite: (path) => path, // 保持路径不变
+          // 如果需要，可以配置 websocket 代理
+          ws: true,
+        },
       },
     },
     base: VITE_BASENAME,

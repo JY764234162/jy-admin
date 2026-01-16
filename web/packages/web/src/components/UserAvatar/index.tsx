@@ -3,6 +3,7 @@ import { UserOutlined, LogoutOutlined, SettingOutlined } from "@ant-design/icons
 import { useNavigate } from "react-router-dom";
 import { useDispatch, useSelector } from "react-redux";
 import { localStg } from "@/utils/storage";
+import { getImageUrl } from "@/utils/image";
 import { loginApi } from "@/api";
 import { message } from "antd";
 import { userSlice } from "@/store/slice/user";
@@ -45,7 +46,7 @@ export const UserAvatar = () => {
     },
   ];
 
-  const avatarUrl = userInfo?.headerImg || undefined;
+  const avatarUrl = getImageUrl(userInfo?.headerImg);
   const displayName = userInfo?.nickName || userInfo?.username || "用户";
 
   return (

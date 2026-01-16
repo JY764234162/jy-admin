@@ -92,6 +92,7 @@ func registerRouter(Router *gin.Engine) *gin.Engine {
 		privateGroup.PUT("/user/profile", apiGroup.UserApi.UpdateProfile)
 		privateGroup.DELETE("/user/:id", apiGroup.UserApi.DeleteUser)
 		privateGroup.POST("/user/changePassword", apiGroup.UserApi.ChangePassword)
+		privateGroup.POST("/user/resetPassword", apiGroup.UserApi.ResetPassword)
 	}
 	//文件管理
 	{

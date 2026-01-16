@@ -71,6 +71,10 @@ export const authRoutes: ElegantConstRoute[] = [
         menuTitle: "菜单管理",
         keyWords: ["菜单", "权限", "路由"],
       }),
+      createLeafRoute("file", {
+        menuTitle: "文件管理",
+        keyWords: ["文件", "上传", "管理"],
+      }),
     ],
   },
   // ========== UI组件 ==========

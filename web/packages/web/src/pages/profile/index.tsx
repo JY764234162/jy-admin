@@ -5,6 +5,7 @@ import { useNavigate } from "react-router-dom";
 import { useDispatch, useSelector } from "react-redux";
 import { userApi, uploadApi } from "@/api";
 import { localStg } from "@/utils/storage";
+import { getImageUrl, getImagePath } from "@/utils/image";
 import type { ChangePasswordRequest, UpdateProfileRequest } from "@/api/types";
 import type { RcFile } from "antd/es/upload";
 import { userSlice } from "@/store/slice/user";
@@ -89,7 +90,7 @@ export const Component = () => {
     setUploading(true);
     try {
       const fileObj = file as RcFile;
-
+      
       // 验证文件类型
       const isImage = fileObj.type?.startsWith("image/");
       if (!isImage) {
@@ -116,37 +117,31 @@ export const Component = () => {
         throw new Error(uploadRes.msg || "文件上传失败");
       }
 
-      // 获取文件 URL（后端返回的 url 字段，格式为 uploads/file/filename）
-      let fileUrl = uploadRes.data.url || uploadRes.data.filePath;
-
-      // 如果 URL 不是完整路径，需要拼接 API 基础路径
-      if (fileUrl && !fileUrl.startsWith("http")) {
-        const BASE_URL = import.meta.env.VITE_API_BASE_URL || "http://localhost:7777";
-        const API_PREFIX = import.meta.env.VITE_API_PREFIX || "/api";
-        // 确保 URL 以 / 开头
-        if (!fileUrl.startsWith("/")) {
-          fileUrl = "/" + fileUrl;
-        }
-        // 拼接完整 URL（静态文件通过 API 前缀路径访问）
-        fileUrl = `${BASE_URL}${API_PREFIX}${fileUrl}`;
+      // 获取文件相对路径（后端返回的 url 字段，格式为 uploads/file/filename）
+      // 不拼接域名，直接保存相对路径到数据库
+      let filePath = uploadRes.data.url || uploadRes.data.filePath || "";
+        
+      // 确保路径格式正确（以 / 开头）
+      if (filePath && !filePath.startsWith("/")) {
+        filePath = "/" + filePath;
       }
 
-      // 调用 API 更新用户头像（需要同时传递 nickName）
+      // 调用 API 更新用户头像（保存相对路径，不拼接域名）
       const updateRes = await userApi.updateProfile({
         nickName: userInfo?.nickName || "",
-        headerImg: fileUrl,
+        headerImg: filePath, // 保存相对路径
       });
       if (updateRes.code !== 0 || !updateRes.data) {
         throw new Error(updateRes.msg || "更新头像失败");
-      }
+          }
 
-      // 更新表单字段
-      profileForm.setFieldsValue({ headerImg: fileUrl });
-
+      // 更新表单字段（使用相对路径，但这里不需要，因为已经通过 updateProfile 更新了）
+      // profileForm.setFieldsValue({ headerImg: filePath });
+        
       // 更新 Redux 中的用户信息
       dispatch(userSlice.actions.setUserInfo(updateRes.data));
-
-      message.success("头像上传成功");
+        
+        message.success("头像上传成功");
       onSuccess?.(uploadRes.data);
     } catch (error: any) {
       console.error("上传失败:", error);
@@ -178,7 +173,7 @@ export const Component = () => {
         <div className={styles.userInfoSection}>
           <div className={styles.avatarWrapper}>
             <Avatar
-              src={userInfo?.headerImg}
+              src={getImageUrl(userInfo?.headerImg)}
               icon={!userInfo?.headerImg ? <UserOutlined /> : undefined}
               size={80}
               className={styles.avatar}

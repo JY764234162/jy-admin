@@ -117,8 +117,8 @@ export interface FileInfo {
 
 export interface FileListParams {
   page?: number;
-  pageSize?: number;
-  fileName?: string;
+  page_size?: number;
+  keyword?: string;
 }
 
 /**

@@ -51,9 +51,9 @@ func (u *Api) GetFileList(c *gin.Context) {
 	}
 
 	common.OkWithDetailed(c, common.PageResult{
-		List:     files,
-		Total:    count,
-		Page:     params.Page,
-		PageSize: params.PageSize,
+			List:     files,
+			Total:    count,
+			Page:     params.Page,
+			PageSize: params.PageSize,
 	}, "查询成功")
 }

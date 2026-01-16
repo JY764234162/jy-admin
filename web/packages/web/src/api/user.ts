@@ -53,4 +53,11 @@ export const userApi = {
   updateProfile: (data: UpdateProfileRequest): Promise<ApiResponse<StorageType.UserInfo>> => {
     return request.put("/user/profile", data);
   },
+
+  /**
+   * 管理员重置用户密码
+   */
+  resetPassword: (data: { userId: number; newPassword: string }): Promise<ApiResponse> => {
+    return request.post("/user/resetPassword", data);
+  },
 };

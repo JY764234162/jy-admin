@@ -21,6 +21,7 @@ import {
   ApiOutlined,
   HomeOutlined,
   PlayCircleOutlined,
+  SettingOutlined,
 } from "@ant-design/icons";
 
 // Icon 映射表 - 将字符串标识符映射到组件
@@ -43,6 +44,7 @@ export const iconMap: Record<string, React.ComponentType<any>> = {
   ApiOutlined,
   HomeOutlined,
   PlayCircleOutlined,
+  SettingOutlined,
 };
 
 // 反序列化路由 - 将字符串标识符转换回 icon 组件

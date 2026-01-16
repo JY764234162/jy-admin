@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { Table, Button, Space, Modal, Form, Input, message, Popconfirm, Card, Tree, Checkbox } from "antd";
+import { Table, Button, Space, Modal, Form, Input, message, Popconfirm, Card, Tree, TreeSelect } from "antd";
 import { PlusOutlined, EditOutlined, DeleteOutlined, SettingOutlined } from "@ant-design/icons";
 import type { ColumnsType } from "antd/es/table";
 import { authorityApi, menuApi } from "@/api";
@@ -55,6 +55,10 @@ export const Component = () => {
     setModalType("create");
     setEditingAuthority(null);
     form.resetFields();
+    // 设置父角色默认值为"0"（根角色）
+    form.setFieldsValue({
+      parentId: "0",
+    });
     setModalVisible(true);
   };
 
@@ -62,10 +66,12 @@ export const Component = () => {
   const showEditModal = (authority: Authority) => {
     setModalType("edit");
     setEditingAuthority(authority);
+    // 如果parentId为空或0，表示是根节点
+    const parentId = authority.parentId && authority.parentId !== "0" ? authority.parentId : undefined;
     form.setFieldsValue({
       authorityId: authority.authorityId,
       authorityName: authority.authorityName,
-      parentId: authority.parentId || "",
+      parentId: parentId || "0", // 根节点使用"0"
       defaultRouter: authority.defaultRouter || "dashboard",
     });
     setModalVisible(true);
@@ -90,11 +96,14 @@ export const Component = () => {
   const handleSubmit = async () => {
     try {
       const values = await form.validateFields();
+      // 处理parentId：如果为空、undefined或"0"，则传递"0"（根节点）
+      const parentId = values.parentId && values.parentId !== "0" ? values.parentId : "0";
+
       if (modalType === "create") {
         const res = await authorityApi.createAuthority({
           authorityId: values.authorityId,
           authorityName: values.authorityName,
-          parentId: values.parentId || "0",
+          parentId: parentId,
           defaultRouter: values.defaultRouter || "dashboard",
         });
         if (res.code === 0) {
@@ -110,7 +119,7 @@ export const Component = () => {
         const res = await authorityApi.updateAuthority({
           ...editingAuthority,
           authorityName: values.authorityName,
-          parentId: values.parentId || "0",
+          parentId: parentId,
           defaultRouter: values.defaultRouter || "dashboard",
         });
         if (res.code === 0) {
@@ -171,6 +180,44 @@ export const Component = () => {
     }));
   };
 
+  // 将角色列表转换为树形数据（用于TreeSelect）
+  const convertAuthoritiesToTreeData = (authorities: Authority[], excludeId?: string): any[] => {
+    // 过滤掉当前编辑的角色，避免选择自己作为父级
+    const filteredAuthorities = excludeId ? authorities.filter((auth) => auth.authorityId !== excludeId) : authorities;
+
+    // 递归构建树形结构
+    const buildTree = (parentId: string | undefined): any[] => {
+      return filteredAuthorities
+        .filter((auth) => {
+          // 如果parentId为空或"0"，查找根节点
+          if (!parentId || parentId === "0") {
+            return !auth.parentId || auth.parentId === "0" || auth.parentId === "";
+          }
+          // 否则查找指定parentId的子节点
+          return auth.parentId === parentId;
+        })
+        .map((auth) => ({
+          title: `${auth.authorityName} (${auth.authorityId})`,
+          value: auth.authorityId,
+          key: auth.authorityId,
+          children: buildTree(auth.authorityId),
+        }));
+    };
+
+    // 构建树形结构，从根节点开始
+    const treeData = buildTree(undefined);
+
+    // 在最前面添加"根角色"选项
+    return [
+      {
+        title: "根角色（无父级）",
+        value: "0",
+        key: "0",
+      },
+      ...treeData,
+    ];
+  };
+
   // 表格列定义
   const columns: ColumnsType<Authority> = [
     {
@@ -215,20 +262,10 @@ export const Component = () => {
           <Button type="link" icon={<EditOutlined />} onClick={() => showEditModal(record)} size="small">
             编辑
           </Button>
-          <Button
-            type="link"
-            icon={<SettingOutlined />}
-            onClick={() => showPermissionModal(record)}
-            size="small"
-          >
+          <Button type="link" icon={<SettingOutlined />} onClick={() => showPermissionModal(record)} size="small">
             权限
           </Button>
-          <Popconfirm
-            title="确定要删除这个角色吗？"
-            onConfirm={() => handleDelete(record.authorityId)}
-            okText="确定"
-            cancelText="取消"
-          >
+          <Popconfirm title="确定要删除这个角色吗？" onConfirm={() => handleDelete(record.authorityId)} okText="确定" cancelText="取消">
             <Button type="link" danger icon={<DeleteOutlined />} size="small">
               删除
             </Button>
@@ -248,13 +285,7 @@ export const Component = () => {
           </Button>
         </div>
 
-        <Table
-          columns={columns}
-          dataSource={authorities}
-          rowKey="authorityId"
-          loading={loading}
-          scroll={{ x: 1000 }}
-        />
+        <Table columns={columns} dataSource={authorities} rowKey="authorityId" loading={loading} scroll={{ x: 1000 }} />
       </Card>
 
       {/* 创建/编辑角色弹窗 */}
@@ -291,8 +322,28 @@ export const Component = () => {
             <Input placeholder="请输入角色名称" />
           </Form.Item>
 
-          <Form.Item name="parentId" label="父角色ID">
-            <Input placeholder="请输入父角色ID（可选，默认为0）" />
+          <Form.Item
+            name="parentId"
+            label="父角色"
+            rules={[
+              { required: true, message: "请选择父角色" },
+            ]}
+            initialValue="0"
+          >
+            <TreeSelect
+              placeholder="请选择父角色"
+              treeData={convertAuthoritiesToTreeData(authorities, modalType === "edit" ? editingAuthority?.authorityId : undefined)}
+              showSearch
+              treeDefaultExpandAll
+              disabled={
+                modalType === "edit" && editingAuthority
+                  ? !editingAuthority.parentId || editingAuthority.parentId === "0"
+                  : false
+              }
+              filterTreeNode={(inputValue, treeNode) => {
+                return (treeNode.title as string)?.toLowerCase().includes(inputValue.toLowerCase()) || false;
+              }}
+            />
           </Form.Item>
 
           <Form.Item name="defaultRouter" label="默认路由">
@@ -328,4 +379,3 @@ export const Component = () => {
     </div>
   );
 };
-
