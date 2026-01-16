@@ -21,6 +21,8 @@ func main() {
 		core.RegisterTables()
 		// 从数据库加载黑名单到内存缓存
 		core.LoadBlacklistFromDB()
+		// 启动JWT token清理定时任务（每天凌晨执行一次）
+		go core.StartJwtCleanupTask()
 		// close db connection logic if needed
 		sqlDB, _ := global.JY_DB.DB()
 		defer sqlDB.Close()

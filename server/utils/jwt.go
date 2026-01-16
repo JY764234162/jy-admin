@@ -2,6 +2,8 @@ package utils
 
 import (
 	"errors"
+	"strconv"
+	"strings"
 	"time"
 
 	"github.com/golang-jwt/jwt/v5"
@@ -44,6 +46,7 @@ func (j *JWT) ParseToken(authorization string) (*CustomClaims, error) {
 
 	// 按标准 Bearer <token> 格式处理
 	var tokenString string
+
 	if len(authorization) > 7 && authorization[:7] == "Bearer " {
 		tokenString = authorization[7:]
 	} else {
@@ -94,7 +97,24 @@ func CreateClaims(baseClaims CustomClaims) CustomClaims {
 	return claims
 }
 
-// ParseDuration 解析时间
 func ParseDuration(d string) (time.Duration, error) {
-	return time.ParseDuration(d)
+	d = strings.TrimSpace(d)
+	dr, err := time.ParseDuration(d)
+	if err == nil {
+		return dr, nil
+	}
+	if strings.Contains(d, "d") {
+		index := strings.Index(d, "d")
+
+		hour, _ := strconv.Atoi(d[:index])
+		dr = time.Hour * 24 * time.Duration(hour)
+		ndr, err := time.ParseDuration(d[index+1:])
+		if err != nil {
+			return dr, nil
+		}
+		return dr + ndr, nil
+	}
+
+	dv, err := strconv.ParseInt(d, 10, 64)
+	return time.Duration(dv), err
 }
