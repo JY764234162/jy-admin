@@ -1,8 +1,6 @@
 package customer
 
 import (
-	"net/http"
-
 	"github.com/gin-gonic/gin"
 	"jiangyi.com/global"
 	"jiangyi.com/model/business"
@@ -29,11 +27,7 @@ func (c *Api) GetCustomerList(ctx *gin.Context) {
 	var params CustomerListRequest
 	var err error
 	if err = ctx.ShouldBindQuery(&params); err != nil {
-		ctx.JSON(http.StatusOK, gin.H{
-			"code": 404,
-			"data": nil,
-			"msg":  "绑定失败",
-		})
+		common.FailWithMsg(ctx, "绑定失败")
 		return
 	}
 
@@ -57,32 +51,20 @@ func (c *Api) GetCustomerList(ctx *gin.Context) {
 	// 统计总数
 	err = query.Count(&count).Error
 	if err != nil {
-		ctx.JSON(http.StatusOK, gin.H{
-			"code": 404,
-			"data": nil,
-			"msg":  "查询失败",
-		})
+		common.FailWithMsg(ctx, "查询失败")
 		return
 	}
 
 	// 分页查询
 	if err = query.Limit(params.PageSize).Offset((params.Page - 1) * params.PageSize).Find(&customers).Error; err != nil {
-		ctx.JSON(http.StatusOK, gin.H{
-			"code": 404,
-			"data": nil,
-			"msg":  "查询失败",
-		})
+		common.FailWithMsg(ctx, "查询失败")
 		return
 	}
 
-	ctx.JSON(http.StatusOK, common.Response{
-		Code: http.StatusOK,
-		Data: common.PageResult{
-			List:     customers,
-			Total:    count,
-			Page:     params.Page,
-			PageSize: params.PageSize,
-		},
-		Msg: "查询成功",
-	})
+	common.OkWithDetailed(ctx, common.PageResult{
+		List:     customers,
+		Total:    count,
+		Page:     params.Page,
+		PageSize: params.PageSize,
+	}, "查询成功")
 }

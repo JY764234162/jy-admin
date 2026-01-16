@@ -2,13 +2,13 @@ package upload
 
 import (
 	"errors"
-	"net/http"
 	"strconv"
 	"strings"
 
 	"github.com/gin-gonic/gin"
 	"gorm.io/gorm"
 	"jiangyi.com/global"
+	"jiangyi.com/model/common"
 	"jiangyi.com/model/system"
 	"jiangyi.com/utils/upload"
 )
@@ -29,19 +29,13 @@ func (u *Api) UploadFile(c *gin.Context) {
 	_, header, err := c.Request.FormFile("file")
 	classId, _ := strconv.Atoi(c.DefaultPostForm("classId", "0"))
 	if err != nil {
-		c.JSON(200, gin.H{
-			"code": 404,
-			"msg":  "未接收到文件",
-		})
+		common.FailWithMsg(c, "未接收到文件")
 		return
 	}
 	oss := upload.NewOss()
 	filePath, key, uploadErr := oss.UploadFile(header)
 	if uploadErr != nil {
-		c.JSON(200, gin.H{
-			"code": 404,
-			"msg":  "写入oss文件失败",
-		})
+		common.FailWithMsg(c, "写入oss文件失败")
 		return
 	}
 	s := strings.Split(header.Filename, ".")
@@ -60,23 +54,13 @@ func (u *Api) UploadFile(c *gin.Context) {
 	if errors.Is(err, gorm.ErrRecordNotFound) {
 		err = global.JY_DB.Create(&file).Error
 		if err != nil {
-			c.JSON(200, gin.H{
-				"code": 404,
-				"msg":  "写入数据库失败",
-			})
+			common.FailWithMsg(c, "写入数据库失败")
 			return
 		}
 	} else {
-		c.JSON(200, gin.H{
-			"code": 404,
-			"msg":  "文件已存在",
-		})
+		common.FailWithMsg(c, "文件已存在")
 		return
 	}
 
-	c.JSON(http.StatusOK, gin.H{
-		"code": http.StatusOK,
-		"data": file,
-		"msg":  "上传成功",
-	})
+	common.OkWithDetailed(c, file, "上传成功")
 }

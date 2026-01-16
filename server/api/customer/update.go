@@ -1,12 +1,11 @@
 package customer
 
 import (
-	"net/http"
-
 	"github.com/gin-gonic/gin"
 	"gorm.io/gorm"
 	"jiangyi.com/global"
 	"jiangyi.com/model/business"
+	"jiangyi.com/model/common"
 )
 
 type UpdateCustomerRequest struct {
@@ -29,11 +28,7 @@ type UpdateCustomerRequest struct {
 func (c *Api) UpdateCustomer(ctx *gin.Context) {
 	var req UpdateCustomerRequest
 	if err := ctx.ShouldBindJSON(&req); err != nil {
-		ctx.JSON(http.StatusOK, gin.H{
-			"code": 404,
-			"data": nil,
-			"msg":  "绑定失败",
-		})
+		common.FailWithMsg(ctx, "绑定失败")
 		return
 	}
 
@@ -41,18 +36,10 @@ func (c *Api) UpdateCustomer(ctx *gin.Context) {
 	// 先查询客户是否存在
 	if err := global.JY_DB.First(&customer, req.ID).Error; err != nil {
 		if err == gorm.ErrRecordNotFound {
-			ctx.JSON(http.StatusOK, gin.H{
-				"code": 404,
-				"data": nil,
-				"msg":  "客户不存在",
-			})
+			common.FailWithMsg(ctx, "客户不存在")
 			return
 		}
-		ctx.JSON(http.StatusOK, gin.H{
-			"code": 404,
-			"data": nil,
-			"msg":  "查询失败",
-		})
+		common.FailWithMsg(ctx, "查询失败")
 		return
 	}
 
@@ -69,20 +56,12 @@ func (c *Api) UpdateCustomer(ctx *gin.Context) {
 	}
 
 	if err := global.JY_DB.Model(&customer).Updates(updateData).Error; err != nil {
-		ctx.JSON(http.StatusOK, gin.H{
-			"code": 404,
-			"data": nil,
-			"msg":  "更新失败",
-		})
+		common.FailWithMsg(ctx, "更新失败")
 		return
 	}
 
 	// 重新查询更新后的数据
 	global.JY_DB.First(&customer, req.ID)
 
-	ctx.JSON(http.StatusOK, gin.H{
-		"code": http.StatusOK,
-		"data": customer,
-		"msg":  "更新成功",
-	})
+	common.OkWithDetailed(ctx, customer, "更新成功")
 }

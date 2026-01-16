@@ -1,8 +1,6 @@
 package upload
 
 import (
-	"net/http"
-
 	"github.com/gin-gonic/gin"
 	"jiangyi.com/global"
 	"jiangyi.com/model/common"
@@ -29,11 +27,7 @@ func (u *Api) GetFileList(c *gin.Context) {
 	var params FileListRequest
 	var err error
 	if err = c.ShouldBindQuery(&params); err != nil {
-		c.JSON(http.StatusOK, gin.H{
-			"code": 404,
-			"data": nil,
-			"msg":  "绑定失败",
-		})
+		common.FailWithMsg(c, "绑定失败")
 		return
 	}
 	// 设置默认值
@@ -47,31 +41,19 @@ func (u *Api) GetFileList(c *gin.Context) {
 	var count int64
 	err = global.JY_DB.Model(&system.ExaFileUploadAndDownload{}).Where("name LIKE ?", "%"+params.Keyword+"%").Count(&count).Error
 	if err != nil {
-		c.JSON(http.StatusOK, gin.H{
-			"code": 404,
-			"data": nil,
-			"msg":  "查询失败",
-		})
+		common.FailWithMsg(c, "查询失败")
 		return
 	}
 
 	if err = global.JY_DB.Find(&files).Limit(params.PageSize).Offset((params.Page - 1) * params.PageSize).Error; err != nil {
-		c.JSON(http.StatusOK, gin.H{
-			"code": 404,
-			"data": nil,
-			"msg":  "查询失败",
-		})
+		common.FailWithMsg(c, "查询失败")
 		return
 	}
 
-	c.JSON(http.StatusOK, common.Response{
-		Code: http.StatusOK,
-		Data: common.PageResult{
-			List:     files,
-			Total:    count,
-			Page:     params.Page,
-			PageSize: params.PageSize,
-		},
-		Msg: "查询成功",
-	})
+	common.OkWithDetailed(c, common.PageResult{
+		List:     files,
+		Total:    count,
+		Page:     params.Page,
+		PageSize: params.PageSize,
+	}, "查询成功")
 }

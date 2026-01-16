@@ -43,7 +43,7 @@ service.interceptors.response.use(
   (response: AxiosResponse) => {
     const res = response.data;
 
-    // 如果返回的状态码不是 200，说明服务端返回了错误
+    // 判断 API 是否成功（标准：code === 0 表示成功）
     if (res.code !== undefined && res.code !== 0) {
       message.error(res.msg || "请求失败");
 

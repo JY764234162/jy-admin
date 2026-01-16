@@ -19,13 +19,12 @@ export const Component = () => {
   const [uploading, setUploading] = useState(false);
   const [profileForm] = Form.useForm<UpdateProfileRequest>();
   const [passwordForm] = Form.useForm<ChangePasswordRequest>();
-  
+
   useEffect(() => {
     // 从 Redux 获取用户信息
     if (userInfo) {
       profileForm.setFieldsValue({
         nickName: userInfo.nickName,
-        headerImg: userInfo.headerImg,
       });
     } else {
       // 如果没有，尝试从 API 获取
@@ -41,7 +40,6 @@ export const Component = () => {
         dispatch(userSlice.actions.setUserInfo(res.data));
         profileForm.setFieldsValue({
           nickName: res.data.nickName,
-          headerImg: res.data.headerImg,
         });
       }
     } catch (error) {
@@ -88,16 +86,16 @@ export const Component = () => {
 
   // 处理头像上传
   const handleAvatarUpload: UploadProps["customRequest"] = async ({ file, onSuccess, onError }) => {
-    console.log("handleAvatarUpload 被调用", file);
     setUploading(true);
     try {
       const fileObj = file as RcFile;
-      
+
       // 验证文件类型
       const isImage = fileObj.type?.startsWith("image/");
       if (!isImage) {
+        const error = new Error("只能上传图片文件！");
         message.error("只能上传图片文件！");
-        onError?.(new Error("只能上传图片文件"));
+        onError?.(error);
         setUploading(false);
         return;
       }
@@ -105,45 +103,51 @@ export const Component = () => {
       // 验证文件大小（限制为 5MB）
       const isLt5M = fileObj.size / 1024 / 1024 < 5;
       if (!isLt5M) {
+        const error = new Error("图片大小不能超过 5MB！");
         message.error("图片大小不能超过 5MB！");
-        onError?.(new Error("图片大小不能超过 5MB"));
+        onError?.(error);
         setUploading(false);
         return;
       }
 
-      console.log("开始上传文件", fileObj.name);
       // 上传文件
-      const res = await uploadApi.uploadFile(fileObj);
-      console.log("上传响应", res);
-      if (res.code === 0 && res.data) {
-        // 获取文件 URL（后端返回的 url 字段，格式为 uploads/file/filename）
-        let fileUrl = res.data.url || res.data.filePath;
-        
-        // 如果 URL 不是完整路径，需要拼接 API 基础路径
-        if (fileUrl && !fileUrl.startsWith("http")) {
-          const BASE_URL = import.meta.env.VITE_API_BASE_URL || "http://localhost:7777";
-          const API_PREFIX = import.meta.env.VITE_API_PREFIX || "/api";
-          // 确保 URL 以 / 开头
-          if (!fileUrl.startsWith("/")) {
-            fileUrl = "/" + fileUrl;
-          }
-          // 拼接完整 URL（静态文件通过 API 前缀路径访问）
-          fileUrl = `${BASE_URL}${API_PREFIX}${fileUrl}`;
-        }
-        
-        // 更新表单字段
-        profileForm.setFieldsValue({ headerImg: fileUrl });
-        
-        // 立即更新 Redux 中的用户信息（头像）
-        if (userInfo) {
-          dispatch(userSlice.actions.updateUserInfo({ headerImg: fileUrl }));
-        }
-        
-        message.success("头像上传成功");
-        onSuccess?.(res.data);
-      } else {
-        throw new Error(res.msg || "上传失败");
+      const uploadRes = await uploadApi.uploadFile(fileObj);
+      if (uploadRes.code !== 0 || !uploadRes.data) {
+        throw new Error(uploadRes.msg || "文件上传失败");
       }
+
+      // 获取文件 URL（后端返回的 url 字段，格式为 uploads/file/filename）
+      let fileUrl = uploadRes.data.url || uploadRes.data.filePath;
+
+      // 如果 URL 不是完整路径，需要拼接 API 基础路径
+      if (fileUrl && !fileUrl.startsWith("http")) {
+        const BASE_URL = import.meta.env.VITE_API_BASE_URL || "http://localhost:7777";
+        const API_PREFIX = import.meta.env.VITE_API_PREFIX || "/api";
+        // 确保 URL 以 / 开头
+        if (!fileUrl.startsWith("/")) {
+          fileUrl = "/" + fileUrl;
+        }
+        // 拼接完整 URL（静态文件通过 API 前缀路径访问）
+        fileUrl = `${BASE_URL}${API_PREFIX}${fileUrl}`;
+      }
+
+      // 调用 API 更新用户头像（需要同时传递 nickName）
+      const updateRes = await userApi.updateProfile({
+        nickName: userInfo?.nickName || "",
+        headerImg: fileUrl,
+      });
+      if (updateRes.code !== 0 || !updateRes.data) {
+        throw new Error(updateRes.msg || "更新头像失败");
+      }
+
+      // 更新表单字段
+      profileForm.setFieldsValue({ headerImg: fileUrl });
+
+      // 更新 Redux 中的用户信息
+      dispatch(userSlice.actions.setUserInfo(updateRes.data));
+
+      message.success("头像上传成功");
+      onSuccess?.(uploadRes.data);
     } catch (error: any) {
       console.error("上传失败:", error);
       message.error(error.message || "头像上传失败");
@@ -179,20 +183,8 @@ export const Component = () => {
               size={80}
               className={styles.avatar}
             />
-            <Upload
-              customRequest={handleAvatarUpload}
-              beforeUpload={beforeUpload}
-              showUploadList={false}
-              accept="image/*"
-              maxCount={1}
-            >
-              <Button
-                type="primary"
-                icon={<UploadOutlined />}
-                loading={uploading}
-                size="small"
-                style={{ marginTop: 8 }}
-              >
+            <Upload customRequest={handleAvatarUpload} beforeUpload={beforeUpload} showUploadList={false} accept="image/*" maxCount={1}>
+              <Button type="primary" icon={<UploadOutlined />} loading={uploading} size="small" style={{ marginTop: 8 }}>
                 上传头像
               </Button>
             </Upload>
@@ -219,7 +211,6 @@ export const Component = () => {
             >
               <Input prefix={<UserOutlined />} placeholder="请输入昵称" />
             </Form.Item>
-
 
             <Form.Item>
               <Button type="primary" htmlType="submit" loading={loading} icon={<SaveOutlined />}>

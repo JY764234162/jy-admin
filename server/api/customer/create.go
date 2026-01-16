@@ -1,11 +1,10 @@
 package customer
 
 import (
-	"net/http"
-
 	"github.com/gin-gonic/gin"
 	"jiangyi.com/global"
 	"jiangyi.com/model/business"
+	"jiangyi.com/model/common"
 )
 
 type CreateCustomerRequest struct {
@@ -27,11 +26,7 @@ type CreateCustomerRequest struct {
 func (c *Api) CreateCustomer(ctx *gin.Context) {
 	var req CreateCustomerRequest
 	if err := ctx.ShouldBindJSON(&req); err != nil {
-		ctx.JSON(http.StatusOK, gin.H{
-			"code": 404,
-			"data": nil,
-			"msg":  "绑定失败",
-		})
+		common.FailWithMsg(ctx, "绑定失败")
 		return
 	}
 
@@ -42,17 +37,9 @@ func (c *Api) CreateCustomer(ctx *gin.Context) {
 	}
 
 	if err := global.JY_DB.Create(&customer).Error; err != nil {
-		ctx.JSON(http.StatusOK, gin.H{
-			"code": 404,
-			"data": nil,
-			"msg":  "创建失败",
-		})
+		common.FailWithMsg(ctx, "创建失败")
 		return
 	}
 
-	ctx.JSON(http.StatusOK, gin.H{
-		"code": http.StatusOK,
-		"data": customer,
-		"msg":  "创建成功",
-	})
+	common.OkWithDetailed(ctx, customer, "创建成功")
 }
