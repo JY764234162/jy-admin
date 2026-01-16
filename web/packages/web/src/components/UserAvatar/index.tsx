@@ -1,16 +1,16 @@
 import { Avatar, Dropdown, MenuProps } from "antd";
 import { UserOutlined, LogoutOutlined, SettingOutlined } from "@ant-design/icons";
 import { useNavigate } from "react-router-dom";
+import { useDispatch, useSelector } from "react-redux";
 import { localStg } from "@/utils/storage";
 import { loginApi } from "@/api";
 import { message } from "antd";
+import { userSlice } from "@/store/slice/user";
 
-interface UserAvatarProps {
-  userInfo: StorageType.UserInfo | null;
-}
-
-export const UserAvatar = ({ userInfo }: UserAvatarProps) => {
+export const UserAvatar = () => {
   const navigate = useNavigate();
+  const dispatch = useDispatch();
+  const userInfo = useSelector(userSlice.selectors.getUserInfo);
 
   const handleLogout = async () => {
     try {
@@ -19,7 +19,7 @@ export const UserAvatar = ({ userInfo }: UserAvatarProps) => {
       console.error("登出失败:", error);
     } finally {
       localStg.remove("token");
-      localStg.remove("userInfo");
+      dispatch(userSlice.actions.clearUserInfo());
       message.success("已退出登录");
       navigate("/login", { replace: true });
     }

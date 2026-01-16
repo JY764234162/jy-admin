@@ -12,6 +12,7 @@ import { localStg } from "@/utils/storage";
 import type { CaptchaResponse } from "@/api/types";
 import { initConstantRoute } from "@/store/slice/route";
 import { store } from "@/store";
+import { userSlice } from "@/store/slice/user";
 
 interface LoginFormValues {
   username: string;
@@ -78,9 +79,10 @@ export const Component = () => {
       });
 
       if (res.code === 0 && res.data) {
-        // 存储 token 和用户信息
+        // 存储 token
         localStg.set("token", res.data.token);
-        localStg.set("userInfo", res.data.user);
+        // 将用户信息存储到 Redux（会自动同步到 localStorage）
+        store.dispatch(userSlice.actions.setUserInfo(res.data.user));
 
         // 处理"记住我"功能
         if (values.remember) {

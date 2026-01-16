@@ -1,6 +1,8 @@
 import axios, { AxiosInstance, InternalAxiosRequestConfig, AxiosResponse, AxiosError } from "axios";
 import { message } from "antd";
 import { localStg } from "./storage";
+import { store } from "@/store";
+import { userSlice } from "@/store/slice/user";
 
 // API 基础地址
 const BASE_URL = import.meta.env.VITE_API_BASE_URL || "http://localhost:7777";
@@ -47,9 +49,9 @@ service.interceptors.response.use(
 
       // 401: Token 过期或未登录
       if (res.code === 401 || response.status === 401) {
-        // 清除 token 并跳转到登录页
+        // 清除 token 和用户信息
         localStg.remove("token");
-        localStg.remove("userInfo");
+        store.dispatch(userSlice.actions.clearUserInfo());
         window.location.href = "/login";
       }
 
@@ -68,7 +70,7 @@ service.interceptors.response.use(
         case 401:
           message.error("未登录或登录已过期，请重新登录");
           localStg.remove("token");
-          localStg.remove("userInfo");
+          store.dispatch(userSlice.actions.clearUserInfo());
           window.location.href = "/login";
           break;
         case 403:

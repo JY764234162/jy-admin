@@ -2,42 +2,43 @@ import { useState, useEffect } from "react";
 import { Form, Input, Button, Card, message, Avatar, Divider, Upload, UploadProps } from "antd";
 import { UserOutlined, LockOutlined, SaveOutlined, UploadOutlined } from "@ant-design/icons";
 import { useNavigate } from "react-router-dom";
+import { useDispatch, useSelector } from "react-redux";
 import { userApi, uploadApi } from "@/api";
 import { localStg } from "@/utils/storage";
 import type { ChangePasswordRequest, UpdateProfileRequest } from "@/api/types";
 import type { RcFile } from "antd/es/upload";
+import { userSlice } from "@/store/slice/user";
 import styles from "./index.module.css";
 
 export const Component = () => {
   const navigate = useNavigate();
+  const dispatch = useDispatch();
+  const userInfo = useSelector(userSlice.selectors.getUserInfo);
   const [loading, setLoading] = useState(false);
   const [passwordLoading, setPasswordLoading] = useState(false);
   const [uploading, setUploading] = useState(false);
-  const [userInfo, setUserInfo] = useState<StorageType.UserInfo | null>(null);
   const [profileForm] = Form.useForm<UpdateProfileRequest>();
   const [passwordForm] = Form.useForm<ChangePasswordRequest>();
-
+  
   useEffect(() => {
-    // 从 localStorage 获取用户信息
-    const storedUserInfo = localStg.get("userInfo");
-    if (storedUserInfo) {
-      setUserInfo(storedUserInfo);
+    // 从 Redux 获取用户信息
+    if (userInfo) {
       profileForm.setFieldsValue({
-        nickName: storedUserInfo.nickName,
-        headerImg: storedUserInfo.headerImg,
+        nickName: userInfo.nickName,
+        headerImg: userInfo.headerImg,
       });
     } else {
       // 如果没有，尝试从 API 获取
       fetchUserInfo();
     }
-  }, []);
+  }, [userInfo]);
 
   const fetchUserInfo = async () => {
     try {
       const res = await userApi.getCurrentUser();
       if (res.code === 0 && res.data) {
-        setUserInfo(res.data);
-        localStg.set("userInfo", res.data);
+        // 更新 Redux 中的用户信息
+        dispatch(userSlice.actions.setUserInfo(res.data));
         profileForm.setFieldsValue({
           nickName: res.data.nickName,
           headerImg: res.data.headerImg,
@@ -54,8 +55,8 @@ export const Component = () => {
       const res = await userApi.updateProfile(values);
       if (res.code === 0 && res.data) {
         message.success("更新成功");
-        setUserInfo(res.data);
-        localStg.set("userInfo", res.data);
+        // 更新 Redux 中的用户信息
+        dispatch(userSlice.actions.setUserInfo(res.data));
       }
     } catch (error: any) {
       console.error("更新失败:", error);
@@ -74,7 +75,7 @@ export const Component = () => {
         // 延迟跳转，让用户看到成功消息
         setTimeout(() => {
           localStg.remove("token");
-          localStg.remove("userInfo");
+          dispatch(userSlice.actions.clearUserInfo());
           navigate("/login", { replace: true });
         }, 1500);
       }
@@ -133,11 +134,9 @@ export const Component = () => {
         // 更新表单字段
         profileForm.setFieldsValue({ headerImg: fileUrl });
         
-        // 立即更新用户信息显示
+        // 立即更新 Redux 中的用户信息（头像）
         if (userInfo) {
-          const updatedUserInfo = { ...userInfo, headerImg: fileUrl };
-          setUserInfo(updatedUserInfo);
-          localStg.set("userInfo", updatedUserInfo);
+          dispatch(userSlice.actions.updateUserInfo({ headerImg: fileUrl }));
         }
         
         message.success("头像上传成功");

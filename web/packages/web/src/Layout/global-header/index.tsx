@@ -13,19 +13,18 @@ import { MenuFoldOutlined, MenuUnfoldOutlined } from "@ant-design/icons";
 import { layoutSlice } from "@/store/slice/layout";
 import { GlobalBreadcrumb } from "../global-breadcrumb";
 import { UserAvatar } from "@/components/UserAvatar";
-import { localStg } from "@/utils/storage";
+import { userSlice } from "@/store/slice/user";
 // console.log(Object.entries(modules));
 
 export const GlobalHeader = memo(() => {
   const settings = useSelector(settingSlice.selectors.getSettings);
   const layoutSetting = useSelector(layoutSlice.selectors.getLayoutSetting);
+  const userInfo = useSelector(userSlice.selectors.getUserInfo);
   const dispatch = useDispatch();
 
   const toggleCollapsed = () => {
     dispatch(layoutSlice.actions.setIsCollapsed(!layoutSetting.isCollapsed));
   };
-
-  const userInfo = (localStg.get("userInfo") as StorageType.UserInfo) || null;
 
   const ButtonListRender = useMemo(() => {
     return (
@@ -34,10 +33,10 @@ export const GlobalHeader = memo(() => {
         <FullScreenButton />
         <SwitchThemeButton />
         <SettingButton />
-        <UserAvatar userInfo={userInfo} />
+        <UserAvatar />
       </>
     );
-  }, [userInfo]);
+  }, []);
 
   return settings.layout.mode === "vertical" ? (
     <Header
