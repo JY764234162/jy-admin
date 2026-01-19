@@ -1,11 +1,16 @@
 package system
 
 import (
+	"time"
+
 	"gorm.io/gorm"
 )
 
 type SysAuthority struct {
-	gorm.Model
+	ID            uint           `gorm:"primarykey" json:"ID"`
+	CreatedAt     time.Time      `json:"createdAt"`
+	UpdatedAt     time.Time      `json:"updatedAt"`
+	DeletedAt     gorm.DeletedAt `gorm:"index" json:"-"`
 	AuthorityId   string         `json:"authorityId" gorm:"not null;unique;primary_key;comment:角色ID"` // 角色ID
 	AuthorityName string         `json:"authorityName" gorm:"comment:角色名"`                            // 角色名
 	ParentId      string         `json:"parentId" gorm:"comment:父角色ID"`                               // 父角色ID

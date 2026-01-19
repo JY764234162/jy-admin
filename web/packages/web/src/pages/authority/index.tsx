@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { Table, Button, Space, Modal, Form, Input, message, Popconfirm, Card, Tree, TreeSelect } from "antd";
+import { Table, Button, Space, Modal, Form, Input, message, Popconfirm, Card, Tree, TreeSelect, Flex } from "antd";
 import { PlusOutlined, EditOutlined, DeleteOutlined, SettingOutlined } from "@ant-design/icons";
 import type { ColumnsType } from "antd/es/table";
 import { authorityApi, menuApi } from "@/api";
@@ -321,7 +321,16 @@ export const Component = () => {
       dataIndex: "createdAt",
       key: "createdAt",
       width: 180,
-      render: (text: string) => (text ? new Date(text).toLocaleString() : "-"),
+      render: (text: string, record: Authority) => {
+        // 兼容不同的字段名格式
+        const createdAt = text || (record as any).CreatedAt || (record as any).created_at;
+        if (!createdAt) return "-";
+        try {
+          return new Date(createdAt).toLocaleString("zh-CN");
+        } catch (error) {
+          return createdAt;
+        }
+      },
     },
     {
       title: "操作",
@@ -329,19 +338,19 @@ export const Component = () => {
       width: 200,
       fixed: "right",
       render: (_, record) => (
-        <Space size="middle">
-          <Button type="link" icon={<EditOutlined />} onClick={() => showEditModal(record)} size="small">
+        <Flex gap="small">
+          <Button type="link" onClick={() => showEditModal(record)} size="small">
             编辑
           </Button>
-          <Button type="link" icon={<SettingOutlined />} onClick={() => showPermissionModal(record)} size="small">
+          <Button type="link" onClick={() => showPermissionModal(record)} size="small">
             权限
           </Button>
           <Popconfirm title="确定要删除这个角色吗？" onConfirm={() => handleDelete(record.authorityId)} okText="确定" cancelText="取消">
-            <Button type="link" danger icon={<DeleteOutlined />} size="small">
+            <Button type="link" danger size="small">
               删除
             </Button>
           </Popconfirm>
-        </Space>
+        </Flex>
       ),
     },
   ];

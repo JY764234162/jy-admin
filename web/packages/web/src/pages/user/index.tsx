@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { Table, Button, Space, Modal, Form, message, Avatar, Popconfirm, Card, Input, Upload, Image, Select } from "antd";
+import { Table, Button, Space, Modal, Form, message, Avatar, Popconfirm, Card, Input, Upload, Image, Select, Flex } from "antd";
 import { PlusOutlined, EditOutlined, DeleteOutlined, UserOutlined, LockOutlined } from "@ant-design/icons";
 import type { ColumnsType } from "antd/es/table";
 import type { GetProp, UploadFile, UploadProps } from "antd";
@@ -405,7 +405,7 @@ export const Component = () => {
       width: 200,
       fixed: "right",
       render: (_, record) => (
-        <Space size="middle">
+        <Flex gap="small">
           <Button type="link" onClick={() => showEditModal(record)} size="small">
             编辑
           </Button>
@@ -417,7 +417,7 @@ export const Component = () => {
               删除
             </Button>
           </Popconfirm>
-        </Space>
+        </Flex>
       ),
     },
   ];

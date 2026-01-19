@@ -393,7 +393,7 @@ export const Component = () => {
       width: 200,
       fixed: "right",
       render: (_, record) => (
-        <Flex align="center">
+        <Flex gap="small">
           <Button type="link" onClick={() => showCreateModal(record)} size="small">
             添加子菜单
           </Button>

@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { Table, Button, Space, Modal, Form, message, Popconfirm, Card, Input, Upload, Image } from "antd";
+import { Table, Button, Space, Modal, Form, message, Popconfirm, Card, Input, Upload, Image, Flex } from "antd";
 import { PlusOutlined, DeleteOutlined, EyeOutlined, UploadOutlined } from "@ant-design/icons";
 import type { ColumnsType } from "antd/es/table";
 import { uploadApi } from "@/api";
@@ -178,7 +178,16 @@ export const Component = () => {
       dataIndex: "createdAt",
       key: "createdAt",
       width: 180,
-      render: (text: string) => (text ? new Date(text).toLocaleString("zh-CN") : "-"),
+      render: (text: string, record: FileInfo) => {
+        // 兼容不同的字段名格式
+        const createdAt = text || (record as any).CreatedAt || (record as any).created_at;
+        if (!createdAt) return "-";
+        try {
+          return new Date(createdAt).toLocaleString("zh-CN");
+        } catch (error) {
+          return createdAt;
+        }
+      },
     },
     {
       title: "操作",
@@ -186,9 +195,9 @@ export const Component = () => {
       width: 150,
       fixed: "right",
       render: (_, record) => (
-        <Space size="middle">
+        <Flex gap="small">
           {isImage(record.fileType, record.fileName, record.name) && (
-            <Button type="link" icon={<EyeOutlined />} onClick={() => handlePreview(record)} size="small">
+            <Button type="link" onClick={() => handlePreview(record)} size="small">
               预览
             </Button>
           )}
@@ -198,11 +207,11 @@ export const Component = () => {
             okText="确定"
             cancelText="取消"
           >
-            <Button type="link" danger icon={<DeleteOutlined />} size="small">
+            <Button type="link" danger size="small">
               删除
             </Button>
           </Popconfirm>
-        </Space>
+        </Flex>
       ),
     },
   ];
