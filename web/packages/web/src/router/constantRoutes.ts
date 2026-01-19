@@ -8,11 +8,25 @@ export const constantRoutes: RouteObject[] = [
     id: "login",
     path: "/login",
     lazy: () => import("@/pages/login"),
+    loader: () => {
+      const token = localStg.get("token");
+      if (token) {
+        return redirect("/");
+      }
+      return true;
+    },
   },
   {
     id: "register",
     path: "/register",
     lazy: () => import("@/pages/register"),
+    loader: () => {
+      const token = localStg.get("token");
+      if (token) {
+        return redirect("/");
+      }
+      return true;
+    },
   },
   {
     id: "layout",
@@ -31,5 +45,8 @@ export const constantRoutes: RouteObject[] = [
     id: "not-found",
     path: "*",
     Component: NotFound,
+    loader: () => {
+      return redirect("/login");
+    },
   },
 ];

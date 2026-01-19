@@ -6,11 +6,11 @@ import { localStg } from "@/utils/storage";
 import { getImageUrl } from "@/utils/image";
 import { loginApi } from "@/api";
 import { userSlice } from "@/store/slice/user";
-import { resetRoutes } from "@/store/slice/route";
+import { delay } from "lodash";
+
 
 export const UserAvatar = () => {
   const navigate = useNavigate();
-  const dispatch = useDispatch();
   const userInfo = useSelector(userSlice.selectors.getUserInfo);
 
   const handleLogout = async () => {
@@ -20,11 +20,9 @@ export const UserAvatar = () => {
       console.error("登出失败:", error);
     } finally {
       localStg.remove("token");
-      dispatch(userSlice.actions.clearUserInfo());
       // 重置路由，清除之前角色的路由
-      await dispatch(resetRoutes());
       window.$message?.success("已退出登录");
-      navigate("/login", { replace: true });
+      location.href = import.meta.env.VITE_BASENAME + "login";
     }
   };
 

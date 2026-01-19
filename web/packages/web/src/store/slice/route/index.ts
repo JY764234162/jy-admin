@@ -3,6 +3,7 @@ import { createSlice, PayloadAction } from "@reduxjs/toolkit";
 import { router } from "@/router/routers";
 import { convertMenusToRoutes } from "@/utils/menuToRoute";
 import { AppThunk } from "@/store";
+import { constantRoutes } from "@/router/constantRoutes";
 
 const initialState: { allRoutes: ElegantConstRoute[]; constantRoutes: ElegantConstRoute[]; authRoutes: ElegantConstRoute[] } = {
   constantRoutes: [],
@@ -28,7 +29,7 @@ export const routesSlice = createSlice({
 });
 
 //路由 - 从后端获取菜单并初始化路由
-export const initConstantRoute = (): AppThunk => async (dispatch, getState) => {
+export const initConstantRoute = (): AppThunk => async (dispatch) => {
   try {
     // 延迟导入 authorityApi，避免循环依赖
     const { authorityApi } = await import("@/api");
@@ -49,10 +50,3 @@ export const initConstantRoute = (): AppThunk => async (dispatch, getState) => {
   }
 };
 
-// 重置路由（退出登录时调用）
-export const resetRoutes = (): AppThunk => async (dispatch) => {
-  // 重置路由到空数组
-  const emptyRoutes = transformToReactRoutes([]);
-  await router.patchRoutes("layout", emptyRoutes);
-  await dispatch(routesSlice.actions.resetRoutes());
-};
