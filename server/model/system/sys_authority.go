@@ -18,17 +18,19 @@ type SysAuthority struct {
 	Children      []SysAuthority `json:"children" gorm:"-"`
 	SysBaseMenus  []SysBaseMenu  `json:"menus" gorm:"many2many:sys_authority_menus;"`
 	DefaultRouter string         `json:"defaultRouter" gorm:"comment:默认路由;default:dashboard"` // 默认路由
+	Enable        bool           `json:"enable" gorm:"default:1;comment:角色状态，1-启用，0-禁用"`      // 角色状态
 }
 
 type SysBaseMenu struct {
 	gorm.Model
 	MenuLevel uint                                       `json:"-"`
-	ParentId  string                                     `json:"parentId" gorm:"comment:父菜单ID"`     // 父菜单ID
-	Path      string                                     `json:"path" gorm:"comment:路由path"`        // 路由path
-	Name      string                                     `json:"name" gorm:"comment:路由name"`        // 路由name
-	Hidden    bool                                       `json:"hidden" gorm:"comment:是否在列表隐藏"`     // 是否在列表隐藏
-	Component string                                     `json:"component" gorm:"comment:对应前端文件路径"` // 对应前端文件路径
-	Sort      int                                        `json:"sort" gorm:"comment:排序标记"`          // 排序标记
+	ParentId  string                                     `json:"parentId" gorm:"comment:父菜单ID"`                  // 父菜单ID
+	Path      string                                     `json:"path" gorm:"comment:路由path"`                     // 路由path
+	Name      string                                     `json:"name" gorm:"comment:路由name"`                     // 路由name
+	Hidden    bool                                       `json:"hidden" gorm:"comment:是否在列表隐藏"`                  // 是否在列表隐藏
+	Component string                                     `json:"component" gorm:"comment:对应前端文件路径"`              // 对应前端文件路径
+	Sort      int                                        `json:"sort" gorm:"comment:排序标记"`                       // 排序标记
+	Enable    bool                                       `json:"enable" gorm:"default:1;comment:菜单状态，1-启用，0-禁用"` // 菜单状态
 	Meta      `json:"meta" gorm:"embedded;comment:附加属性"` // 附加属性
 }
 

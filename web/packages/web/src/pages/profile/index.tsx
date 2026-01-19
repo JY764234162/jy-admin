@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { Form, Input, Button, Card, message, Avatar, Divider, Upload, UploadProps } from "antd";
+import { Form, Input, Button, Card, Avatar, Divider, Upload, UploadProps } from "antd";
 import { UserOutlined, LockOutlined, SaveOutlined, UploadOutlined } from "@ant-design/icons";
 import { useNavigate } from "react-router-dom";
 import { useDispatch, useSelector } from "react-redux";
@@ -53,7 +53,7 @@ export const Component = () => {
     try {
       const res = await userApi.updateProfile(values);
       if (res.code === 0 && res.data) {
-        message.success("更新成功");
+        window.$message?.success("更新成功");
         // 更新 Redux 中的用户信息
         dispatch(userSlice.actions.setUserInfo(res.data));
       }
@@ -69,7 +69,7 @@ export const Component = () => {
     try {
       const res = await userApi.changePassword(values);
       if (res.code === 0) {
-        message.success("密码修改成功，请重新登录");
+        window.$message?.success("密码修改成功，请重新登录");
         passwordForm.resetFields();
         // 延迟跳转，让用户看到成功消息
         setTimeout(() => {
@@ -95,7 +95,7 @@ export const Component = () => {
       const isImage = fileObj.type?.startsWith("image/");
       if (!isImage) {
         const error = new Error("只能上传图片文件！");
-        message.error("只能上传图片文件！");
+        window.$message?.error("只能上传图片文件！");
         onError?.(error);
         setUploading(false);
         return;
@@ -105,7 +105,7 @@ export const Component = () => {
       const isLt5M = fileObj.size / 1024 / 1024 < 5;
       if (!isLt5M) {
         const error = new Error("图片大小不能超过 5MB！");
-        message.error("图片大小不能超过 5MB！");
+        window.$message?.error("图片大小不能超过 5MB！");
         onError?.(error);
         setUploading(false);
         return;
@@ -141,11 +141,11 @@ export const Component = () => {
       // 更新 Redux 中的用户信息
       dispatch(userSlice.actions.setUserInfo(updateRes.data));
         
-        message.success("头像上传成功");
+        window.$message?.success("头像上传成功");
       onSuccess?.(uploadRes.data);
     } catch (error: any) {
       console.error("上传失败:", error);
-      message.error(error.message || "头像上传失败");
+      window.$message?.error(error.message || "头像上传失败");
       onError?.(error);
     } finally {
       setUploading(false);
@@ -156,12 +156,12 @@ export const Component = () => {
   const beforeUpload = (file: RcFile) => {
     const isImage = file.type?.startsWith("image/");
     if (!isImage) {
-      message.error("只能上传图片文件！");
+      window.$message?.error("只能上传图片文件！");
       return false;
     }
     const isLt5M = file.size / 1024 / 1024 < 5;
     if (!isLt5M) {
-      message.error("图片大小不能超过 5MB！");
+      window.$message?.error("图片大小不能超过 5MB！");
       return false;
     }
     return true; // 阻止自动上传，使用 customRequest

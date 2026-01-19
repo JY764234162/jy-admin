@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { Form, Input, Button, message, Card, Spin } from "antd";
+import { Form, Input, Button, Card, Spin } from "antd";
 import { EyeInvisibleOutlined, EyeTwoTone, UserOutlined, LockOutlined, MailOutlined } from "@ant-design/icons";
 import { useNavigate, Link } from "react-router-dom";
 import styles from "../login/styles.module.css";
@@ -60,7 +60,7 @@ export const Component = () => {
       });
 
       if (res.code === 0) {
-        message.success("注册成功，请登录");
+        window.$message?.success("注册成功，请登录");
         // 跳转到登录页
         navigate("/login");
       }

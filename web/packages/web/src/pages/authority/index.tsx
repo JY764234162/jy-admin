@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { Table, Button, Space, Modal, Form, Input, message, Popconfirm, Card, Tree, TreeSelect, Flex } from "antd";
+import { Table, Button, Space, Modal, Form, Input, Popconfirm, Card, Tree, TreeSelect, Flex, Switch } from "antd";
 import { PlusOutlined, EditOutlined, DeleteOutlined, SettingOutlined } from "@ant-design/icons";
 import type { ColumnsType } from "antd/es/table";
 import { authorityApi, menuApi } from "@/api";
@@ -27,7 +27,7 @@ export const Component = () => {
       }
     } catch (error) {
       console.error("获取角色列表失败:", error);
-      message.error("获取角色列表失败");
+      window.$message?.error("获取角色列表失败");
     } finally {
       setLoading(false);
     }
@@ -73,6 +73,7 @@ export const Component = () => {
       authorityName: authority.authorityName,
       parentId: parentId || "0", // 根节点使用"0"
       defaultRouter: authority.defaultRouter || "dashboard",
+      enable: authority.enable !== false, // 保持原有状态
     });
     setModalVisible(true);
   };
@@ -119,15 +120,16 @@ export const Component = () => {
           authorityName: values.authorityName,
           parentId: parentId,
           defaultRouter: values.defaultRouter || "dashboard",
+          enable: true, // 默认启用
         });
         if (res.code === 0) {
-          message.success("创建角色成功");
+          window.$message?.success("创建角色成功");
           setModalVisible(false);
           fetchAuthorities();
         }
       } else {
         if (!editingAuthority) {
-          message.error("角色信息不存在");
+          window.$message?.error("角色信息不存在");
           return;
         }
         const res = await authorityApi.updateAuthority({
@@ -135,9 +137,10 @@ export const Component = () => {
           authorityName: values.authorityName,
           parentId: parentId,
           defaultRouter: values.defaultRouter || "dashboard",
+          enable: editingAuthority.enable !== false, // 保持原有状态
         });
         if (res.code === 0) {
-          message.success("更新角色成功");
+          window.$message?.success("更新角色成功");
           setModalVisible(false);
           fetchAuthorities();
         }
@@ -147,7 +150,7 @@ export const Component = () => {
         return;
       }
       console.error("操作失败:", error);
-      message.error(error.message || "操作失败");
+      window.$message?.error(error.message || "操作失败");
     }
   };
 
@@ -156,12 +159,12 @@ export const Component = () => {
     try {
       const res = await authorityApi.deleteAuthority({ authorityId });
       if (res.code === 0) {
-        message.success("删除角色成功");
+        window.$message?.success("删除角色成功");
         fetchAuthorities();
       }
     } catch (error) {
       console.error("删除角色失败:", error);
-      message.error("删除角色失败");
+      window.$message?.error("删除角色失败");
     }
   };
 
@@ -176,12 +179,12 @@ export const Component = () => {
         menuIds: selectedMenuIds,
       });
       if (res.code === 0) {
-        message.success("设置权限成功");
+        window.$message?.success("设置权限成功");
         setPermissionModalVisible(false);
       }
     } catch (error) {
       console.error("设置权限失败:", error);
-      message.error("设置权限失败");
+      window.$message?.error("设置权限失败");
     }
   };
 
@@ -315,6 +318,28 @@ export const Component = () => {
       dataIndex: "defaultRouter",
       key: "defaultRouter",
       width: 150,
+    },
+    {
+      title: "状态",
+      dataIndex: "enable",
+      key: "enable",
+      width: 100,
+      render: (enable: boolean, record: Authority) => (
+        <Switch
+          checked={enable !== false}
+          onChange={async (checked) => {
+            try {
+              const res = await authorityApi.updateAuthority({ ...record, enable: checked });
+              if (res.code === 0) {
+                window.$message?.success(checked ? "角色已启用" : "角色已禁用");
+                fetchAuthorities();
+              }
+            } catch (error) {
+              console.error("更新角色状态失败:", error);
+            }
+          }}
+        />
+      ),
     },
     {
       title: "创建时间",

@@ -30,7 +30,23 @@ func (a *Api) UpdateMenu(c *gin.Context) {
 		return
 	}
 
-	err = global.JY_DB.Model(&system.SysBaseMenu{}).Where("id = ?", menu.ID).Updates(&menu).Error
+	// 使用 map 更新，确保 enable 字段（即使是 false）也能正确更新
+	// 注意：meta 字段是 embedded，字段名直接作为列名（snake_case）
+	updateData := map[string]interface{}{
+		"parent_id":    menu.ParentId,
+		"path":         menu.Path,
+		"name":         menu.Name,
+		"hidden":       menu.Hidden,
+		"component":    menu.Component,
+		"sort":         menu.Sort,
+		"enable":       menu.Enable,
+		"title":        menu.Title,
+		"icon":         menu.Icon,
+		"close_tab":    menu.CloseTab,
+		"keep_alive":   menu.KeepAlive,
+		"default_menu": menu.DefaultMenu,
+	}
+	err = global.JY_DB.Model(&system.SysBaseMenu{}).Where("id = ?", menu.ID).Updates(updateData).Error
 	if err != nil {
 		common.FailWithMsg(c, "更新菜单失败")
 		return

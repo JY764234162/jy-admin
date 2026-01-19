@@ -1,5 +1,5 @@
 import React, { useState, useRef } from 'react';
-import { Upload, Card, Space, Typography, message, Spin } from 'antd';
+import { Upload, Card, Space, Typography, Spin } from 'antd';
 import { InboxOutlined, CopyOutlined } from '@ant-design/icons';
 import type { UploadProps } from 'antd';
 import { ColorThief } from './utils';

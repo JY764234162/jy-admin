@@ -1,5 +1,5 @@
 import { useRef, useState, useEffect, useCallback } from 'react';
-import { Button, Slider, message, Modal, Input, Space, Tag, Tooltip } from 'antd';
+import { Button, Slider, Modal, Input, Space, Tag, Tooltip } from 'antd';
 import {
   PlayCircleOutlined,
   PauseOutlined,
@@ -121,7 +121,7 @@ export const Component = () => {
       // 监听加载错误
       wavesurfer.on('error', (error: any) => {
         console.error('WaveSurfer error:', error);
-        message.error('音频加载失败');
+        window.$message?.error('音频加载失败');
         setLoading(false);
       });
 
@@ -174,7 +174,7 @@ export const Component = () => {
       return wavesurfer;
     } catch (error) {
       console.error('Failed to initialize WaveSurfer:', error);
-      message.error('初始化音频编辑器失败');
+      window.$message?.error('初始化音频编辑器失败');
       setLoading(false);
       return null;
     }
@@ -183,7 +183,7 @@ export const Component = () => {
   // 处理文件上传
   const handleFileUpload = useCallback((file: File) => {
     if (!file.type.startsWith('audio/')) {
-      message.error('请上传音频文件！');
+      window.$message?.error('请上传音频文件！');
       return;
     }
 
@@ -243,7 +243,7 @@ export const Component = () => {
   // 添加选区（用于剪切）
   const addRegion = () => {
     if (!regionsPluginRef.current || !wavesurferRef.current) {
-      message.warning('请先加载音频文件！');
+      window.$message?.warning('请先加载音频文件！');
       return;
     }
 
@@ -259,7 +259,7 @@ export const Component = () => {
       resize: true,
     });
 
-    message.success('已添加选区，可拖动调整范围');
+    window.$message?.success('已添加选区，可拖动调整范围');
   };
 
   // 删除选区
@@ -296,7 +296,7 @@ export const Component = () => {
   const cutRegion = async (regionId: string) => {
     const region = regions.find((r) => r.id === regionId);
     if (!region || !audioBuffer) {
-      message.error('无法剪切音频');
+      window.$message?.error('无法剪切音频');
       return;
     }
 
@@ -326,13 +326,13 @@ export const Component = () => {
       // 导出为 MP3（默认）
       try {
         await exportAudioBufferAsMP3(newBuffer, `cut_${Date.now()}.mp3`);
-        message.success('音频片段已导出为 MP3！');
+        window.$message?.success('音频片段已导出为 MP3！');
       } catch (error) {
-        message.warning('MP3 导出失败，已回退到 WAV 格式');
+        window.$message?.warning('MP3 导出失败，已回退到 WAV 格式');
       }
     } catch (error) {
       console.error('剪切失败:', error);
-      message.error('剪切失败，请重试！');
+      window.$message?.error('剪切失败，请重试！');
     }
   };
 
@@ -447,15 +447,15 @@ export const Component = () => {
   // 导出完整音频（默认 MP3）
   const exportAudio = async () => {
     if (!audioBuffer) {
-      message.warning('请先加载音频文件！');
+      window.$message?.warning('请先加载音频文件！');
       return;
     }
 
     try {
       await exportAudioBufferAsMP3(audioBuffer, `edited_${Date.now()}.mp3`);
-      message.success('音频已导出为 MP3！');
+      window.$message?.success('音频已导出为 MP3！');
     } catch (error) {
-      message.warning('MP3 导出失败，已回退到 WAV 格式');
+      window.$message?.warning('MP3 导出失败，已回退到 WAV 格式');
     }
   };
 
@@ -542,10 +542,10 @@ export const Component = () => {
         const buffer = await audioContext.decodeAudioData(arrayBuffer);
         setAudioBuffer(buffer);
         
-        message.success('音频加载成功！');
+        window.$message?.success('音频加载成功！');
       } catch (error) {
         console.error('音频加载失败:', error);
-        message.error('音频加载失败，请重试！' + (error instanceof Error ? ': ' + error.message : ''));
+        window.$message?.error('音频加载失败，请重试！' + (error instanceof Error ? ': ' + error.message : ''));
         setLoading(false);
       }
     };

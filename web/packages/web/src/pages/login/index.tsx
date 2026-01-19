@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { Form, Input, Button, Checkbox, message, Divider, Card, Spin } from "antd";
+import { Form, Input, Button, Checkbox, Divider, Card, Spin } from "antd";
 import { EyeInvisibleOutlined, EyeTwoTone, UserOutlined, LockOutlined, ReloadOutlined } from "@ant-design/icons";
 import { useNavigate, useLocation } from "react-router-dom";
 import styles from "./styles.module.css";
@@ -96,7 +96,7 @@ export const Component = () => {
           localStg.remove("rememberMe");
         }
 
-        message.success("登录成功！");
+        window.$message?.success("登录成功！");
         // 获取用户信息和菜单权限
         await store.dispatch(getCurrentUserInfo());
         // 初始化路由（会根据权限过滤）
@@ -155,7 +155,7 @@ export const Component = () => {
           onFinish={handlePasswordLogin}
           autoComplete="off"
           size="large"
-          initialValues={{ remember: true, username: "admin", password: "123456" }}
+          initialValues={{ remember: true, username: "guest", password: "123456" }}
         >
           <div className="text-base font-bold my-4 text-[var(--ant-color-primary)]">密码登录</div>
 

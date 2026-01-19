@@ -77,6 +77,7 @@ export interface User {
   nickName: string;
   headerImg?: string;
   authorityId: number | string;
+  enable?: boolean;
   createdAt?: string;
   updatedAt?: string;
 }
@@ -129,6 +130,7 @@ export interface Authority {
   authorityId: number;
   authorityName: string;
   parentId?: number;
+  enable?: boolean;
   createdAt?: string;
   updatedAt?: string;
 }

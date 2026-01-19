@@ -5,7 +5,6 @@ import { useDispatch, useSelector } from "react-redux";
 import { localStg } from "@/utils/storage";
 import { getImageUrl } from "@/utils/image";
 import { loginApi } from "@/api";
-import { message } from "antd";
 import { userSlice } from "@/store/slice/user";
 import { resetRoutes } from "@/store/slice/route";
 
@@ -24,7 +23,7 @@ export const UserAvatar = () => {
       dispatch(userSlice.actions.clearUserInfo());
       // 重置路由，清除之前角色的路由
       await dispatch(resetRoutes());
-      message.success("已退出登录");
+      window.$message?.success("已退出登录");
       navigate("/login", { replace: true });
     }
   };

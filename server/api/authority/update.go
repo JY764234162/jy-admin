@@ -24,7 +24,14 @@ func (a *Api) UpdateAuthority(c *gin.Context) {
 		common.FailWithMsg(c, "参数绑定失败")
 		return
 	}
-	err = global.JY_DB.Where("authority_id = ?", auth.AuthorityId).Updates(&auth).Error
+	// 使用 map 更新，确保 enable 字段（即使是 false）也能正确更新
+	updateData := map[string]interface{}{
+		"authority_name": auth.AuthorityName,
+		"parent_id":      auth.ParentId,
+		"default_router": auth.DefaultRouter,
+		"enable":         auth.Enable,
+	}
+	err = global.JY_DB.Model(&system.SysAuthority{}).Where("authority_id = ?", auth.AuthorityId).Updates(updateData).Error
 	if err != nil {
 		common.FailWithMsg(c, "更新角色失败")
 		return

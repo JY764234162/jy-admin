@@ -19,6 +19,7 @@ export interface Menu {
     keepAlive?: boolean;
     defaultMenu?: boolean;
   };
+  enable: boolean;
   children?: Menu[];
   createdAt?: string;
   updatedAt?: string;
@@ -56,4 +57,3 @@ export const menuApi = {
     return request.delete(`/menu/${id}`);
   },
 };
-

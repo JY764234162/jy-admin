@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { Table, Button, Space, Modal, Form, message, Avatar, Popconfirm, Card, Input, Upload, Image, Select, Flex } from "antd";
+import { Table, Button, Space, Modal, Form, Avatar, Popconfirm, Card, Input, Upload, Image, Select, Flex, Switch } from "antd";
 import { PlusOutlined, EditOutlined, DeleteOutlined, UserOutlined, LockOutlined } from "@ant-design/icons";
 import type { ColumnsType } from "antd/es/table";
 import type { GetProp, UploadFile, UploadProps } from "antd";
@@ -58,7 +58,7 @@ export const Component = () => {
       }
     } catch (error) {
       console.error("获取用户列表失败:", error);
-      message.error("获取用户列表失败");
+      window.$message?.error("获取用户列表失败");
     } finally {
       setLoading(false);
     }
@@ -74,7 +74,7 @@ export const Component = () => {
       }
     } catch (error) {
       console.error("获取角色列表失败:", error);
-      message.error("获取角色列表失败");
+      window.$message?.error("获取角色列表失败");
     } finally {
       setAuthoritiesLoading(false);
     }
@@ -138,15 +138,16 @@ export const Component = () => {
           nickName: values.nickName,
           headerImg: values.headerImg,
           authorityId: values.authorityId,
+          enable: true, // 默认启用
         });
         if (res.code === 0) {
-          message.success("创建用户成功");
+          window.$message?.success("创建用户成功");
           setModalVisible(false);
           fetchUsers();
         }
       } else {
         if (!editingUser?.ID) {
-          message.error("用户ID不存在");
+          window.$message?.error("用户ID不存在");
           return;
         }
         const res = await userApi.updateUser({
@@ -155,9 +156,10 @@ export const Component = () => {
           nickName: values.nickName,
           headerImg: values.headerImg,
           authorityId: values.authorityId,
+          enable: editingUser.enable !== false, // 保持原有状态
         });
         if (res.code === 0) {
-          message.success("更新用户成功");
+          window.$message?.success("更新用户成功");
           setModalVisible(false);
           fetchUsers();
         }
@@ -168,7 +170,7 @@ export const Component = () => {
         return;
       }
       console.error("操作失败:", error);
-      message.error(error.message || "操作失败");
+      window.$message?.error(error.message || "操作失败");
     }
   };
 
@@ -177,12 +179,12 @@ export const Component = () => {
     try {
       const res = await userApi.deleteUser(id);
       if (res.code === 0) {
-        message.success("删除用户成功");
+        window.$message?.success("删除用户成功");
         fetchUsers();
       }
     } catch (error) {
       console.error("删除用户失败:", error);
-      message.error("删除用户失败");
+      window.$message?.error("删除用户失败");
     }
   };
 
@@ -198,7 +200,7 @@ export const Component = () => {
     try {
       const values = await passwordForm.validateFields();
       if (!resettingUser?.ID) {
-        message.error("用户信息不存在");
+        window.$message?.error("用户信息不存在");
         return;
       }
       const res = await userApi.resetPassword({
@@ -206,7 +208,7 @@ export const Component = () => {
         newPassword: values.newPassword,
       });
       if (res.code === 0) {
-        message.success("重置密码成功");
+        window.$message?.success("重置密码成功");
         setPasswordModalVisible(false);
         passwordForm.resetFields();
       }
@@ -215,7 +217,7 @@ export const Component = () => {
         return;
       }
       console.error("重置密码失败:", error);
-      message.error(error.message || "重置密码失败");
+      window.$message?.error(error.message || "重置密码失败");
     }
   };
 
@@ -309,11 +311,11 @@ export const Component = () => {
 
       // 保存相对路径到表单（用于提交到数据库）
       form.setFieldsValue({ headerImg: filePath });
-      message.success("头像上传成功");
+      window.$message?.success("头像上传成功");
       onSuccess?.(uploadRes.data, fileObj as any);
     } catch (error: any) {
       console.error("上传失败:", error);
-      message.error(error.message || "头像上传失败");
+      window.$message?.error(error.message || "头像上传失败");
       onError?.(error);
 
       // 更新文件列表，标记为失败
@@ -366,6 +368,28 @@ export const Component = () => {
       key: "authorityId",
       width: 150,
       render: (authorityId: string | number) => getAuthorityName(authorityId),
+    },
+    {
+      title: "状态",
+      dataIndex: "enable",
+      key: "enable",
+      width: 100,
+      render: (enable: boolean, record: User) => (
+        <Switch
+          checked={enable !== false}
+          onChange={async (checked) => {
+            try {
+              const res = await userApi.updateUser({ ...record, enable: checked });
+              if (res.code === 0) {
+                window.$message?.success(checked ? "用户已启用" : "用户已禁用");
+                fetchUsers();
+              }
+            } catch (error) {
+              console.error("更新用户状态失败:", error);
+            }
+          }}
+        />
+      ),
     },
     {
       title: "创建时间",
@@ -517,13 +541,13 @@ export const Component = () => {
                 // 验证文件类型
                 const isImage = file.type?.startsWith("image/");
                 if (!isImage) {
-                  message.error("只能上传图片文件！");
+                  window.$message?.error("只能上传图片文件！");
                   return Upload.LIST_IGNORE; // 阻止添加到列表
                 }
                 // 验证文件大小（5MB）
                 const isLt5M = file.size / 1024 / 1024 < 5;
                 if (!isLt5M) {
-                  message.error("图片大小不能超过5MB！");
+                  window.$message?.error("图片大小不能超过5MB！");
                   return Upload.LIST_IGNORE; // 阻止添加到列表
                 }
                 // 返回 true 允许文件添加到列表，然后由 customRequest 处理上传

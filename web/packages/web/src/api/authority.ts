@@ -11,6 +11,7 @@ export interface Authority {
   authorityName: string;
   parentId?: string;
   defaultRouter?: string;
+  enable?: boolean;
   createdAt?: string;
   updatedAt?: string;
 }

@@ -1,5 +1,4 @@
 import axios, { AxiosInstance, InternalAxiosRequestConfig, AxiosResponse, AxiosError } from "axios";
-import { message } from "antd";
 import { localStg } from "./storage";
 
 // API 路径前缀
@@ -51,7 +50,7 @@ service.interceptors.response.use(
 
     // 判断 API 是否成功（标准：code === 0 表示成功）
     if (res.code !== undefined && res.code !== 0) {
-      message.error(res.msg || "请求失败");
+      window.$message?.error(res.msg || "请求失败");
 
       // 401: Token 过期或未登录
       if (res.code === 401 || response.status === 401) {
@@ -75,7 +74,7 @@ service.interceptors.response.use(
 
       switch (status) {
         case 401: {
-          message.error("未登录或登录已过期，请重新登录");
+          window.$message?.error("未登录或登录已过期，请重新登录");
           // 清除 token 和用户信息（只清除 localStorage，避免循环依赖）
           // store 会在重新加载时从 localStorage 读取，如果 token 不存在会自动重置
           localStg.remove("token");
@@ -84,21 +83,21 @@ service.interceptors.response.use(
           break;
         }
         case 403:
-          message.error("没有权限访问该资源");
+          window.$message?.error("没有权限访问该资源");
           break;
         case 404:
-          message.error("请求的资源不存在");
+          window.$message?.error("请求的资源不存在");
           break;
         case 500:
-          message.error("服务器内部错误");
+          window.$message?.error("服务器内部错误");
           break;
         default:
-          message.error((data as any)?.msg || `请求失败: ${status}`);
+          window.$message?.error((data as any)?.msg || `请求失败: ${status}`);
       }
     } else if (error.request) {
-      message.error("网络错误，请检查网络连接");
+      window.$message?.error("网络错误，请检查网络连接");
     } else {
-      message.error("请求配置错误");
+      window.$message?.error("请求配置错误");
     }
 
     return Promise.reject(error);

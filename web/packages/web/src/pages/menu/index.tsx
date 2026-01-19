@@ -1,11 +1,9 @@
 import { useState, useEffect } from "react";
-import { Table, Button, Space, Modal, Form, Input, InputNumber, Switch, message, Popconfirm, Card, Tree, Flex, TreeSelect } from "antd";
+import { Table, Button, Space, Modal, Form, Input, InputNumber, Switch, Popconfirm, Card, Tree, Flex, TreeSelect } from "antd";
 import { PlusOutlined, EditOutlined, DeleteOutlined, ImportOutlined } from "@ant-design/icons";
 import type { ColumnsType } from "antd/es/table";
 import { menuApi } from "@/api";
 import type { Menu } from "@/api";
-import { authRoutes } from "@/router/constantRoutes";
-import { dynamicLazyMap } from "@/router/imports";
 import styles from "./index.module.css";
 
 export const Component = () => {
@@ -26,7 +24,7 @@ export const Component = () => {
       }
     } catch (error) {
       console.error("获取菜单列表失败:", error);
-      message.error("获取菜单列表失败");
+      window.$message?.error("获取菜单列表失败");
     } finally {
       setLoading(false);
     }
@@ -64,6 +62,7 @@ export const Component = () => {
       parentId: menu.parentId,
       sort: menu.sort || 0,
       hidden: menu.hidden || false,
+      enable: menu.enable !== false, // 保持原有状态
       meta: {
         title: menu.meta?.title || "",
         icon: menu.meta?.icon || "",
@@ -87,6 +86,7 @@ export const Component = () => {
           parentId: values.parentId || "0",
           sort: values.sort || 0,
           hidden: values.hidden || false,
+          enable: true, // 默认启用
           meta: {
             title: values.meta.title,
             icon: values.meta.icon || "",
@@ -96,13 +96,13 @@ export const Component = () => {
           },
         });
         if (res.code === 0) {
-          message.success("创建菜单成功");
+          window.$message?.success("创建菜单成功");
           setModalVisible(false);
           fetchMenus();
         }
       } else {
         if (!editingMenu?.ID) {
-          message.error("菜单ID不存在");
+          window.$message?.error("菜单ID不存在");
           return;
         }
         const res = await menuApi.updateMenu({
@@ -113,6 +113,7 @@ export const Component = () => {
           parentId: values.parentId || "0",
           sort: values.sort || 0,
           hidden: values.hidden || false,
+          enable: editingMenu.enable !== false, // 保持原有状态
           meta: {
             title: values.meta.title,
             icon: values.meta.icon || "",
@@ -122,7 +123,7 @@ export const Component = () => {
           },
         });
         if (res.code === 0) {
-          message.success("更新菜单成功");
+          window.$message?.success("更新菜单成功");
           setModalVisible(false);
           fetchMenus();
         }
@@ -132,7 +133,7 @@ export const Component = () => {
         return;
       }
       console.error("操作失败:", error);
-      message.error(error.message || "操作失败");
+      window.$message?.error(error.message || "操作失败");
     }
   };
 
@@ -141,129 +142,16 @@ export const Component = () => {
     try {
       const res = await menuApi.deleteMenu(id);
       if (res.code === 0) {
-        message.success("删除菜单成功");
+        window.$message?.success("删除菜单成功");
         fetchMenus();
       }
     } catch (error: any) {
       console.error("删除菜单失败:", error);
-      message.error(error.response?.data?.msg || "删除菜单失败");
+      window.$message?.error(error.response?.data?.msg || "删除菜单失败");
     }
   };
 
-  // 批量导入菜单（从 constantRoutes.ts 导入，保持层级关系和顺序）
-  const handleImportRoutes = async () => {
-    try {
-      // 递归创建菜单（先创建父菜单，获取ID后再创建子菜单）
-      const createMenuRecursive = async (
-        routes: any[],
-        parentId: string = "0",
-        baseSort: number = 0
-      ): Promise<{ successCount: number; failCount: number }> => {
-        let successCount = 0;
-        let failCount = 0;
 
-        for (let index = 0; index < routes.length; index++) {
-          const route = routes[index];
-          if (!route.path) continue;
-
-          // 获取组件路径（从 dynamicLazyMap 中查找）
-          let component = route.path;
-          if (dynamicLazyMap[route.path]) {
-            // 从 dynamic import 中提取路径
-            const importPath = dynamicLazyMap[route.path].toString();
-            // 尝试提取路径（例如：() => import("@/pages/user") -> @/pages/user）
-            const match = importPath.match(/import\(["'](.+?)["']\)/);
-            if (match) {
-              component = match[1];
-            }
-          }
-
-          // 处理图标：如果是组件，转换为字符串；如果已经是字符串，直接使用
-          let iconStr: string | undefined = undefined;
-          if (route.handle?.icon) {
-            if (typeof route.handle.icon === "string") {
-              iconStr = route.handle.icon;
-            } else {
-              // 如果是组件，尝试从组件名称中提取（这需要根据实际情况调整）
-              iconStr = route.handle.icon.name || undefined;
-            }
-          }
-
-          const menuData: Omit<Menu, "ID" | "children" | "createdAt" | "updatedAt"> = {
-            parentId,
-            path: `/${route.path}`, // 添加开头的斜杠
-            name: route.path,
-            component: component,
-            sort: baseSort + index * 10, // 保持顺序
-            hidden: route.handle?.hidden || false,
-            meta: {
-              title: route.handle?.menuTitle || route.path,
-              icon: iconStr,
-              closeTab: false,
-              keepAlive: false,
-              defaultMenu: false,
-            },
-          };
-
-          try {
-            const res = await menuApi.createMenu(menuData);
-            if (res.code === 0 && res.data?.ID) {
-              successCount++;
-              const menuId = String(res.data.ID);
-
-              // 如果有子路由，递归创建（使用新的 baseSort 保持层级顺序）
-              if (route.children && route.children.length > 0) {
-                const childResult = await createMenuRecursive(route.children, menuId, (baseSort + index) * 100);
-                successCount += childResult.successCount;
-                failCount += childResult.failCount;
-              }
-            } else {
-              failCount++;
-            }
-          } catch (error: any) {
-            // 如果是因为菜单已存在而失败，尝试继续创建子菜单
-            if (error.response?.data?.msg?.includes("已存在") || error.message?.includes("已存在")) {
-              // 尝试查找已存在的菜单
-              try {
-                const menuListRes = await menuApi.getMenuList();
-                if (menuListRes.code === 0 && menuListRes.data) {
-                  const existingMenu = findMenuByPath(menuListRes.data, menuData.path);
-                  if (existingMenu?.ID) {
-                    const menuId = String(existingMenu.ID);
-                    // 继续创建子菜单
-                    if (route.children && route.children.length > 0) {
-                      const childResult = await createMenuRecursive(route.children, menuId, (baseSort + index) * 100);
-                      successCount += childResult.successCount;
-                      failCount += childResult.failCount;
-                    }
-                  }
-                }
-              } catch (e) {
-                // 忽略查找错误
-              }
-            }
-            failCount++;
-            console.error("创建菜单失败:", menuData, error);
-          }
-        }
-
-        return { successCount, failCount };
-      };
-
-      // 开始导入
-      const result = await createMenuRecursive(authRoutes);
-
-      if (result.successCount > 0) {
-        message.success(`成功导入 ${result.successCount} 个菜单${result.failCount > 0 ? `，失败 ${result.failCount} 个` : ""}`);
-        fetchMenus();
-      } else {
-        message.error("导入失败，请检查菜单是否已存在");
-      }
-    } catch (error: any) {
-      console.error("导入菜单失败:", error);
-      message.error(error.message || "导入菜单失败");
-    }
-  };
 
   // 在菜单树中查找指定路径的菜单
   const findMenuByPath = (menus: Menu[], path: string): Menu | null => {
@@ -388,6 +276,28 @@ export const Component = () => {
       render: (hidden: boolean) => (hidden ? "是" : "否"),
     },
     {
+      title: "状态",
+      dataIndex: "enable",
+      key: "enable",
+      width: 100,
+      render: (enable: boolean, record: Menu) => (
+        <Switch
+          checked={enable !== false}
+          onChange={async (checked) => {
+            try {
+              const res = await menuApi.updateMenu({ ...record, enable: checked });
+              if (res.code === 0) {
+                window.$message?.success(checked ? "菜单已启用" : "菜单已禁用");
+                fetchMenus();
+              }
+            } catch (error) {
+              console.error("更新菜单状态失败:", error);
+            }
+          }}
+        />
+      ),
+    },
+    {
       title: "操作",
       key: "action",
       width: 200,
@@ -419,16 +329,7 @@ export const Component = () => {
             <Button type="primary" icon={<PlusOutlined />} onClick={() => showCreateModal()}>
               新增菜单
             </Button>
-            <Popconfirm
-              title="确定要导入 constantRoutes.ts 中的所有菜单吗？这将创建所有菜单项并保持层级关系和顺序。"
-              onConfirm={handleImportRoutes}
-              okText="确定"
-              cancelText="取消"
-            >
-              <Button type="default" icon={<ImportOutlined />}>
-                批量导入菜单
-              </Button>
-            </Popconfirm>
+
           </Space>
         </div>
 

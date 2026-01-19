@@ -25,8 +25,14 @@ func (a *Api) UpdateUser(c *gin.Context) {
 		return
 	}
 	// 不允许通过此接口直接修改密码，如果有密码修改需求应走专门的接口
-	user.Password = ""
-	err = global.JY_DB.Model(&system.SysUser{}).Where("id = ?", user.ID).Updates(&user).Error
+	// 使用 map 更新，确保 enable 字段（即使是 false）也能正确更新
+	updateData := map[string]interface{}{
+		"nick_name":    user.NickName,
+		"header_img":   user.HeaderImg,
+		"authority_id": user.AuthorityId,
+		"enable":       user.Enable,
+	}
+	err = global.JY_DB.Model(&system.SysUser{}).Where("id = ?", user.ID).Updates(updateData).Error
 	if err != nil {
 		common.FailWithMsg(c, "更新用户失败")
 		return

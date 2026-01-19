@@ -19,7 +19,7 @@ type MenuTreeItem struct {
 
 // GetAuthorityMenus 获取当前用户的菜单权限（树状结构）
 // @Summary      获取当前用户的菜单权限
-// @Description  从token中解析用户角色，获取该角色的菜单权限（树状结构）
+// @Description  从token中解析用户角色，获取该角色的菜单权限（树状结构）。如果角色被禁用，返回空菜单
 // @Security     ApiKeyAuth
 // @Tags         Authority
 // @Produce      json
@@ -41,8 +41,8 @@ func (a *Api) GetAuthorityMenus(c *gin.Context) {
 		return
 	}
 
-	// 获取菜单权限（树状结构）
-	treeMenus := a.getMenusByAuthorityId(authorityId)
+	// 获取菜单权限（树状结构），如果角色被禁用则返回空菜单
+	treeMenus := a.getMenusByAuthorityId(authorityId, true)
 	if treeMenus == nil {
 		common.FailWithMsg(c, "获取菜单权限失败")
 		return
@@ -53,7 +53,7 @@ func (a *Api) GetAuthorityMenus(c *gin.Context) {
 
 // GetAuthorityMenusByRole 根据角色ID获取菜单权限（用于角色管理页面）
 // @Summary      根据角色ID获取菜单权限
-// @Description  根据角色ID获取该角色的菜单权限（树状结构），用于角色管理页面
+// @Description  根据角色ID获取该角色的菜单权限（树状结构），用于角色管理页面。不判断角色是否禁用，直接返回该角色的所有菜单
 // @Security     ApiKeyAuth
 // @Tags         Authority
 // @Produce      json
@@ -67,8 +67,8 @@ func (a *Api) GetAuthorityMenusByRole(c *gin.Context) {
 		return
 	}
 
-	// 获取菜单权限（树状结构）
-	treeMenus := a.getMenusByAuthorityId(authorityId)
+	// 获取菜单权限（树状结构），不判断角色是否禁用
+	treeMenus := a.getMenusByAuthorityId(authorityId, false)
 	if treeMenus == nil {
 		common.FailWithMsg(c, "获取菜单权限失败")
 		return
@@ -78,12 +78,18 @@ func (a *Api) GetAuthorityMenusByRole(c *gin.Context) {
 }
 
 // getMenusByAuthorityId 根据角色ID获取菜单权限（内部方法）
-func (a *Api) getMenusByAuthorityId(authorityId string) []MenuTreeItem {
+// checkRoleEnable: true-检查角色状态（如果角色被禁用返回空菜单），false-不检查角色状态（用于角色管理页面）
+func (a *Api) getMenusByAuthorityId(authorityId string, checkRoleEnable bool) []MenuTreeItem {
 	// 查找角色
 	var authority system.SysAuthority
 	err := global.JY_DB.Where("authority_id = ?", authorityId).First(&authority).Error
 	if err != nil {
 		return nil
+	}
+
+	// 如果需要检查角色状态，且角色被禁用，返回空菜单
+	if checkRoleEnable && !authority.Enable {
+		return []MenuTreeItem{}
 	}
 
 	// 获取角色的菜单
@@ -98,20 +104,34 @@ func (a *Api) getMenusByAuthorityId(authorityId string) []MenuTreeItem {
 		return []MenuTreeItem{}
 	}
 
+	// 过滤掉禁用的菜单（无论是否检查角色状态，都要过滤禁用的菜单）
+	var enabledMenus []system.SysBaseMenu
+	for _, menu := range menus {
+		if menu.Enable {
+			enabledMenus = append(enabledMenus, menu)
+		}
+	}
+
+	// 如果没有启用的菜单，返回空数组
+	if len(enabledMenus) == 0 {
+		return []MenuTreeItem{}
+	}
+
 	// 按排序字段排序（使用更高效的排序方式）
-	sort.Slice(menus, func(i, j int) bool {
-		return menus[i].Sort < menus[j].Sort
+	sort.Slice(enabledMenus, func(i, j int) bool {
+		return enabledMenus[i].Sort < enabledMenus[j].Sort
 	})
 
 	// 构建树形结构
-	return buildMenuTree(menus, "0")
+	return buildMenuTree(enabledMenus, "0")
 }
 
-// buildMenuTree 构建菜单树
+// buildMenuTree 构建菜单树（只包含启用的菜单）
 func buildMenuTree(menus []system.SysBaseMenu, parentId string) []MenuTreeItem {
 	var tree []MenuTreeItem
 	for _, menu := range menus {
-		if menu.ParentId == parentId {
+		// 只处理启用的菜单
+		if menu.ParentId == parentId && menu.Enable {
 			children := buildMenuTree(menus, fmt.Sprintf("%d", menu.ID))
 			tree = append(tree, MenuTreeItem{
 				SysBaseMenu: menu,

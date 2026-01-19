@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { Table, Button, Space, Modal, Form, message, Popconfirm, Card, Input, Upload, Image, Flex } from "antd";
+import { Table, Button, Space, Modal, Form, Popconfirm, Card, Input, Upload, Image, Flex } from "antd";
 import { PlusOutlined, DeleteOutlined, EyeOutlined, UploadOutlined } from "@ant-design/icons";
 import type { ColumnsType } from "antd/es/table";
 import { uploadApi } from "@/api";
@@ -34,7 +34,7 @@ export const Component = () => {
       }
     } catch (error) {
       console.error("获取文件列表失败:", error);
-      message.error("获取文件列表失败");
+      window.$message?.error("获取文件列表失败");
     } finally {
       setLoading(false);
     }
@@ -50,14 +50,14 @@ export const Component = () => {
     try {
       const res = await uploadApi.uploadFile(file);
       if (res.code === 0) {
-        message.success("文件上传成功");
+        window.$message?.success("文件上传成功");
         fetchFiles();
       } else {
-        message.error(res.msg || "文件上传失败");
+        window.$message?.error(res.msg || "文件上传失败");
       }
     } catch (error: any) {
       console.error("上传失败:", error);
-      message.error(error.message || "文件上传失败");
+      window.$message?.error(error.message || "文件上传失败");
     } finally {
       setUploading(false);
     }
@@ -67,18 +67,18 @@ export const Component = () => {
   // 删除文件
   const handleDelete = async (file: FileInfo) => {
     if (!file.key) {
-      message.error("文件信息不完整");
+      window.$message?.error("文件信息不完整");
       return;
     }
     try {
       const res = await uploadApi.deleteFile({ key: file.key });
       if (res.code === 0) {
-        message.success("删除文件成功");
+        window.$message?.success("删除文件成功");
         fetchFiles();
       }
     } catch (error) {
       console.error("删除文件失败:", error);
-      message.error("删除文件失败");
+      window.$message?.error("删除文件失败");
     }
   };
 
@@ -89,7 +89,7 @@ export const Component = () => {
       setPreviewImage(imageUrl);
       setPreviewVisible(true);
     } else {
-      message.warning("无法预览该文件");
+      window.$message?.warning("无法预览该文件");
     }
   };
 

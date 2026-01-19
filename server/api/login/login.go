@@ -79,6 +79,16 @@ func (l *Api) Login(ctx *gin.Context) {
 		return
 	}
 
+	// 检查用户状态（只有用户被禁用时才不允许登录）
+	if !user.Enable {
+		global.JY_BlackCache.Increment(key, 1)
+		common.FailWithMsg(ctx, "用户已被禁用，无法登录")
+		return
+	}
+
+	// 注意：角色禁用不影响登录，只影响菜单权限
+	// 角色禁用时，用户仍可登录，但获取菜单时会返回空菜单（在 getMenusByAuthorityId 中处理）
+
 	// 生成Token
 	j := utils.NewJWT()
 	claims := utils.CreateClaims(utils.CustomClaims{
