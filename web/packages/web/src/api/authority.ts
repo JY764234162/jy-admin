@@ -64,10 +64,19 @@ export const authorityApi = {
   },
 
   /**
-   * 获取角色的菜单权限
+   * 获取当前用户的菜单权限（树状结构）
+   * 从token中解析用户角色，无需传递角色ID参数
    */
-  getAuthorityMenus: (authorityId: string): Promise<ApiResponse<Menu[]>> => {
-    return request.get("/authority/getMenus", { params: { authorityId } });
+  getAuthorityMenus: (): Promise<ApiResponse<Menu[]>> => {
+    return request.get("/authority/getMenus");
+  },
+
+  /**
+   * 根据角色ID获取菜单权限（用于角色管理页面）
+   * @param authorityId 角色ID
+   */
+  getAuthorityMenusByRole: (authorityId: string): Promise<ApiResponse<Menu[]>> => {
+    return request.get("/authority/getMenusByRole", { params: { authorityId } });
   },
 
   /**

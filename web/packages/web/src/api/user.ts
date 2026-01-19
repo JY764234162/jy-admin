@@ -44,7 +44,7 @@ export const userApi = {
    * 获取当前用户信息
    */
   getCurrentUser: (): Promise<ApiResponse<StorageType.UserInfo>> => {
-    return request.get("/user/current");
+    return request.get("/user/userinfo");
   },
 
   /**

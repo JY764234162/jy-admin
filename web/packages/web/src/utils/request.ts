@@ -1,8 +1,6 @@
 import axios, { AxiosInstance, InternalAxiosRequestConfig, AxiosResponse, AxiosError } from "axios";
 import { message } from "antd";
 import { localStg } from "./storage";
-import { store } from "@/store";
-import { userSlice } from "@/store/slice/user";
 
 // API 路径前缀
 const API_PREFIX = import.meta.env.VITE_API_PREFIX || "/api";
@@ -57,9 +55,10 @@ service.interceptors.response.use(
 
       // 401: Token 过期或未登录
       if (res.code === 401 || response.status === 401) {
-        // 清除 token 和用户信息
+        // 清除 token 和用户信息（只清除 localStorage，避免循环依赖）
+        // store 会在重新加载时从 localStorage 读取，如果 token 不存在会自动重置
         localStg.remove("token");
-        store.dispatch(userSlice.actions.clearUserInfo());
+        localStg.remove("userInfo");
         window.location.href = "/login";
       }
 
@@ -75,12 +74,15 @@ service.interceptors.response.use(
       const { status, data } = error.response;
 
       switch (status) {
-        case 401:
+        case 401: {
           message.error("未登录或登录已过期，请重新登录");
+          // 清除 token 和用户信息（只清除 localStorage，避免循环依赖）
+          // store 会在重新加载时从 localStorage 读取，如果 token 不存在会自动重置
           localStg.remove("token");
-          store.dispatch(userSlice.actions.clearUserInfo());
+          localStg.remove("userInfo");
           window.location.href = "/login";
           break;
+        }
         case 403:
           message.error("没有权限访问该资源");
           break;

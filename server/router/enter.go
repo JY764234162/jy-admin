@@ -86,7 +86,7 @@ func registerRouter(Router *gin.Engine) *gin.Engine {
 	//用户管理
 	{
 		privateGroup.GET("/user/list", apiGroup.UserApi.GetUserList)
-		privateGroup.GET("/user/current", apiGroup.UserApi.GetCurrentUser)
+		privateGroup.GET("/user/userinfo", apiGroup.UserApi.GetCurrentUser)
 		privateGroup.POST("/user", apiGroup.UserApi.CreateUser)
 		privateGroup.PUT("/user", apiGroup.UserApi.UpdateUser)
 		privateGroup.PUT("/user/profile", apiGroup.UserApi.UpdateProfile)
@@ -107,6 +107,7 @@ func registerRouter(Router *gin.Engine) *gin.Engine {
 		privateGroup.PUT("/authority", apiGroup.AuthorityApi.UpdateAuthority)
 		privateGroup.DELETE("/authority", apiGroup.AuthorityApi.DeleteAuthority)
 		privateGroup.GET("/authority/getMenus", apiGroup.AuthorityApi.GetAuthorityMenus)
+		privateGroup.GET("/authority/getMenusByRole", apiGroup.AuthorityApi.GetAuthorityMenusByRole)
 		privateGroup.POST("/authority/setMenus", apiGroup.AuthorityApi.SetAuthorityMenus)
 	}
 	//菜单管理

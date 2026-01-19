@@ -81,9 +81,23 @@ export const Component = () => {
   const showPermissionModal = async (authority: Authority) => {
     setEditingAuthority(authority);
     try {
-      const res = await authorityApi.getAuthorityMenus(authority.authorityId);
+      // 传递authorityId参数获取指定角色的菜单权限
+      const res = await authorityApi.getAuthorityMenusByRole(authority.authorityId);
       if (res.code === 0 && res.data) {
-        const menuIds = res.data.map((menu) => menu.ID).filter((id): id is number => id !== undefined);
+        // 递归提取所有菜单ID（包括子菜单）
+        const extractMenuIds = (menus: Menu[]): number[] => {
+          const ids: number[] = [];
+          menus.forEach((menu) => {
+            if (menu.ID !== undefined) {
+              ids.push(menu.ID);
+            }
+            if (menu.children && menu.children.length > 0) {
+              ids.push(...extractMenuIds(menu.children));
+            }
+          });
+          return ids;
+        };
+        const menuIds = extractMenuIds(res.data);
         setSelectedMenuIds(menuIds);
       }
     } catch (error) {

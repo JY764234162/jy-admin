@@ -16,7 +16,7 @@ import (
 // @Accept       json
 // @Produce      json
 // @Success      200   {object}  common.Response{data=system.SysUser,msg=string}  "获取成功"
-// @Router       /user/current [get]
+// @Router       /user/userinfo [get]
 func (a *Api) GetCurrentUser(c *gin.Context) {
 	// 从 JWT claims 中获取当前登录用户的 ID
 	claims, exists := c.Get("claims")

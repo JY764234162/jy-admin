@@ -22,6 +22,7 @@ export const MenuContextProvider = memo(({ children }: { children: ReactNode }) 
   }, [router.state.matches]);
 
   const items = useMemo(() => {
+    console.log(allRoutes, transformToMenuItems(allRoutes));
     return transformToMenuItems(allRoutes);
   }, [allRoutes]);
 
