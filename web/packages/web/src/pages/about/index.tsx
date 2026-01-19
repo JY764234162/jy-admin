@@ -9,7 +9,6 @@ const { dependencies, devDependencies, name, version, homepage, repository } = p
 
 const transformDependenciesToItems = (dependencies: Record<string, string>) => {
   return Object.entries(dependencies).map((item) => {
-    console.log(item);
     const [name, version] = item;
     return {
       label: name,
@@ -44,7 +43,7 @@ export const Component = () => {
     {
       label: "Github地址",
       children: (
-        <a href={repository.url} style={{ color: primary }} target="_blank">
+        <a href={repository.url} style={{ color: primary }} target="_blank" rel="noreferrer">
           Github地址
         </a>
       ),
@@ -52,7 +51,7 @@ export const Component = () => {
     {
       label: "项目预览地址",
       children: (
-        <a href={homepage} style={{ color: primary }} target="_blank">
+        <a href={homepage} style={{ color: primary }} target="_blank" rel="noreferrer">
           项目预览地址
         </a>
       ),
