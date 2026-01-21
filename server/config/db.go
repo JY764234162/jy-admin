@@ -36,3 +36,23 @@ func (c GeneralDB) LogLevel() logger.LogLevel {
 		return logger.Info
 	}
 }
+
+// GetMaxIdleConns 获取最大空闲连接数
+func (c GeneralDB) GetMaxIdleConns() int {
+	return c.MaxIdleConns
+}
+
+// GetMaxOpenConns 获取最大打开连接数
+func (c GeneralDB) GetMaxOpenConns() int {
+	return c.MaxOpenConns
+}
+
+// GetPrefix 获取表前缀
+func (c GeneralDB) GetPrefix() string {
+	return c.Prefix
+}
+
+// GetSingular 获取是否使用单数表名
+func (c GeneralDB) GetSingular() bool {
+	return c.Singular
+}

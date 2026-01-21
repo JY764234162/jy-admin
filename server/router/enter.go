@@ -35,7 +35,12 @@ func (fs justFilesFilesystem) Open(name string) (http.File, error) {
 
 func InitGinRouter() *gin.Engine {
 	Router := gin.New()
-	//	日志
+
+	// 使用自定义日志中间件
+	Router.Use(middleware.LoggerMiddleware())
+	Router.Use(middleware.ErrorLoggerMiddleware())
+
+	//	日志（开发环境保留 gin 默认日志）
 	if gin.Mode() == gin.DebugMode {
 		Router.Use(gin.Logger())
 	}

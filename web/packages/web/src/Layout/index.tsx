@@ -3,7 +3,6 @@ import { useDispatch, useSelector } from "react-redux";
 import { settingSlice } from "@/store/slice/setting";
 import { SettingDrawer } from "@/components/SettingDrawerButton";
 import { router } from "@/router/routers";
-import { localStg } from "@/utils/storage";
 import { MenuContextProvider } from "@/context/MenuContext/provider";
 import { useMount, useUpdateEffect } from "ahooks";
 import { Layout as AntdLayout, theme } from "antd";
@@ -49,7 +48,7 @@ export const Layout: React.FC = memo(() => {
     }
   }, [location]);
 
-  
+
 
   //初始化弱视和灰度
   useEffect(() => {

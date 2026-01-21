@@ -14,6 +14,7 @@ import (
 
 func main() {
 	core.InitViper()
+	core.InitZap() // 初始化日志系统
 	core.InitBlackCache()
 	global.JY_DB = core.InitGorm()
 	//初始化数据库

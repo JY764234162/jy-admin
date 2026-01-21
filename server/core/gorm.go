@@ -3,6 +3,7 @@ package core
 import (
 	"fmt"
 
+	"gorm.io/driver/mysql"
 	"gorm.io/driver/sqlite"
 	"gorm.io/gorm"
 	"gorm.io/gorm/schema"
@@ -12,26 +13,66 @@ import (
 )
 
 func InitGorm() *gorm.DB {
-	// 数据库配置
-	general := global.JY_Config.Sqlite
+	var db *gorm.DB
+	var err error
+	var dsn string
+	var prefix string
+	var singular bool
+	var maxIdleConns, maxOpenConns int
+
+	// 根据配置选择数据库类型
+	dbType := global.JY_Config.System.DBType
+	switch dbType {
+	case "mysql":
+		mysqlConfig := global.JY_Config.Mysql
+		dsn = mysqlConfig.Dsn()
+		prefix = mysqlConfig.Prefix
+		singular = mysqlConfig.Singular
+		maxIdleConns = mysqlConfig.MaxIdleConns
+		maxOpenConns = mysqlConfig.MaxOpenConns
+		fmt.Printf("使用 MySQL 数据库: %s@%s:%s/%s\n", mysqlConfig.Username, mysqlConfig.Path, mysqlConfig.Port, mysqlConfig.Dbname)
+	case "sqlite", "":
+		// 默认为 SQLite
+		sqliteConfig := global.JY_Config.Sqlite
+		dsn = sqliteConfig.Dsn()
+		prefix = sqliteConfig.Prefix
+		singular = sqliteConfig.Singular
+		maxIdleConns = sqliteConfig.MaxIdleConns
+		maxOpenConns = sqliteConfig.MaxOpenConns
+		fmt.Printf("使用 SQLite 数据库: %s\n", dsn)
+	default:
+		panic(fmt.Sprintf("不支持的数据库类型: %s，支持的类型: sqlite, mysql", dbType))
+	}
+
+	// GORM 配置
 	gormConfig := &gorm.Config{
 		NamingStrategy: schema.NamingStrategy{
-			TablePrefix:   general.Prefix,
-			SingularTable: general.Singular,
+			TablePrefix:   prefix,
+			SingularTable: singular,
 		},
 		DisableForeignKeyConstraintWhenMigrating: true,
 	}
-	fmt.Println(general.Dsn())
-	if db, err := gorm.Open(sqlite.Open(general.Dsn()), gormConfig); err != nil {
+
+	// 连接数据库
+	switch dbType {
+	case "mysql":
+		db, err = gorm.Open(mysql.Open(dsn), gormConfig)
+	case "sqlite", "":
+		db, err = gorm.Open(sqlite.Open(dsn), gormConfig)
+	}
+
+	if err != nil {
 		fmt.Printf("连接数据库失败: %v\n", err)
 		panic(err)
-	} else {
-		sqlDB, _ := db.DB()
-		sqlDB.SetMaxIdleConns(general.MaxIdleConns)
-		sqlDB.SetMaxOpenConns(general.MaxOpenConns)
-		fmt.Printf("连接数据库成功:%v\n", general.Dsn())
-		return db
 	}
+
+	// 设置连接池
+	sqlDB, _ := db.DB()
+	sqlDB.SetMaxIdleConns(maxIdleConns)
+	sqlDB.SetMaxOpenConns(maxOpenConns)
+
+	fmt.Printf("连接数据库成功: %s\n", dsn)
+	return db
 }
 
 func RegisterTables() {

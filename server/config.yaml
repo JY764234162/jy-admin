@@ -1,5 +1,5 @@
 system:
-  db-type: sqlite
+  db-type: mysql
   oss-type: local
   router-prefix: '/api/'
   port: 7777
@@ -25,6 +25,21 @@ sqlite:
   max-open-conns: 100
   log-mode: ''
   log-zap: false
+
+mysql:
+  path: '101.42.138.198'              # MySQL 主机地址
+  port: '3306'                   # MySQL 端口
+  config: 'charset=utf8mb4&parseTime=True&loc=Local'  # 额外配置参数
+  db-name: 'jy_admin'            # 数据库名
+  username: 'jy_admin'               # 数据库用户名
+  password: '123456'           # 数据库密码
+  prefix: ''                     # 表前缀
+  engine: 'InnoDB'               # 存储引擎
+  max-idle-conns: 10             # 最大空闲连接数
+  max-open-conns: 100            # 最大打开连接数
+  log-mode: 'info'               # 日志级别: silent, error, warn, info
+  log-zap: false                 # 是否使用 zap 记录日志
+  singular: false                 # 是否使用单数表名
 local:
   path: uploads/file
   store-path: uploads/file
@@ -34,3 +49,13 @@ captcha:
   img-height: 100
   open-captcha: 3
   open-captcha-timeout: 3600
+log:
+  level: info          # 日志级别: debug, info, warn, error
+  format: console      # 日志格式: json, console
+  output: both         # 输出位置: stdout, file, both
+  path: ./logs         # 日志文件路径
+  file-name: app.log   # 日志文件名
+  max-size: 100        # 单个日志文件最大大小(MB)
+  max-backups: 7       # 保留的旧日志文件数量
+  max-age: 30          # 保留日志文件的最大天数
+  compress: true        # 是否压缩旧日志文件

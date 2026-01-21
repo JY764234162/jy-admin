@@ -7,6 +7,7 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/songzhibin97/gkit/cache/local_cache"
 	"github.com/spf13/viper"
+	"go.uber.org/zap"
 	"gorm.io/gorm"
 	"jiangyi.com/config"
 )
@@ -34,4 +35,5 @@ var (
 	JY_RouteInfo  gin.RouteInfo
 	JY_Lock       sync.RWMutex
 	JY_BlackCache local_cache.Cache // 本地缓存，用于黑名单等场景
+	JY_LOG        *zap.Logger       // 全局日志实例
 )

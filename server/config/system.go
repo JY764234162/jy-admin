@@ -1,7 +1,7 @@
 package config
 
 type System struct {
-	DBType             string `mapstructure:"db-type	"`
+	DBType             string `mapstructure:"db-type"`
 	OSSType            string `mapstructure:"oss-type"`
 	RouterPrefix       string `mapstructure:"router-prefix"`
 	Port               string `mapstructure:"port"`

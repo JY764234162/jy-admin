@@ -37,7 +37,7 @@ func (l *Api) Login(ctx *gin.Context) {
 	var err error
 	err = ctx.ShouldBindJSON(&params)
 	if err != nil {
-		common.FailWithMsg(ctx, "获取参数失败")
+		common.FailWithError(ctx, "获取参数失败", err)
 		return
 	}
 	if params.Username == "" || params.Password == "" {
@@ -68,7 +68,7 @@ func (l *Api) Login(ctx *gin.Context) {
 	err = global.JY_DB.Where("username = ?", params.Username).First(&user).Error
 	if err != nil {
 		global.JY_BlackCache.Increment(key, 1)
-		common.FailWithMsg(ctx, "用户不存在或密码错误")
+		common.FailWithError(ctx, "用户不存在或密码错误", err)
 		return
 	}
 
@@ -99,7 +99,7 @@ func (l *Api) Login(ctx *gin.Context) {
 	})
 	token, err := j.CreateToken(claims)
 	if err != nil {
-		common.FailWithMsg(ctx, "获取token失败")
+		common.FailWithError(ctx, "获取token失败", err)
 		return
 	}
 
