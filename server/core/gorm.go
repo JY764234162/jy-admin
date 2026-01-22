@@ -4,7 +4,7 @@ import (
 	"fmt"
 
 	"gorm.io/driver/mysql"
-	"gorm.io/driver/sqlite"
+	// "gorm.io/driver/sqlite"  // 注释掉 SQLite 导入，避免 CGO 依赖
 	"gorm.io/gorm"
 	"gorm.io/gorm/schema"
 	"jiangyi.com/global"
@@ -32,14 +32,8 @@ func InitGorm() *gorm.DB {
 		maxOpenConns = mysqlConfig.MaxOpenConns
 		fmt.Printf("使用 MySQL 数据库: %s@%s:%s/%s\n", mysqlConfig.Username, mysqlConfig.Path, mysqlConfig.Port, mysqlConfig.Dbname)
 	case "sqlite", "":
-		// 默认为 SQLite
-		sqliteConfig := global.JY_Config.Sqlite
-		dsn = sqliteConfig.Dsn()
-		prefix = sqliteConfig.Prefix
-		singular = sqliteConfig.Singular
-		maxIdleConns = sqliteConfig.MaxIdleConns
-		maxOpenConns = sqliteConfig.MaxOpenConns
-		fmt.Printf("使用 SQLite 数据库: %s\n", dsn)
+		// SQLite 需要 CGO，Docker 环境不支持，强制使用 MySQL
+		panic("SQLite 在 Docker 环境中不可用，请使用 MySQL。请在配置文件中设置 db-type: mysql")
 	default:
 		panic(fmt.Sprintf("不支持的数据库类型: %s，支持的类型: sqlite, mysql", dbType))
 	}
@@ -58,7 +52,10 @@ func InitGorm() *gorm.DB {
 	case "mysql":
 		db, err = gorm.Open(mysql.Open(dsn), gormConfig)
 	case "sqlite", "":
-		db, err = gorm.Open(sqlite.Open(dsn), gormConfig)
+		// SQLite 需要 CGO，Docker 环境不支持
+		panic("SQLite 在 Docker 环境中不可用，请使用 MySQL")
+	default:
+		panic(fmt.Sprintf("不支持的数据库类型: %s", dbType))
 	}
 
 	if err != nil {

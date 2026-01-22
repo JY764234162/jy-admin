@@ -1,0 +1,55 @@
+name: Build Only
+
+on:
+  push:
+    branches:
+      - main
+      - master
+  workflow_dispatch:
+
+env:
+  DOCKER_BUILDKIT: 1
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Build backend image
+        run: |
+          docker buildx build \
+            --platform linux/amd64 \
+            -t jy-admin-backend:latest \
+            -f deploy/server/Dockerfile \
+            --load \
+            server/
+
+      - name: Build frontend image
+        run: |
+          docker buildx build \
+            --platform linux/amd64 \
+            -t jy-admin-frontend:latest \
+            -f deploy/web/Dockerfile \
+            --load \
+            web/
+
+      - name: Save images
+        run: |
+          docker save jy-admin-backend:latest -o backend.tar
+          docker save jy-admin-frontend:latest -o frontend.tar
+
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: docker-images
+          path: |
+            backend.tar
+            frontend.tar
+          retention-days: 7
+

@@ -1,0 +1,65 @@
+# Docker 环境配置文件
+# 用于 Docker Compose 部署
+
+system:
+  db-type: mysql
+  oss-type: local
+  router-prefix: '/api/'
+  port: 7777
+  iplimit-count: 10000
+  iplimit-time: 3600
+  use-strict-auth: true
+  disable-auto-migrate: true        # 生产环境禁用自动迁移
+  read-timeout: 300
+  write-timeout: 300
+
+jwt:
+  # 通过环境变量 JWT_SIGNING_KEY 设置
+  signing-key: ${JWT_SIGNING_KEY:change-this-secret-key}
+  expires-time: 7d
+  buffer-time: 1d
+  issuer: JY-Admin-Production
+
+mysql:
+  # ⚠️ 使用 Docker 容器名作为主机地址
+  # 如果 MySQL 在 Docker 网络中，使用容器名 'mysql'
+  # 如果 MySQL 在主机上，使用 'host.docker.internal'
+  # 如果 MySQL 在外部服务器，使用 IP 地址 '101.42.138.198'
+  path: 'mysql'                     # Docker 容器名（推荐）
+  # path: 'host.docker.internal'    # 访问主机上的 MySQL
+  # path: '101.42.138.198'          # 外部 MySQL 服务器
+  port: '3306'
+  config: 'charset=utf8mb4&parseTime=True&loc=Local&timeout=10s&readTimeout=30s&writeTimeout=30s'
+  db-name: 'jy_admin'
+  username: 'jy_admin'
+  password: ${MYSQL_PASSWORD:123456}  # 从环境变量读取
+  prefix: ''
+  engine: 'InnoDB'
+  max-idle-conns: 10
+  max-open-conns: 100
+  log-mode: warn
+  log-zap: false
+  singular: false
+
+local:
+  path: uploads/file
+  store-path: uploads/file
+
+captcha:
+  key-long: 6
+  img-width: 300
+  img-height: 100
+  open-captcha: 0
+  open-captcha-timeout: 3600
+
+log:
+  level: info
+  format: json                       # Docker 环境使用 JSON 格式
+  output: file                       # 只输出到文件
+  path: /app/logs
+  file-name: app.log
+  max-size: 100
+  max-backups: 30
+  max-age: 90
+  compress: true
+

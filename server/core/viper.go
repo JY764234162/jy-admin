@@ -21,8 +21,13 @@ func InitViper() {
 	}
 
 	// 根据环境加载不同的配置文件
+	// 优先检查是否存在 config.docker.yaml（Docker 环境）
 	configName := "config"
-	if env != "dev" {
+	if _, err := os.Stat("config.docker.yaml"); err == nil {
+		// Docker 环境
+		configName = "config.docker"
+		env = "docker"
+	} else if env != "dev" {
 		configName = fmt.Sprintf("config.%s", env)
 	}
 

@@ -8,7 +8,7 @@ import svgSprite from "vite-plugin-svg-sprite";
 import vitePluginResourceClassification from "./custom-vite-plugins/vite-plugin-resource-classification";
 import { getBuildTime, setHtmlBuildTimePlugin } from "./custom-vite-plugins/buildTime";
 import { setupProjectInfo } from "./custom-vite-plugins/info";
-import { visualizer } from "rollup-plugin-visualizer";
+// import { visualizer } from "rollup-plugin-visualizer";
 // https://vitejs.dev/config/
 export default defineConfig(({ mode }: ConfigEnv) => {
   //加载对应环境的环境变量
@@ -24,7 +24,7 @@ export default defineConfig(({ mode }: ConfigEnv) => {
       vitePluginResourceClassification(),
       svgSprite({ symbolId: "icon-[name]-[hash]" }),
       tailwindcss(),
-      visualizer({ open: true }),
+      // visualizer({ open: true }),
       setHtmlBuildTimePlugin(buildTime),
       setupProjectInfo(),
     ],
@@ -59,7 +59,7 @@ export default defineConfig(({ mode }: ConfigEnv) => {
         },
       },
     },
-    base: VITE_BASENAME,
+    base: VITE_BASENAME || "/",  // 如果没有设置，默认使用根路径
     assetsInclude: ["**/*.gltf"],
     define: {
       BUILD_TIME: JSON.stringify(buildTime),

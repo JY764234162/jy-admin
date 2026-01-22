@@ -2,7 +2,7 @@
 # 使用方式: APP_ENV=prod go run main.go 或 export APP_ENV=prod && ./jy-admin
 
 system:
-  db-type: sqlite                    # 数据库类型: sqlite, mysql, postgres
+  db-type: mysql                    # 数据库类型: sqlite, mysql, postgres
   oss-type: local                    # 对象存储类型: local, minio, qiniu, oss
   router-prefix: '/api/'             # API 路由前缀
   port: 7777                         # 服务端口
@@ -37,10 +37,10 @@ sqlite:
 mysql:
   # ⚠️ 如果使用 MySQL，请设置 system.db-type: mysql
   # 并通过环境变量设置数据库密码: export MYSQL_PASSWORD="your-password"
-  path: 'localhost'                   # MySQL 主机地址（可以是 IP 或域名）
+  path: 'mysql'                   # MySQL 主机地址（可以是 IP 或域名）
   port: '3306'                       # MySQL 端口
   config: 'charset=utf8mb4&parseTime=True&loc=Local&timeout=10s&readTimeout=30s&writeTimeout=30s'  # 连接参数
-  db-name: 'jy_admin_prod'          # 生产环境数据库名
+  db-name: 'jy_admin'          # 生产环境数据库名
   username: 'jy_admin'              # 数据库用户名（建议创建专用用户）
   password: ${MYSQL_PASSWORD:change-this-password}  # 数据库密码（建议通过环境变量设置）
   prefix: ''                        # 表前缀（可选）

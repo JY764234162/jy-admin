@@ -1,0 +1,40 @@
+# Node modules
+node_modules/
+**/node_modules/
+
+# 构建产物（会在 Docker 内构建）
+docs/
+dist/
+
+# 开发文件
+.git/
+.gitignore
+*.md
+README*
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# 日志
+*.log
+logs/
+
+# 临时文件
+tmp/
+temp/
+.DS_Store
+
+# 测试文件
+**/__tests__/
+**/*.test.*
+**/*.spec.*
+
+# 其他不需要的文件
+others/
+*.db
+*.db-shm
+*.db-wal
+

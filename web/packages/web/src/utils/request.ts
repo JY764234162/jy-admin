@@ -5,18 +5,12 @@ import { localStg } from "./storage";
 const API_PREFIX = import.meta.env.VITE_API_PREFIX || "/api";
 
 // 是否使用代理（通过环境变量配置）
-const USE_PROXY = import.meta.env.VITE_USE_PROXY === "true";
+const VITE_API_BASE_URL = import.meta.env.VITE_API_BASE_URL || '';
 
-// API 基础地址
-// 使用代理时：使用相对路径（通过 Vite 代理转发）
-// 不使用代理时：使用环境变量配置的完整URL，如果没有则使用当前域名
-const BASE_URL = USE_PROXY
-  ? "" // 使用代理时使用相对路径，通过 Vite 代理转发
-  : import.meta.env.VITE_API_BASE_URL || window.location.origin; // 不使用代理时使用配置的URL或当前域名
 
 // 创建 axios 实例
 const service: AxiosInstance = axios.create({
-  baseURL: `${BASE_URL}${API_PREFIX}`,
+  baseURL: `${VITE_API_BASE_URL}${API_PREFIX}`,
   timeout: 30000,
   headers: {
     "Content-Type": "application/json;charset=UTF-8",

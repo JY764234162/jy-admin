@@ -1,0 +1,65 @@
+# Git
+.git
+.gitignore
+.gitattributes
+
+# IDE
+.vscode
+.idea
+*.swp
+*.swo
+*~
+
+# Build artifacts
+__debug_bin*
+*.exe
+*.dll
+*.so
+*.dylib
+jy-admin
+jy-admin-linux
+
+# Test files
+*_test.go
+testdata
+
+# Documentation
+*.md
+README*
+DEPLOY*
+ENVIRONMENT*
+MYSQL_*
+PRODUCTION_*
+QUICK_*
+LOGGING*
+
+# Database files
+*.db
+*.db-shm
+*.db-wal
+
+# Logs
+*.log
+logs/
+
+# Temporary files
+tmp/
+temp/
+.DS_Store
+
+# Uploads (不需要打包到镜像)
+uploads/
+
+# Node modules (前端)
+node_modules/
+web/node_modules/
+web/packages/*/node_modules/
+
+# Frontend build (会在构建时复制)
+web/docs/
+
+# Docker files
+docker-compose*.yml
+Dockerfile*
+.dockerignore
+
