@@ -1,6 +1,6 @@
 system:
-  db-type: mysql
-  oss-type: local
+  db-type: sqlite
+  oss-type: local                    # 对象存储类型: local, tencent-cos
   router-prefix: '/api/'
   port: 7777
   iplimit-count: 15000
@@ -26,23 +26,21 @@ sqlite:
   log-mode: ''
   log-zap: false
 
-mysql:
-  path: '101.42.138.198'              # MySQL 主机地址
-  port: '3306'                   # MySQL 端口
-  config: 'charset=utf8mb4&parseTime=True&loc=Local'  # 额外配置参数
-  db-name: 'jy_admin'            # 数据库名
-  username: 'jy_admin'               # 数据库用户名
-  password: '123456'           # 数据库密码
-  prefix: ''                     # 表前缀
-  engine: 'InnoDB'               # 存储引擎
-  max-idle-conns: 10             # 最大空闲连接数
-  max-open-conns: 100            # 最大打开连接数
-  log-mode: 'info'               # 日志级别: silent, error, warn, info
-  log-zap: false                 # 是否使用 zap 记录日志
-  singular: false                 # 是否使用单数表名
 local:
   path: uploads/file
   store-path: uploads/file
+
+# 腾讯云COS配置（当 system.oss-type 设置为 tencent-cos 时使用）
+cos:
+  secret-id: ""                      # 腾讯云 SecretId
+  secret-key: ""                      # 腾讯云 SecretKey
+  region: ap-guangzhou                # COS 地域
+  bucket: ""                          # 存储桶名称
+  domain: ""                          # 自定义域名（可选）
+  path-prefix: "uploads"              # 路径前缀（可选）
+  use-https: true                     # 是否使用 HTTPS
+  use-cdn: false                      # 是否使用 CDN 加速域名
+
 captcha:
   key-long: 6
   img-width: 300

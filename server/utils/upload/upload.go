@@ -3,6 +3,7 @@ package upload
 import (
 	"mime/multipart"
 
+	"go.uber.org/zap"
 	"jiangyi.com/global"
 )
 
@@ -15,10 +16,15 @@ func NewOss() OSS {
 	switch global.JY_Config.System.OSSType {
 	case "local":
 		return &Local{}
+	case "tencent-cos":
+		cosClient, err := NewTencentCOS()
+		if err != nil {
+			global.JY_LOG.Error("COS初始化失败", zap.Error(err))
+			panic("COS初始化失败: " + err.Error()) // 如果配置了COS但初始化失败，应该panic，避免使用错误的存储
+		}
+		return cosClient
 	// case "qiniu":
 	// 	return &Qiniu{}
-	// case "tencent-cos":
-	// 	return &TencentCOS{}
 	// case "aliyun-oss":
 	// 	return &AliyunOSS{}
 	// case "huawei-obs":

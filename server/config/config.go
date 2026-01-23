@@ -6,6 +6,7 @@ type Config struct {
 	Sqlite  Sqlite  `mapstructure:"sqlite"`
 	Mysql   Mysql   `mapstructure:"mysql"`
 	Local   Local   `mapstructure:"local"`
+	Cos     Cos     `mapstructure:"cos"`
 	Captcha Captcha `mapstructure:"captcha"`
 	Log     Log     `mapstructure:"log"`
 }

@@ -14,21 +14,22 @@ import (
 func InitViper() {
 	v := viper.New()
 
-	// 获取环境变量，默认为 dev
-	env := os.Getenv("APP_ENV")
-	if env == "" {
-		env = "dev"
-	}
+	// 根据 GIN_MODE 环境变量判断环境
+	// GIN_MODE 可能的值: debug, release, test
+	// release 模式（生产环境）使用 config.docker.yaml
+	// debug/test 模式或未设置（开发环境）使用 config.dev.yaml
+	ginMode := os.Getenv("GIN_MODE")
+	configName := "config.dev"
+	env := "dev"
 
-	// 根据环境加载不同的配置文件
-	// 优先检查是否存在 config.docker.yaml（Docker 环境）
-	configName := "config"
-	if _, err := os.Stat("config.docker.yaml"); err == nil {
-		// Docker 环境
+	if ginMode == "release" {
+		// 生产环境使用 config.docker.yaml
 		configName = "config.docker"
-		env = "docker"
-	} else if env != "dev" {
-		configName = fmt.Sprintf("config.%s", env)
+		env = "prod"
+	} else {
+		// 开发环境使用 config.dev.yaml
+		configName = "config.dev"
+		env = "dev"
 	}
 
 	v.SetConfigName(configName)
@@ -68,6 +69,6 @@ func InitViper() {
 		fmt.Println("已从环境变量 MYSQL_PASSWORD 读取 MySQL 密码")
 	}
 
-	fmt.Printf("读取配置成功: %s.yaml (环境: %s)\n", configName, env)
+	fmt.Printf("读取配置成功: %s.yaml (GIN_MODE: %s, 环境: %s)\n", configName, ginMode, env)
 	global.JY_Viper = v
 }
