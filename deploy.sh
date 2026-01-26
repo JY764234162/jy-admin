@@ -130,8 +130,8 @@ fi
 
 echo ""
 echo -e "${GREEN}访问地址：${NC}"
-echo "  前端: http://localhost:8080"
-echo "  健康检查: http://localhost:8080/api/health"
+echo "  前端: http://localhost"
+echo "  健康检查: http://localhost/api/health"
 echo ""
 echo -e "${BLUE}常用命令：${NC}"
 echo "  查看日志: docker-compose logs -f"

@@ -89,7 +89,7 @@ services:
     container_name: jy-admin-frontend
     restart: always
     ports:
-      - "8080:80" # ⚠️ 只暴露前端端口
+      - "80:80" # 前端服务端口（注意：80端口需要root权限）
     depends_on:
       - backend
     networks:

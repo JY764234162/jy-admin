@@ -236,8 +236,8 @@ chmod +x deploy.sh
 
 #### 3. 访问系统
 
-- 前端地址: http://localhost:8080
-- 健康检查: http://localhost:8080/api/health
+- 前端地址: http://localhost
+- 健康检查: http://localhost/api/health
 
 详细部署说明请参考 [部署指南](deploy/DEPLOYMENT_GUIDE.md)
 
