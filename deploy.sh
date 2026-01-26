@@ -97,6 +97,18 @@ fi
 export DOCKER_BUILDKIT=1
 export COMPOSE_DOCKER_CLI_BUILD=1
 
+# 清理虚悬镜像（dangling images）
+echo -e "\n${BLUE}清理虚悬镜像...${NC}"
+DANGLING_IMAGES=$(docker images -f "dangling=true" -q)
+if [ -z "$DANGLING_IMAGES" ]; then
+    echo -e "${GREEN}✓ 没有虚悬镜像需要清理${NC}"
+else
+    DANGLING_COUNT=$(echo "$DANGLING_IMAGES" | wc -l | tr -d ' ')
+    echo -e "${YELLOW}发现 $DANGLING_COUNT 个虚悬镜像，正在清理...${NC}"
+    docker image prune -f > /dev/null
+    echo -e "${GREEN}✓ 虚悬镜像清理完成${NC}"
+fi
+
 # 构建和启动
 echo -e "\n${BLUE}开始构建和启动服务...${NC}\n"
 
