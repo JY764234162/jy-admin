@@ -48,6 +48,9 @@ func NewTencentCOS() (*TencentCOS, error) {
 		},
 	})
 
+	fmt.Printf("COS客户端创建成功: 地域=%s, 存储桶=%s, URL=%s\n",
+		cosConfig.Region, cosConfig.Bucket, u.String())
+
 	return &TencentCOS{
 		client: client,
 	}, nil

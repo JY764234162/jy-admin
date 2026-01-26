@@ -3,7 +3,7 @@
 
 system:
   db-type: mysql
-  oss-type: local                    # 对象存储类型: local, tencent-cos
+  oss-type: tencent-cos                    # 对象存储类型: local, tencent-cos
   router-prefix: '/api/'
   port: 7777
   iplimit-count: 10000
@@ -15,19 +15,13 @@ system:
 
 jwt:
   # 通过环境变量 JWT_SIGNING_KEY 设置
-  signing-key: ${JWT_SIGNING_KEY:change-this-secret-key}
+  signing-key: ${JWT_SIGNING_KEY:jy_admin_secret_key}
   expires-time: 7d
   buffer-time: 1d
   issuer: JY-Admin-Production
 
 mysql:
-  # ⚠️ 使用 Docker 容器名作为主机地址
-  # 如果 MySQL 在 Docker 网络中，使用容器名 'mysql'
-  # 如果 MySQL 在主机上，使用 'host.docker.internal'
-  # 如果 MySQL 在外部服务器，使用 IP 地址 '101.42.138.198'
   path: 'mysql'                     # Docker 容器名（推荐）
-  # path: 'host.docker.internal'    # 访问主机上的 MySQL
-  # path: '101.42.138.198'          # 外部 MySQL 服务器
   port: '3306'
   config: 'charset=utf8mb4&parseTime=True&loc=Local&timeout=10s&readTimeout=30s&writeTimeout=30s'
   db-name: 'jy_admin'
@@ -49,11 +43,12 @@ local:
 # 建议通过环境变量设置敏感信息：
 # export COS_SECRET_ID="your-secret-id"
 # export COS_SECRET_KEY="your-secret-key"
+
 cos:
-  secret-id: ${COS_SECRET_ID:}      # 腾讯云 SecretId（必填）
-  secret-key: ${COS_SECRET_KEY:}     # 腾讯云 SecretKey（必填）
-  region: ap-guangzhou               # COS 地域，如：ap-guangzhou, ap-beijing, ap-shanghai
-  bucket: your-bucket-name           # 存储桶名称（必填）
+  secret-id: ${COS_SECRET_ID}      # 腾讯云 SecretId（必填）
+  secret-key: ${COS_SECRET_KEY}     # 腾讯云 SecretKey（必填）
+  region: ap-beijing               # COS 地域，如：ap-guangzhou, ap-beijing, ap-shanghai
+  bucket: beij-1304949087           # 存储桶名称（必填）
   domain: ""                         # 自定义域名（可选），如：cdn.example.com
   path-prefix: "uploads"             # 路径前缀（可选），文件将存储在此前缀下
   use-https: true                    # 是否使用 HTTPS（推荐开启）
@@ -69,7 +64,7 @@ captcha:
 log:
   level: info
   format: json                       # Docker 环境使用 JSON 格式
-  output: file                       # 只输出到文件
+  output: both                       # 同时输出到控制台和文件（便于 Docker 日志查看）
   path: /app/logs
   file-name: app.log
   max-size: 100

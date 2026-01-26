@@ -5,7 +5,7 @@ import { useNavigate } from "react-router-dom";
 import { useDispatch, useSelector } from "react-redux";
 import { userApi, uploadApi } from "@/api";
 import { localStg } from "@/utils/storage";
-import { getImageUrl, getImagePath } from "@/utils/image";
+import { getImageUrl, getImagePath, normalizeFileUrl } from "@/utils/image";
 import type { ChangePasswordRequest, UpdateProfileRequest } from "@/api/types";
 import type { RcFile } from "antd/es/upload";
 import { userSlice } from "@/store/slice/user";
@@ -117,19 +117,16 @@ export const Component = () => {
         throw new Error(uploadRes.msg || "文件上传失败");
       }
 
-      // 获取文件相对路径（后端返回的 url 字段，格式为 uploads/file/filename）
-      // 不拼接域名，直接保存相对路径到数据库
-      let filePath = uploadRes.data.url || uploadRes.data.filePath || "";
+      // 获取文件URL（可能是完整URL（COS）或相对路径（本地存储））
+      const rawUrl = uploadRes.data.url || uploadRes.data.filePath || "";
         
-      // 确保路径格式正确（以 / 开头）
-      if (filePath && !filePath.startsWith("/")) {
-        filePath = "/" + filePath;
-      }
+      // 规范化文件URL（COS 返回完整URL，本地存储返回相对路径）
+      const filePath = normalizeFileUrl(rawUrl);
 
-      // 调用 API 更新用户头像（保存相对路径，不拼接域名）
+      // 调用 API 更新用户头像（COS 保存完整URL，本地存储保存相对路径）
       const updateRes = await userApi.updateProfile({
         nickName: userInfo?.nickName || "",
-        headerImg: filePath, // 保存相对路径
+        headerImg: filePath, // COS 为完整URL，本地存储为相对路径
       });
       if (updateRes.code !== 0 || !updateRes.data) {
         throw new Error(updateRes.msg || "更新头像失败");

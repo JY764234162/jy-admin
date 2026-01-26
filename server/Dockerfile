@@ -5,6 +5,8 @@ WORKDIR /app
 
 # 复制 go mod 文件
 COPY go.mod go.sum ./
+# 配置国内代理
+RUN go env -w GOPROXY=https://goproxy.cn,direct
 RUN go mod download
 
 # 复制源代码
@@ -30,9 +32,14 @@ WORKDIR /app
 # 从构建阶段复制可执行文件
 COPY --from=builder /app/jy-admin .
 
-# 复制配置文件（优先使用 config.docker.yaml，如果不存在则使用 config.prod.yaml）
-COPY config.docker.yaml config.yaml
-COPY config.prod.yaml .
+# 复制配置文件（构建时从构建上下文复制）
+# 注意：config.docker.yaml 需要在构建前复制到 server 目录
+# 如果文件不存在，使用空文件作为占位符（避免构建失败）
+COPY config.docker.yaml* ./
+RUN if [ ! -f config.docker.yaml ]; then \
+      echo "警告: config.docker.yaml 不存在，将使用默认配置"; \
+      touch config.docker.yaml; \
+    fi
 
 # 创建必要的目录
 RUN mkdir -p /app/data /app/uploads /app/logs

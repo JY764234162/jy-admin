@@ -36,4 +36,5 @@ var (
 	JY_Lock       sync.RWMutex
 	JY_BlackCache local_cache.Cache // 本地缓存，用于黑名单等场景
 	JY_LOG        *zap.Logger       // 全局日志实例
+	JY_OSS        interface{}       // 全局OSS实例（upload.OSS接口类型）
 )

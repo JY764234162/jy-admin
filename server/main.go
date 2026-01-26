@@ -16,6 +16,7 @@ func main() {
 	core.InitViper()
 	core.InitZap() // 初始化日志系统
 	core.InitBlackCache()
+	core.InitOSS() // 初始化OSS存储服务
 	global.JY_DB = core.InitGorm()
 	//初始化数据库
 	if global.JY_DB != nil {

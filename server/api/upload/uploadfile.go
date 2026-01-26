@@ -2,10 +2,12 @@ package upload
 
 import (
 	"errors"
+	"fmt"
 	"strconv"
 	"strings"
 
 	"github.com/gin-gonic/gin"
+	"go.uber.org/zap"
 	"gorm.io/gorm"
 	"jiangyi.com/global"
 	"jiangyi.com/model/common"
@@ -32,10 +34,29 @@ func (u *Api) UploadFile(c *gin.Context) {
 		common.FailWithMsg(c, "未接收到文件")
 		return
 	}
-	oss := upload.NewOss()
+	// 使用全局OSS实例
+	if global.JY_OSS == nil {
+		global.JY_LOG.Error("OSS未初始化")
+		common.FailWithMsg(c, "文件存储服务未初始化")
+		return
+	}
+
+	oss, ok := global.JY_OSS.(upload.OSS)
+	if !ok {
+		global.JY_LOG.Error("OSS类型转换失败", zap.Any("type", fmt.Sprintf("%T", global.JY_OSS)))
+		common.FailWithMsg(c, "文件存储服务类型错误")
+		return
+	}
+
 	filePath, key, uploadErr := oss.UploadFile(header)
+
 	if uploadErr != nil {
-		common.FailWithMsg(c, "写入oss文件失败")
+		global.JY_LOG.Error("文件上传失败",
+			zap.String("filename", header.Filename),
+			zap.String("oss_type", global.JY_Config.System.OSSType),
+			zap.Error(uploadErr),
+		)
+		common.FailWithError(c, "写入oss文件失败", uploadErr)
 		return
 	}
 	s := strings.Split(header.Filename, ".")

@@ -72,3 +72,543 @@ net/http.(*conn).serve
 2026-01-21 10:30:13	[34mINFO[0m	gin@v1.11.0/context.go:192	HTTP请求	{"status": 200, "method": "GET", "path": "/api/login/captcha", "query": "", "ip": "::1", "user-agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36", "cost": "221.375µs"}
 2026-01-23 10:56:24	[34mINFO[0m	server/main.go:17	日志系统初始化成功	{"level": "info", "format": "console", "output": "both"}
 2026-01-23 11:00:44	[34mINFO[0m	server/main.go:17	日志系统初始化成功	{"level": "info", "format": "console", "output": "both"}
+2026-01-23 11:01:35	[34mINFO[0m	gin@v1.11.0/context.go:192	HTTP请求	{"status": 200, "method": "GET", "path": "/api/login/captcha", "query": "", "ip": "::1", "user-agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Cursor/2.1.46 Chrome/138.0.7204.251 Electron/37.7.0 Safari/537.36", "cost": "891.291µs"}
+2026-01-23 11:01:36	[33mWARN[0m	common/response.go:61	接口警告	{"method": "GET", "path": "/api/user/userinfo", "query": "", "ip": "::1", "user-agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36", "msg": "用户不存在", "file": "/Users/jiangyi/Desktop/study/jy-admin/server/api/user/current.go", "line": 32, "func": "GetCurrentUser"}
+2026-01-23 11:01:36	[34mINFO[0m	gin@v1.11.0/context.go:192	HTTP请求	{"status": 200, "method": "GET", "path": "/api/user/userinfo", "query": "", "ip": "::1", "user-agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36", "cost": "2.255ms"}
+2026-01-23 11:01:36	[34mINFO[0m	gin@v1.11.0/context.go:192	HTTP请求	{"status": 200, "method": "GET", "path": "/api/login/captcha", "query": "", "ip": "::1", "user-agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Cursor/2.1.46 Chrome/138.0.7204.251 Electron/37.7.0 Safari/537.36", "cost": "63.875µs"}
+2026-01-23 11:01:37	[34mINFO[0m	gin@v1.11.0/context.go:192	HTTP请求	{"status": 200, "method": "GET", "path": "/api/login/captcha", "query": "", "ip": "::1", "user-agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Cursor/2.1.46 Chrome/138.0.7204.251 Electron/37.7.0 Safari/537.36", "cost": "62.25µs"}
+2026-01-23 11:01:54	[34mINFO[0m	gin@v1.11.0/context.go:192	HTTP请求	{"status": 200, "method": "GET", "path": "/api/login/captcha", "query": "", "ip": "::1", "user-agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36", "cost": "168.875µs"}
+2026-01-23 11:02:31	[34mINFO[0m	gin@v1.11.0/context.go:192	HTTP请求	{"status": 200, "method": "GET", "path": "/api/login/captcha", "query": "", "ip": "::1", "user-agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36", "cost": "118.5µs"}
+2026-01-23 11:02:32	[33mWARN[0m	common/response.go:61	接口警告	{"method": "POST", "path": "/api/login", "query": "", "ip": "::1", "user-agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36", "msg": "用户不存在或密码错误", "file": "/Users/jiangyi/Desktop/study/jy-admin/server/api/login/login.go", "line": 78, "func": "Login"}
+2026-01-23 11:02:32	[34mINFO[0m	gin@v1.11.0/context.go:192	HTTP请求	{"status": 200, "method": "POST", "path": "/api/login", "query": "", "ip": "::1", "user-agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36", "cost": "101.812125ms"}
+2026-01-23 11:02:32	[34mINFO[0m	gin@v1.11.0/context.go:192	HTTP请求	{"status": 200, "method": "GET", "path": "/api/login/captcha", "query": "", "ip": "::1", "user-agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36", "cost": "45.083µs"}
+2026-01-23 11:02:44	[34mINFO[0m	gin@v1.11.0/context.go:192	HTTP请求	{"status": 200, "method": "POST", "path": "/api/login", "query": "", "ip": "::1", "user-agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36", "cost": "71.170333ms"}
+2026-01-23 11:02:44	[34mINFO[0m	gin@v1.11.0/context.go:192	HTTP请求	{"status": 200, "method": "GET", "path": "/api/user/userinfo", "query": "", "ip": "::1", "user-agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36", "cost": "982.917µs"}
+2026-01-23 11:02:44	[34mINFO[0m	gin@v1.11.0/context.go:192	HTTP请求	{"status": 200, "method": "GET", "path": "/api/authority/getMenus", "query": "", "ip": "::1", "user-agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36", "cost": "8.013458ms"}
+2026-01-23 11:02:45	[34mINFO[0m	gin@v1.11.0/context.go:192	HTTP请求	{"status": 200, "method": "GET", "path": "/api/uploads/file/4eb71cdf366eba0ad7dccba248fd043e_20260116163231.jpeg", "query": "", "ip": "::1", "user-agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36", "cost": "4.758917ms"}
+2026-01-23 11:02:50	[34mINFO[0m	gin@v1.11.0/context.go:192	HTTP请求	{"status": 200, "method": "GET", "path": "/api/authority/list", "query": "", "ip": "::1", "user-agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36", "cost": "397.375µs"}
+2026-01-23 11:02:50	[34mINFO[0m	gin@v1.11.0/context.go:192	HTTP请求	{"status": 200, "method": "GET", "path": "/api/menu/list", "query": "", "ip": "::1", "user-agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36", "cost": "2.146ms"}
+2026-01-23 11:02:52	[34mINFO[0m	gin@v1.11.0/context.go:192	HTTP请求	{"status": 200, "method": "GET", "path": "/api/user/list", "query": "page=1&pageSize=10", "ip": "::1", "user-agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36", "cost": "319.416µs"}
+2026-01-23 11:02:52	[34mINFO[0m	gin@v1.11.0/context.go:192	HTTP请求	{"status": 200, "method": "GET", "path": "/api/authority/list", "query": "", "ip": "::1", "user-agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36", "cost": "123.833µs"}
+2026-01-23 11:02:52	[34mINFO[0m	gin@v1.11.0/context.go:192	HTTP请求	{"status": 200, "method": "GET", "path": "/api/uploads/file/4eb71cdf366eba0ad7dccba248fd043e_20260116163231.jpeg", "query": "", "ip": "::1", "user-agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36", "cost": "603.417µs"}
+2026-01-23 11:15:49	[34mINFO[0m	gin@v1.11.0/context.go:192	HTTP请求	{"status": 200, "method": "POST", "path": "/api/logout", "query": "", "ip": "::1", "user-agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36", "cost": "5.979416ms"}
+2026-01-23 11:15:51	[34mINFO[0m	gin@v1.11.0/context.go:192	HTTP请求	{"status": 200, "method": "GET", "path": "/api/login/captcha", "query": "", "ip": "::1", "user-agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36", "cost": "53.125µs"}
+2026-01-23 11:15:54	[34mINFO[0m	gin@v1.11.0/context.go:192	HTTP请求	{"status": 200, "method": "GET", "path": "/api/login/captcha", "query": "", "ip": "::1", "user-agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36", "cost": "82.292µs"}
+2026-01-23 11:15:57	[31mERROR[0m	common/response.go:71	接口错误	{"method": "POST", "path": "/api/login", "query": "", "ip": "::1", "user-agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36", "msg": "用户不存在或密码错误", "file": "/Users/jiangyi/Desktop/study/jy-admin/server/api/login/login.go", "line": 71, "func": "Login", "error": "record not found"}
+jiangyi.com/model/common.FailWithError
+	/Users/jiangyi/Desktop/study/jy-admin/server/model/common/response.go:71
+jiangyi.com/api/login.(*Api).Login
+	/Users/jiangyi/Desktop/study/jy-admin/server/api/login/login.go:71
+github.com/gin-gonic/gin.(*Context).Next
+	/Users/jiangyi/go/pkg/mod/github.com/gin-gonic/gin@v1.11.0/context.go:192
+github.com/gin-gonic/gin.CustomRecoveryWithWriter.func1
+	/Users/jiangyi/go/pkg/mod/github.com/gin-gonic/gin@v1.11.0/recovery.go:92
+github.com/gin-gonic/gin.(*Context).Next
+	/Users/jiangyi/go/pkg/mod/github.com/gin-gonic/gin@v1.11.0/context.go:192
+github.com/gin-gonic/gin.LoggerWithConfig.func1
+	/Users/jiangyi/go/pkg/mod/github.com/gin-gonic/gin@v1.11.0/logger.go:249
+github.com/gin-gonic/gin.(*Context).Next
+	/Users/jiangyi/go/pkg/mod/github.com/gin-gonic/gin@v1.11.0/context.go:192
+jiangyi.com/router.InitGinRouter.ErrorLoggerMiddleware.func2
+	/Users/jiangyi/Desktop/study/jy-admin/server/middleware/logger.go:58
+github.com/gin-gonic/gin.(*Context).Next
+	/Users/jiangyi/go/pkg/mod/github.com/gin-gonic/gin@v1.11.0/context.go:192
+jiangyi.com/router.InitGinRouter.LoggerMiddleware.func1
+	/Users/jiangyi/Desktop/study/jy-admin/server/middleware/logger.go:19
+github.com/gin-gonic/gin.(*Context).Next
+	/Users/jiangyi/go/pkg/mod/github.com/gin-gonic/gin@v1.11.0/context.go:192
+github.com/gin-gonic/gin.(*Engine).handleHTTPRequest
+	/Users/jiangyi/go/pkg/mod/github.com/gin-gonic/gin@v1.11.0/gin.go:689
+github.com/gin-gonic/gin.(*Engine).ServeHTTP
+	/Users/jiangyi/go/pkg/mod/github.com/gin-gonic/gin@v1.11.0/gin.go:643
+net/http.serverHandler.ServeHTTP
+	/opt/homebrew/Cellar/go/1.25.6/libexec/src/net/http/server.go:3340
+net/http.(*conn).serve
+	/opt/homebrew/Cellar/go/1.25.6/libexec/src/net/http/server.go:2109
+2026-01-23 11:15:57	[34mINFO[0m	gin@v1.11.0/context.go:192	HTTP请求	{"status": 200, "method": "POST", "path": "/api/login", "query": "", "ip": "::1", "user-agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36", "cost": "2.937708ms"}
+2026-01-23 11:15:57	[34mINFO[0m	gin@v1.11.0/context.go:192	HTTP请求	{"status": 200, "method": "GET", "path": "/api/login/captcha", "query": "", "ip": "::1", "user-agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36", "cost": "4.394708ms"}
+2026-01-23 11:16:04	[34mINFO[0m	gin@v1.11.0/context.go:192	HTTP请求	{"status": 200, "method": "GET", "path": "/api/login/captcha", "query": "", "ip": "::1", "user-agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36", "cost": "1.789667ms"}
+2026-01-23 11:16:10	[34mINFO[0m	server/main.go:17	日志系统初始化成功	{"level": "info", "format": "console", "output": "both"}
+2026-01-23 11:16:21	[34mINFO[0m	gin@v1.11.0/context.go:192	HTTP请求	{"status": 200, "method": "GET", "path": "/api/login/captcha", "query": "", "ip": "::1", "user-agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36", "cost": "535.708µs"}
+2026-01-23 11:16:23	[31mERROR[0m	common/response.go:71	接口错误	{"method": "POST", "path": "/api/login", "query": "", "ip": "::1", "user-agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36", "msg": "用户不存在或密码错误", "file": "/Users/jiangyi/Desktop/study/jy-admin/server/api/login/login.go", "line": 71, "func": "Login", "error": "record not found"}
+jiangyi.com/model/common.FailWithError
+	/Users/jiangyi/Desktop/study/jy-admin/server/model/common/response.go:71
+jiangyi.com/api/login.(*Api).Login
+	/Users/jiangyi/Desktop/study/jy-admin/server/api/login/login.go:71
+github.com/gin-gonic/gin.(*Context).Next
+	/Users/jiangyi/go/pkg/mod/github.com/gin-gonic/gin@v1.11.0/context.go:192
+github.com/gin-gonic/gin.CustomRecoveryWithWriter.func1
+	/Users/jiangyi/go/pkg/mod/github.com/gin-gonic/gin@v1.11.0/recovery.go:92
+github.com/gin-gonic/gin.(*Context).Next
+	/Users/jiangyi/go/pkg/mod/github.com/gin-gonic/gin@v1.11.0/context.go:192
+github.com/gin-gonic/gin.LoggerWithConfig.func1
+	/Users/jiangyi/go/pkg/mod/github.com/gin-gonic/gin@v1.11.0/logger.go:249
+github.com/gin-gonic/gin.(*Context).Next
+	/Users/jiangyi/go/pkg/mod/github.com/gin-gonic/gin@v1.11.0/context.go:192
+jiangyi.com/router.InitGinRouter.ErrorLoggerMiddleware.func2
+	/Users/jiangyi/Desktop/study/jy-admin/server/middleware/logger.go:58
+github.com/gin-gonic/gin.(*Context).Next
+	/Users/jiangyi/go/pkg/mod/github.com/gin-gonic/gin@v1.11.0/context.go:192
+jiangyi.com/router.InitGinRouter.LoggerMiddleware.func1
+	/Users/jiangyi/Desktop/study/jy-admin/server/middleware/logger.go:19
+github.com/gin-gonic/gin.(*Context).Next
+	/Users/jiangyi/go/pkg/mod/github.com/gin-gonic/gin@v1.11.0/context.go:192
+github.com/gin-gonic/gin.(*Engine).handleHTTPRequest
+	/Users/jiangyi/go/pkg/mod/github.com/gin-gonic/gin@v1.11.0/gin.go:689
+github.com/gin-gonic/gin.(*Engine).ServeHTTP
+	/Users/jiangyi/go/pkg/mod/github.com/gin-gonic/gin@v1.11.0/gin.go:643
+net/http.serverHandler.ServeHTTP
+	/opt/homebrew/Cellar/go/1.25.6/libexec/src/net/http/server.go:3340
+net/http.(*conn).serve
+	/opt/homebrew/Cellar/go/1.25.6/libexec/src/net/http/server.go:2109
+2026-01-23 11:16:23	[34mINFO[0m	gin@v1.11.0/context.go:192	HTTP请求	{"status": 200, "method": "POST", "path": "/api/login", "query": "", "ip": "::1", "user-agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36", "cost": "1.714375ms"}
+2026-01-23 11:16:23	[34mINFO[0m	gin@v1.11.0/context.go:192	HTTP请求	{"status": 200, "method": "GET", "path": "/api/login/captcha", "query": "", "ip": "::1", "user-agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36", "cost": "126.375µs"}
+2026-01-23 11:16:24	[31mERROR[0m	common/response.go:71	接口错误	{"method": "POST", "path": "/api/login", "query": "", "ip": "::1", "user-agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36", "msg": "用户不存在或密码错误", "file": "/Users/jiangyi/Desktop/study/jy-admin/server/api/login/login.go", "line": 71, "func": "Login", "error": "record not found"}
+jiangyi.com/model/common.FailWithError
+	/Users/jiangyi/Desktop/study/jy-admin/server/model/common/response.go:71
+jiangyi.com/api/login.(*Api).Login
+	/Users/jiangyi/Desktop/study/jy-admin/server/api/login/login.go:71
+github.com/gin-gonic/gin.(*Context).Next
+	/Users/jiangyi/go/pkg/mod/github.com/gin-gonic/gin@v1.11.0/context.go:192
+github.com/gin-gonic/gin.CustomRecoveryWithWriter.func1
+	/Users/jiangyi/go/pkg/mod/github.com/gin-gonic/gin@v1.11.0/recovery.go:92
+github.com/gin-gonic/gin.(*Context).Next
+	/Users/jiangyi/go/pkg/mod/github.com/gin-gonic/gin@v1.11.0/context.go:192
+github.com/gin-gonic/gin.LoggerWithConfig.func1
+	/Users/jiangyi/go/pkg/mod/github.com/gin-gonic/gin@v1.11.0/logger.go:249
+github.com/gin-gonic/gin.(*Context).Next
+	/Users/jiangyi/go/pkg/mod/github.com/gin-gonic/gin@v1.11.0/context.go:192
+jiangyi.com/router.InitGinRouter.ErrorLoggerMiddleware.func2
+	/Users/jiangyi/Desktop/study/jy-admin/server/middleware/logger.go:58
+github.com/gin-gonic/gin.(*Context).Next
+	/Users/jiangyi/go/pkg/mod/github.com/gin-gonic/gin@v1.11.0/context.go:192
+jiangyi.com/router.InitGinRouter.LoggerMiddleware.func1
+	/Users/jiangyi/Desktop/study/jy-admin/server/middleware/logger.go:19
+github.com/gin-gonic/gin.(*Context).Next
+	/Users/jiangyi/go/pkg/mod/github.com/gin-gonic/gin@v1.11.0/context.go:192
+github.com/gin-gonic/gin.(*Engine).handleHTTPRequest
+	/Users/jiangyi/go/pkg/mod/github.com/gin-gonic/gin@v1.11.0/gin.go:689
+github.com/gin-gonic/gin.(*Engine).ServeHTTP
+	/Users/jiangyi/go/pkg/mod/github.com/gin-gonic/gin@v1.11.0/gin.go:643
+net/http.serverHandler.ServeHTTP
+	/opt/homebrew/Cellar/go/1.25.6/libexec/src/net/http/server.go:3340
+net/http.(*conn).serve
+	/opt/homebrew/Cellar/go/1.25.6/libexec/src/net/http/server.go:2109
+2026-01-23 11:16:24	[34mINFO[0m	gin@v1.11.0/context.go:192	HTTP请求	{"status": 200, "method": "POST", "path": "/api/login", "query": "", "ip": "::1", "user-agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36", "cost": "1.330167ms"}
+2026-01-23 11:16:24	[34mINFO[0m	gin@v1.11.0/context.go:192	HTTP请求	{"status": 200, "method": "GET", "path": "/api/login/captcha", "query": "", "ip": "::1", "user-agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36", "cost": "5.523375ms"}
+2026-01-23 14:15:29	[34mINFO[0m	server/main.go:17	日志系统初始化成功	{"level": "info", "format": "console", "output": "both"}
+2026-01-23 14:15:29	[34mINFO[0m	server/main.go:19	文件存储初始化	{"type": "腾讯云COS", "region": "ap-beijing", "bucket": "beij-1304949087", "path-prefix": "uploads"}
+2026-01-23 14:19:23	[34mINFO[0m	server/main.go:17	日志系统初始化成功	{"level": "info", "format": "console", "output": "both"}
+2026-01-23 14:19:23	[34mINFO[0m	server/main.go:19	文件存储初始化	{"type": "腾讯云COS", "region": "ap-beijing", "bucket": "beij-1304949087", "path-prefix": "uploads"}
+2026-01-23 14:20:01	[34mINFO[0m	gin@v1.11.0/context.go:192	HTTP请求	{"status": 200, "method": "GET", "path": "/api/login/captcha", "query": "", "ip": "::1", "user-agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Cursor/2.1.46 Chrome/138.0.7204.251 Electron/37.7.0 Safari/537.36", "cost": "512.625µs"}
+2026-01-23 14:20:02	[34mINFO[0m	gin@v1.11.0/context.go:192	HTTP请求	{"status": 200, "method": "GET", "path": "/api/login/captcha", "query": "", "ip": "::1", "user-agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Cursor/2.1.46 Chrome/138.0.7204.251 Electron/37.7.0 Safari/537.36", "cost": "112.958µs"}
+2026-01-23 14:20:03	[34mINFO[0m	gin@v1.11.0/context.go:192	HTTP请求	{"status": 200, "method": "GET", "path": "/api/login/captcha", "query": "", "ip": "::1", "user-agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Cursor/2.1.46 Chrome/138.0.7204.251 Electron/37.7.0 Safari/537.36", "cost": "36.917µs"}
+2026-01-23 14:20:13	[34mINFO[0m	gin@v1.11.0/context.go:192	HTTP请求	{"status": 200, "method": "GET", "path": "/api/login/captcha", "query": "", "ip": "::1", "user-agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36", "cost": "84.834µs"}
+2026-01-23 14:20:14	[34mINFO[0m	gin@v1.11.0/context.go:192	登录尝试	{"username": "admin", "ip": "::1", "user-agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36"}
+2026-01-23 14:20:14	[34mINFO[0m	gin@v1.11.0/context.go:192	登录成功	{"username": "admin", "ip": "::1", "user_id": 3, "authority_id": "888", "nick_name": "江一"}
+2026-01-23 14:20:14	[34mINFO[0m	gin@v1.11.0/context.go:192	HTTP请求	{"status": 200, "method": "POST", "path": "/api/login", "query": "", "ip": "::1", "user-agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36", "cost": "85.99375ms"}
+2026-01-23 14:20:14	[34mINFO[0m	gin@v1.11.0/context.go:192	HTTP请求	{"status": 200, "method": "GET", "path": "/api/user/userinfo", "query": "", "ip": "::1", "user-agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36", "cost": "469.75µs"}
+2026-01-23 14:20:14	[34mINFO[0m	gin@v1.11.0/context.go:192	HTTP请求	{"status": 200, "method": "GET", "path": "/api/authority/getMenus", "query": "", "ip": "::1", "user-agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36", "cost": "2.09475ms"}
+2026-01-23 14:20:14	[33mWARN[0m	gin@v1.11.0/context.go:192	HTTP请求警告	{"status": 404, "method": "GET", "path": "/api/uploads/file/4eb71cdf366eba0ad7dccba248fd043e_20260116163231.jpeg", "query": "", "ip": "::1", "user-agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36", "cost": "111.292µs"}
+2026-01-23 14:20:17	[34mINFO[0m	gin@v1.11.0/context.go:192	HTTP请求	{"status": 200, "method": "GET", "path": "/api/authority/list", "query": "", "ip": "::1", "user-agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36", "cost": "608.417µs"}
+2026-01-23 14:20:17	[34mINFO[0m	gin@v1.11.0/context.go:192	HTTP请求	{"status": 200, "method": "GET", "path": "/api/menu/list", "query": "", "ip": "::1", "user-agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36", "cost": "2.28275ms"}
+2026-01-23 14:20:20	[34mINFO[0m	gin@v1.11.0/context.go:192	HTTP请求	{"status": 200, "method": "GET", "path": "/api/upload/list", "query": "page=1&page_size=10", "ip": "::1", "user-agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36", "cost": "1.625792ms"}
+2026-01-23 14:20:20	[33mWARN[0m	gin@v1.11.0/context.go:192	HTTP请求警告	{"status": 404, "method": "GET", "path": "/api/uploads/file/c4ca4238a0b923820dcc509a6f75849b_20260116113228.jpeg", "query": "", "ip": "::1", "user-agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36", "cost": "63.333µs"}
+2026-01-23 14:20:20	[33mWARN[0m	gin@v1.11.0/context.go:192	HTTP请求警告	{"status": 404, "method": "GET", "path": "/api/uploads/file/f76a1b81d4e4fa1d10174e62503974f3_20260116161101.jpg", "query": "", "ip": "::1", "user-agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36", "cost": "24.208µs"}
+2026-01-23 14:20:20	[33mWARN[0m	gin@v1.11.0/context.go:192	HTTP请求警告	{"status": 404, "method": "GET", "path": "/api/uploads/file/0d5046807e0d9dc45b5f4be28148c418_20260116161235.jpeg", "query": "", "ip": "::1", "user-agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36", "cost": "61.625µs"}
+2026-01-23 14:20:20	[33mWARN[0m	gin@v1.11.0/context.go:192	HTTP请求警告	{"status": 404, "method": "GET", "path": "/api/uploads/file/4eb71cdf366eba0ad7dccba248fd043e_20260116163231.jpeg", "query": "", "ip": "::1", "user-agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36", "cost": "132.334µs"}
+2026-01-23 14:20:20	[33mWARN[0m	gin@v1.11.0/context.go:192	HTTP请求警告	{"status": 404, "method": "GET", "path": "/api/uploads/file/1f6be4333bd89e3a67ca47e614ab8bf4_20260116170405.jpg", "query": "", "ip": "::1", "user-agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36", "cost": "57.625µs"}
+2026-01-23 14:20:20	[33mWARN[0m	gin@v1.11.0/context.go:192	HTTP请求警告	{"status": 404, "method": "GET", "path": "/api/uploads/file/c4ca4238a0b923820dcc509a6f75849b_20260116163606.jpeg", "query": "", "ip": "::1", "user-agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36", "cost": "826.334µs"}
+2026-01-23 14:20:20	[33mWARN[0m	gin@v1.11.0/context.go:192	HTTP请求警告	{"status": 404, "method": "GET", "path": "/api/uploads/file/6229f1b4224c42c4541ea81a1aed1aef_20260116175852.jpg", "query": "", "ip": "::1", "user-agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36", "cost": "68.292µs"}
+2026-01-23 14:20:20	[33mWARN[0m	gin@v1.11.0/context.go:192	HTTP请求警告	{"status": 404, "method": "GET", "path": "/api/uploads/file/3c4d0d19bcfdd593d104b152b2d332ae_20260116175906.jpg", "query": "", "ip": "::1", "user-agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36", "cost": "46.292µs"}
+2026-01-23 14:20:28	[33mWARN[0m	common/response.go:61	接口警告	{"method": "POST", "path": "/api/upload", "query": "", "ip": "::1", "user-agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36", "msg": "写入oss文件失败", "file": "/Users/jiangyi/Desktop/study/jy-admin/server/api/upload/uploadfile.go", "line": 39, "func": "UploadFile"}
+2026-01-23 14:20:28	[34mINFO[0m	gin@v1.11.0/context.go:192	HTTP请求	{"status": 200, "method": "POST", "path": "/api/upload", "query": "", "ip": "::1", "user-agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36", "cost": "3.67029825s"}
+2026-01-23 14:24:41	[34mINFO[0m	server/main.go:17	日志系统初始化成功	{"level": "info", "format": "console", "output": "both"}
+2026-01-23 14:24:41	[34mINFO[0m	server/main.go:19	文件存储初始化	{"type": "腾讯云COS", "region": "ap-beijing", "bucket": "beij-1304949087", "path-prefix": "uploads"}
+2026-01-23 14:26:27	[34mINFO[0m	server/main.go:17	日志系统初始化成功	{"level": "info", "format": "console", "output": "both"}
+2026-01-23 14:26:27	[34mINFO[0m	server/main.go:19	文件存储初始化	{"type": "腾讯云COS", "region": "ap-beijing", "bucket": "beij-1304949087", "path-prefix": "uploads"}
+2026-01-23 14:28:06	[31mERROR[0m	gin@v1.11.0/context.go:192	文件上传失败	{"filename": "0ace113833f2a92fdcef618bb3a5bf6f.jpeg", "oss_type": "tencent-cos", "error": "上传文件到COS失败: PUT https://beij-1304949087.cos.ap-beijing.myqcloud.com/uploads/0d5046807e0d9dc45b5f4be28148c418_20260123142803.jpeg: 403 InvalidAccessKeyId(Message: The access key Id format you provided is invalid., RequestId: Njk3MzE0ZjVfZmFhNjQwOV9jYjRjXzE3NDRlNWU=, TraceId: OGVmYzZiMmQzYjA2OWNhODk0NTRkMTBiOWVmMDAxODc0OWRkZjk0ZDM1NmI1M2E2MTRlY2MzZDhmNmI5MWI1OTQyYWVlY2QwZTk2MDVmZDQ3MmI2Y2I4ZmI5ZmM4ODFjODI5NWYxNjBlMjI5ZDdlMzMyOGMyZGUxNGFjMGM2N2M=)"}
+github.com/gin-gonic/gin.(*Context).Next
+	/Users/jiangyi/go/pkg/mod/github.com/gin-gonic/gin@v1.11.0/context.go:192
+jiangyi.com/router.registerRouter.JWTAuth.func3
+	/Users/jiangyi/Desktop/study/jy-admin/server/middleware/jwt.go:34
+github.com/gin-gonic/gin.(*Context).Next
+	/Users/jiangyi/go/pkg/mod/github.com/gin-gonic/gin@v1.11.0/context.go:192
+github.com/gin-gonic/gin.CustomRecoveryWithWriter.func1
+	/Users/jiangyi/go/pkg/mod/github.com/gin-gonic/gin@v1.11.0/recovery.go:92
+github.com/gin-gonic/gin.(*Context).Next
+	/Users/jiangyi/go/pkg/mod/github.com/gin-gonic/gin@v1.11.0/context.go:192
+github.com/gin-gonic/gin.LoggerWithConfig.func1
+	/Users/jiangyi/go/pkg/mod/github.com/gin-gonic/gin@v1.11.0/logger.go:249
+github.com/gin-gonic/gin.(*Context).Next
+	/Users/jiangyi/go/pkg/mod/github.com/gin-gonic/gin@v1.11.0/context.go:192
+jiangyi.com/router.InitGinRouter.ErrorLoggerMiddleware.func2
+	/Users/jiangyi/Desktop/study/jy-admin/server/middleware/logger.go:58
+github.com/gin-gonic/gin.(*Context).Next
+	/Users/jiangyi/go/pkg/mod/github.com/gin-gonic/gin@v1.11.0/context.go:192
+jiangyi.com/router.InitGinRouter.LoggerMiddleware.func1
+	/Users/jiangyi/Desktop/study/jy-admin/server/middleware/logger.go:19
+github.com/gin-gonic/gin.(*Context).Next
+	/Users/jiangyi/go/pkg/mod/github.com/gin-gonic/gin@v1.11.0/context.go:192
+github.com/gin-gonic/gin.(*Engine).handleHTTPRequest
+	/Users/jiangyi/go/pkg/mod/github.com/gin-gonic/gin@v1.11.0/gin.go:689
+github.com/gin-gonic/gin.(*Engine).ServeHTTP
+	/Users/jiangyi/go/pkg/mod/github.com/gin-gonic/gin@v1.11.0/gin.go:643
+net/http.serverHandler.ServeHTTP
+	/opt/homebrew/Cellar/go/1.25.6/libexec/src/net/http/server.go:3340
+net/http.(*conn).serve
+	/opt/homebrew/Cellar/go/1.25.6/libexec/src/net/http/server.go:2109
+2026-01-23 14:28:06	[31mERROR[0m	common/response.go:71	接口错误	{"method": "POST", "path": "/api/upload", "query": "", "ip": "::1", "user-agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36", "msg": "写入oss文件失败", "file": "/Users/jiangyi/Desktop/study/jy-admin/server/api/upload/uploadfile.go", "line": 58, "func": "UploadFile", "error": "上传文件到COS失败: PUT https://beij-1304949087.cos.ap-beijing.myqcloud.com/uploads/0d5046807e0d9dc45b5f4be28148c418_20260123142803.jpeg: 403 InvalidAccessKeyId(Message: The access key Id format you provided is invalid., RequestId: Njk3MzE0ZjVfZmFhNjQwOV9jYjRjXzE3NDRlNWU=, TraceId: OGVmYzZiMmQzYjA2OWNhODk0NTRkMTBiOWVmMDAxODc0OWRkZjk0ZDM1NmI1M2E2MTRlY2MzZDhmNmI5MWI1OTQyYWVlY2QwZTk2MDVmZDQ3MmI2Y2I4ZmI5ZmM4ODFjODI5NWYxNjBlMjI5ZDdlMzMyOGMyZGUxNGFjMGM2N2M=)"}
+jiangyi.com/model/common.FailWithError
+	/Users/jiangyi/Desktop/study/jy-admin/server/model/common/response.go:71
+jiangyi.com/api/upload.(*Api).UploadFile
+	/Users/jiangyi/Desktop/study/jy-admin/server/api/upload/uploadfile.go:58
+github.com/gin-gonic/gin.(*Context).Next
+	/Users/jiangyi/go/pkg/mod/github.com/gin-gonic/gin@v1.11.0/context.go:192
+jiangyi.com/router.registerRouter.JWTAuth.func3
+	/Users/jiangyi/Desktop/study/jy-admin/server/middleware/jwt.go:34
+github.com/gin-gonic/gin.(*Context).Next
+	/Users/jiangyi/go/pkg/mod/github.com/gin-gonic/gin@v1.11.0/context.go:192
+github.com/gin-gonic/gin.CustomRecoveryWithWriter.func1
+	/Users/jiangyi/go/pkg/mod/github.com/gin-gonic/gin@v1.11.0/recovery.go:92
+github.com/gin-gonic/gin.(*Context).Next
+	/Users/jiangyi/go/pkg/mod/github.com/gin-gonic/gin@v1.11.0/context.go:192
+github.com/gin-gonic/gin.LoggerWithConfig.func1
+	/Users/jiangyi/go/pkg/mod/github.com/gin-gonic/gin@v1.11.0/logger.go:249
+github.com/gin-gonic/gin.(*Context).Next
+	/Users/jiangyi/go/pkg/mod/github.com/gin-gonic/gin@v1.11.0/context.go:192
+jiangyi.com/router.InitGinRouter.ErrorLoggerMiddleware.func2
+	/Users/jiangyi/Desktop/study/jy-admin/server/middleware/logger.go:58
+github.com/gin-gonic/gin.(*Context).Next
+	/Users/jiangyi/go/pkg/mod/github.com/gin-gonic/gin@v1.11.0/context.go:192
+jiangyi.com/router.InitGinRouter.LoggerMiddleware.func1
+	/Users/jiangyi/Desktop/study/jy-admin/server/middleware/logger.go:19
+github.com/gin-gonic/gin.(*Context).Next
+	/Users/jiangyi/go/pkg/mod/github.com/gin-gonic/gin@v1.11.0/context.go:192
+github.com/gin-gonic/gin.(*Engine).handleHTTPRequest
+	/Users/jiangyi/go/pkg/mod/github.com/gin-gonic/gin@v1.11.0/gin.go:689
+github.com/gin-gonic/gin.(*Engine).ServeHTTP
+	/Users/jiangyi/go/pkg/mod/github.com/gin-gonic/gin@v1.11.0/gin.go:643
+net/http.serverHandler.ServeHTTP
+	/opt/homebrew/Cellar/go/1.25.6/libexec/src/net/http/server.go:3340
+net/http.(*conn).serve
+	/opt/homebrew/Cellar/go/1.25.6/libexec/src/net/http/server.go:2109
+2026-01-23 14:28:06	[34mINFO[0m	gin@v1.11.0/context.go:192	HTTP请求	{"status": 200, "method": "POST", "path": "/api/upload", "query": "", "ip": "::1", "user-agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36", "cost": "2.350552625s"}
+2026-01-23 14:29:17	[31mERROR[0m	gin@v1.11.0/context.go:192	文件上传失败	{"filename": "0a350cfad233f49bd70f0e54c33bdd9f.jpeg", "oss_type": "tencent-cos", "error": "上传文件到COS失败: PUT https://beij-1304949087.cos.ap-beijing.myqcloud.com/uploads/191188108f01af6e52088732a3e33d5a_20260123142914.jpeg: 403 InvalidAccessKeyId(Message: The access key Id format you provided is invalid., RequestId: Njk3MzE1M2RfYTJhYjI0MDlfZjQ5ZF8xODA0Yjgz, TraceId: OGVmYzZiMmQzYjA2OWNhODk0NTRkMTBiOWVmMDAxODc0OWRkZjk0ZDM1NmI1M2E2MTRlY2MzZDhmNmI5MWI1OTQyYWVlY2QwZTk2MDVmZDQ3MmI2Y2I4ZmI5ZmM4ODFjODI5NWYxNjBlMjI5ZDdlMzMyOGMyZGUxNGFjMGM2N2M=)"}
+github.com/gin-gonic/gin.(*Context).Next
+	/Users/jiangyi/go/pkg/mod/github.com/gin-gonic/gin@v1.11.0/context.go:192
+jiangyi.com/router.registerRouter.JWTAuth.func3
+	/Users/jiangyi/Desktop/study/jy-admin/server/middleware/jwt.go:34
+github.com/gin-gonic/gin.(*Context).Next
+	/Users/jiangyi/go/pkg/mod/github.com/gin-gonic/gin@v1.11.0/context.go:192
+github.com/gin-gonic/gin.CustomRecoveryWithWriter.func1
+	/Users/jiangyi/go/pkg/mod/github.com/gin-gonic/gin@v1.11.0/recovery.go:92
+github.com/gin-gonic/gin.(*Context).Next
+	/Users/jiangyi/go/pkg/mod/github.com/gin-gonic/gin@v1.11.0/context.go:192
+github.com/gin-gonic/gin.LoggerWithConfig.func1
+	/Users/jiangyi/go/pkg/mod/github.com/gin-gonic/gin@v1.11.0/logger.go:249
+github.com/gin-gonic/gin.(*Context).Next
+	/Users/jiangyi/go/pkg/mod/github.com/gin-gonic/gin@v1.11.0/context.go:192
+jiangyi.com/router.InitGinRouter.ErrorLoggerMiddleware.func2
+	/Users/jiangyi/Desktop/study/jy-admin/server/middleware/logger.go:58
+github.com/gin-gonic/gin.(*Context).Next
+	/Users/jiangyi/go/pkg/mod/github.com/gin-gonic/gin@v1.11.0/context.go:192
+jiangyi.com/router.InitGinRouter.LoggerMiddleware.func1
+	/Users/jiangyi/Desktop/study/jy-admin/server/middleware/logger.go:19
+github.com/gin-gonic/gin.(*Context).Next
+	/Users/jiangyi/go/pkg/mod/github.com/gin-gonic/gin@v1.11.0/context.go:192
+github.com/gin-gonic/gin.(*Engine).handleHTTPRequest
+	/Users/jiangyi/go/pkg/mod/github.com/gin-gonic/gin@v1.11.0/gin.go:689
+github.com/gin-gonic/gin.(*Engine).ServeHTTP
+	/Users/jiangyi/go/pkg/mod/github.com/gin-gonic/gin@v1.11.0/gin.go:643
+net/http.serverHandler.ServeHTTP
+	/opt/homebrew/Cellar/go/1.25.6/libexec/src/net/http/server.go:3340
+net/http.(*conn).serve
+	/opt/homebrew/Cellar/go/1.25.6/libexec/src/net/http/server.go:2109
+2026-01-23 14:29:17	[31mERROR[0m	common/response.go:71	接口错误	{"method": "POST", "path": "/api/upload", "query": "", "ip": "::1", "user-agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36", "msg": "写入oss文件失败", "file": "/Users/jiangyi/Desktop/study/jy-admin/server/api/upload/uploadfile.go", "line": 58, "func": "UploadFile", "error": "上传文件到COS失败: PUT https://beij-1304949087.cos.ap-beijing.myqcloud.com/uploads/191188108f01af6e52088732a3e33d5a_20260123142914.jpeg: 403 InvalidAccessKeyId(Message: The access key Id format you provided is invalid., RequestId: Njk3MzE1M2RfYTJhYjI0MDlfZjQ5ZF8xODA0Yjgz, TraceId: OGVmYzZiMmQzYjA2OWNhODk0NTRkMTBiOWVmMDAxODc0OWRkZjk0ZDM1NmI1M2E2MTRlY2MzZDhmNmI5MWI1OTQyYWVlY2QwZTk2MDVmZDQ3MmI2Y2I4ZmI5ZmM4ODFjODI5NWYxNjBlMjI5ZDdlMzMyOGMyZGUxNGFjMGM2N2M=)"}
+jiangyi.com/model/common.FailWithError
+	/Users/jiangyi/Desktop/study/jy-admin/server/model/common/response.go:71
+jiangyi.com/api/upload.(*Api).UploadFile
+	/Users/jiangyi/Desktop/study/jy-admin/server/api/upload/uploadfile.go:58
+github.com/gin-gonic/gin.(*Context).Next
+	/Users/jiangyi/go/pkg/mod/github.com/gin-gonic/gin@v1.11.0/context.go:192
+jiangyi.com/router.registerRouter.JWTAuth.func3
+	/Users/jiangyi/Desktop/study/jy-admin/server/middleware/jwt.go:34
+github.com/gin-gonic/gin.(*Context).Next
+	/Users/jiangyi/go/pkg/mod/github.com/gin-gonic/gin@v1.11.0/context.go:192
+github.com/gin-gonic/gin.CustomRecoveryWithWriter.func1
+	/Users/jiangyi/go/pkg/mod/github.com/gin-gonic/gin@v1.11.0/recovery.go:92
+github.com/gin-gonic/gin.(*Context).Next
+	/Users/jiangyi/go/pkg/mod/github.com/gin-gonic/gin@v1.11.0/context.go:192
+github.com/gin-gonic/gin.LoggerWithConfig.func1
+	/Users/jiangyi/go/pkg/mod/github.com/gin-gonic/gin@v1.11.0/logger.go:249
+github.com/gin-gonic/gin.(*Context).Next
+	/Users/jiangyi/go/pkg/mod/github.com/gin-gonic/gin@v1.11.0/context.go:192
+jiangyi.com/router.InitGinRouter.ErrorLoggerMiddleware.func2
+	/Users/jiangyi/Desktop/study/jy-admin/server/middleware/logger.go:58
+github.com/gin-gonic/gin.(*Context).Next
+	/Users/jiangyi/go/pkg/mod/github.com/gin-gonic/gin@v1.11.0/context.go:192
+jiangyi.com/router.InitGinRouter.LoggerMiddleware.func1
+	/Users/jiangyi/Desktop/study/jy-admin/server/middleware/logger.go:19
+github.com/gin-gonic/gin.(*Context).Next
+	/Users/jiangyi/go/pkg/mod/github.com/gin-gonic/gin@v1.11.0/context.go:192
+github.com/gin-gonic/gin.(*Engine).handleHTTPRequest
+	/Users/jiangyi/go/pkg/mod/github.com/gin-gonic/gin@v1.11.0/gin.go:689
+github.com/gin-gonic/gin.(*Engine).ServeHTTP
+	/Users/jiangyi/go/pkg/mod/github.com/gin-gonic/gin@v1.11.0/gin.go:643
+net/http.serverHandler.ServeHTTP
+	/opt/homebrew/Cellar/go/1.25.6/libexec/src/net/http/server.go:3340
+net/http.(*conn).serve
+	/opt/homebrew/Cellar/go/1.25.6/libexec/src/net/http/server.go:2109
+2026-01-23 14:29:17	[34mINFO[0m	gin@v1.11.0/context.go:192	HTTP请求	{"status": 200, "method": "POST", "path": "/api/upload", "query": "", "ip": "::1", "user-agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36", "cost": "3.253562875s"}
+2026-01-23 14:31:32	[34mINFO[0m	server/main.go:17	日志系统初始化成功	{"level": "info", "format": "console", "output": "both"}
+2026-01-23 14:31:32	[34mINFO[0m	server/main.go:19	文件存储初始化	{"type": "腾讯云COS", "region": "ap-beijing", "bucket": "beij-1304949087", "path-prefix": "uploads"}
+2026-01-23 14:31:39	[31mERROR[0m	gin@v1.11.0/context.go:192	文件上传失败	{"filename": "0ace113833f2a92fdcef618bb3a5bf6f.jpeg", "oss_type": "tencent-cos", "error": "上传文件到COS失败: PUT https://beij-1304949087.cos.ap-beijing.myqcloud.com/uploads/0d5046807e0d9dc45b5f4be28148c418_20260123143138.jpeg: 403 InvalidAccessKeyId(Message: The access key Id format you provided is invalid., RequestId: Njk3MzE1Y2JfZmFhNjQwOV9jYjU3XzE3NTA1YmE=, TraceId: OGVmYzZiMmQzYjA2OWNhODk0NTRkMTBiOWVmMDAxODc0OWRkZjk0ZDM1NmI1M2E2MTRlY2MzZDhmNmI5MWI1OTQyYWVlY2QwZTk2MDVmZDQ3MmI2Y2I4ZmI5ZmM4ODFjODI5NWYxNjBlMjI5ZDdlMzMyOGMyZGUxNGFjMGM2N2M=)"}
+github.com/gin-gonic/gin.(*Context).Next
+	/Users/jiangyi/go/pkg/mod/github.com/gin-gonic/gin@v1.11.0/context.go:192
+jiangyi.com/middleware.JWTAuth.func1
+	/Users/jiangyi/Desktop/study/jy-admin/server/middleware/jwt.go:34
+github.com/gin-gonic/gin.(*Context).Next
+	/Users/jiangyi/go/pkg/mod/github.com/gin-gonic/gin@v1.11.0/context.go:192
+github.com/gin-gonic/gin.CustomRecoveryWithWriter.func1
+	/Users/jiangyi/go/pkg/mod/github.com/gin-gonic/gin@v1.11.0/recovery.go:92
+github.com/gin-gonic/gin.(*Context).Next
+	/Users/jiangyi/go/pkg/mod/github.com/gin-gonic/gin@v1.11.0/context.go:192
+github.com/gin-gonic/gin.LoggerWithConfig.func1
+	/Users/jiangyi/go/pkg/mod/github.com/gin-gonic/gin@v1.11.0/logger.go:249
+github.com/gin-gonic/gin.(*Context).Next
+	/Users/jiangyi/go/pkg/mod/github.com/gin-gonic/gin@v1.11.0/context.go:192
+jiangyi.com/middleware.ErrorLoggerMiddleware.func1
+	/Users/jiangyi/Desktop/study/jy-admin/server/middleware/logger.go:58
+github.com/gin-gonic/gin.(*Context).Next
+	/Users/jiangyi/go/pkg/mod/github.com/gin-gonic/gin@v1.11.0/context.go:192
+jiangyi.com/middleware.LoggerMiddleware.func1
+	/Users/jiangyi/Desktop/study/jy-admin/server/middleware/logger.go:19
+github.com/gin-gonic/gin.(*Context).Next
+	/Users/jiangyi/go/pkg/mod/github.com/gin-gonic/gin@v1.11.0/context.go:192
+github.com/gin-gonic/gin.(*Engine).handleHTTPRequest
+	/Users/jiangyi/go/pkg/mod/github.com/gin-gonic/gin@v1.11.0/gin.go:689
+github.com/gin-gonic/gin.(*Engine).ServeHTTP
+	/Users/jiangyi/go/pkg/mod/github.com/gin-gonic/gin@v1.11.0/gin.go:643
+net/http.serverHandler.ServeHTTP
+	/opt/homebrew/Cellar/go/1.25.6/libexec/src/net/http/server.go:3340
+net/http.(*conn).serve
+	/opt/homebrew/Cellar/go/1.25.6/libexec/src/net/http/server.go:2109
+2026-01-23 14:31:39	[31mERROR[0m	common/response.go:71	接口错误	{"method": "POST", "path": "/api/upload", "query": "", "ip": "::1", "user-agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36", "msg": "写入oss文件失败", "file": "/Users/jiangyi/Desktop/study/jy-admin/server/api/upload/uploadfile.go", "line": 59, "func": "UploadFile", "error": "上传文件到COS失败: PUT https://beij-1304949087.cos.ap-beijing.myqcloud.com/uploads/0d5046807e0d9dc45b5f4be28148c418_20260123143138.jpeg: 403 InvalidAccessKeyId(Message: The access key Id format you provided is invalid., RequestId: Njk3MzE1Y2JfZmFhNjQwOV9jYjU3XzE3NTA1YmE=, TraceId: OGVmYzZiMmQzYjA2OWNhODk0NTRkMTBiOWVmMDAxODc0OWRkZjk0ZDM1NmI1M2E2MTRlY2MzZDhmNmI5MWI1OTQyYWVlY2QwZTk2MDVmZDQ3MmI2Y2I4ZmI5ZmM4ODFjODI5NWYxNjBlMjI5ZDdlMzMyOGMyZGUxNGFjMGM2N2M=)"}
+jiangyi.com/model/common.FailWithError
+	/Users/jiangyi/Desktop/study/jy-admin/server/model/common/response.go:71
+jiangyi.com/api/upload.(*Api).UploadFile
+	/Users/jiangyi/Desktop/study/jy-admin/server/api/upload/uploadfile.go:59
+github.com/gin-gonic/gin.(*Context).Next
+	/Users/jiangyi/go/pkg/mod/github.com/gin-gonic/gin@v1.11.0/context.go:192
+jiangyi.com/middleware.JWTAuth.func1
+	/Users/jiangyi/Desktop/study/jy-admin/server/middleware/jwt.go:34
+github.com/gin-gonic/gin.(*Context).Next
+	/Users/jiangyi/go/pkg/mod/github.com/gin-gonic/gin@v1.11.0/context.go:192
+github.com/gin-gonic/gin.CustomRecoveryWithWriter.func1
+	/Users/jiangyi/go/pkg/mod/github.com/gin-gonic/gin@v1.11.0/recovery.go:92
+github.com/gin-gonic/gin.(*Context).Next
+	/Users/jiangyi/go/pkg/mod/github.com/gin-gonic/gin@v1.11.0/context.go:192
+github.com/gin-gonic/gin.LoggerWithConfig.func1
+	/Users/jiangyi/go/pkg/mod/github.com/gin-gonic/gin@v1.11.0/logger.go:249
+github.com/gin-gonic/gin.(*Context).Next
+	/Users/jiangyi/go/pkg/mod/github.com/gin-gonic/gin@v1.11.0/context.go:192
+jiangyi.com/middleware.ErrorLoggerMiddleware.func1
+	/Users/jiangyi/Desktop/study/jy-admin/server/middleware/logger.go:58
+github.com/gin-gonic/gin.(*Context).Next
+	/Users/jiangyi/go/pkg/mod/github.com/gin-gonic/gin@v1.11.0/context.go:192
+jiangyi.com/middleware.LoggerMiddleware.func1
+	/Users/jiangyi/Desktop/study/jy-admin/server/middleware/logger.go:19
+github.com/gin-gonic/gin.(*Context).Next
+	/Users/jiangyi/go/pkg/mod/github.com/gin-gonic/gin@v1.11.0/context.go:192
+github.com/gin-gonic/gin.(*Engine).handleHTTPRequest
+	/Users/jiangyi/go/pkg/mod/github.com/gin-gonic/gin@v1.11.0/gin.go:689
+github.com/gin-gonic/gin.(*Engine).ServeHTTP
+	/Users/jiangyi/go/pkg/mod/github.com/gin-gonic/gin@v1.11.0/gin.go:643
+net/http.serverHandler.ServeHTTP
+	/opt/homebrew/Cellar/go/1.25.6/libexec/src/net/http/server.go:3340
+net/http.(*conn).serve
+	/opt/homebrew/Cellar/go/1.25.6/libexec/src/net/http/server.go:2109
+2026-01-23 14:31:39	[34mINFO[0m	gin@v1.11.0/context.go:192	HTTP请求	{"status": 200, "method": "POST", "path": "/api/upload", "query": "", "ip": "::1", "user-agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36", "cost": "1.198209917s"}
+2026-01-23 14:32:52	[34mINFO[0m	server/main.go:17	日志系统初始化成功	{"level": "info", "format": "console", "output": "both"}
+2026-01-23 14:32:52	[34mINFO[0m	server/main.go:19	文件存储初始化	{"type": "腾讯云COS", "region": "ap-beijing", "bucket": "beij-1304949087", "path-prefix": "uploads"}
+2026-01-23 14:33:47	[34mINFO[0m	server/main.go:17	日志系统初始化成功	{"level": "info", "format": "console", "output": "both"}
+2026-01-23 14:33:47	[34mINFO[0m	server/main.go:19	文件存储初始化	{"type": "腾讯云COS", "region": "ap-beijing", "bucket": "beij-1304949087", "path-prefix": "uploads"}
+2026-01-23 14:34:49	[34mINFO[0m	gin@v1.11.0/context.go:192	HTTP请求	{"status": 200, "method": "GET", "path": "/api/user/userinfo", "query": "", "ip": "::1", "user-agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36", "cost": "4.741634458s"}
+2026-01-23 14:35:00	[31mERROR[0m	gin@v1.11.0/context.go:192	文件上传失败	{"filename": "0ace113833f2a92fdcef618bb3a5bf6f.jpeg", "oss_type": "tencent-cos", "error": "上传文件到COS失败: PUT https://beij-1304949087.cos.ap-beijing.myqcloud.com/uploads/0d5046807e0d9dc45b5f4be28148c418_20260123143442.jpeg: 403 InvalidAccessKeyId(Message: The access key Id format you provided is invalid., RequestId: Njk3MzE2OGRfZmFmNDUxZV8xMGVmOV8xNThlZjhl, TraceId: OGVmYzZiMmQzYjA2OWNhODk0NTRkMTBiOWVmMDAxODc0OWRkZjk0ZDM1NmI1M2E2MTRlY2MzZDhmNmI5MWI1OTQyYWVlY2QwZTk2MDVmZDQ3MmI2Y2I4ZmI5ZmM4ODFjODI5NWYxNjBlMjI5ZDdlMzMyOGMyZGUxNGFjMGM2N2M=)"}
+github.com/gin-gonic/gin.(*Context).Next
+	/Users/jiangyi/go/pkg/mod/github.com/gin-gonic/gin@v1.11.0/context.go:192
+jiangyi.com/middleware.JWTAuth.func1
+	/Users/jiangyi/Desktop/study/jy-admin/server/middleware/jwt.go:34
+github.com/gin-gonic/gin.(*Context).Next
+	/Users/jiangyi/go/pkg/mod/github.com/gin-gonic/gin@v1.11.0/context.go:192
+github.com/gin-gonic/gin.CustomRecoveryWithWriter.func1
+	/Users/jiangyi/go/pkg/mod/github.com/gin-gonic/gin@v1.11.0/recovery.go:92
+github.com/gin-gonic/gin.(*Context).Next
+	/Users/jiangyi/go/pkg/mod/github.com/gin-gonic/gin@v1.11.0/context.go:192
+github.com/gin-gonic/gin.LoggerWithConfig.func1
+	/Users/jiangyi/go/pkg/mod/github.com/gin-gonic/gin@v1.11.0/logger.go:249
+github.com/gin-gonic/gin.(*Context).Next
+	/Users/jiangyi/go/pkg/mod/github.com/gin-gonic/gin@v1.11.0/context.go:192
+jiangyi.com/middleware.ErrorLoggerMiddleware.func1
+	/Users/jiangyi/Desktop/study/jy-admin/server/middleware/logger.go:58
+github.com/gin-gonic/gin.(*Context).Next
+	/Users/jiangyi/go/pkg/mod/github.com/gin-gonic/gin@v1.11.0/context.go:192
+jiangyi.com/middleware.LoggerMiddleware.func1
+	/Users/jiangyi/Desktop/study/jy-admin/server/middleware/logger.go:19
+github.com/gin-gonic/gin.(*Context).Next
+	/Users/jiangyi/go/pkg/mod/github.com/gin-gonic/gin@v1.11.0/context.go:192
+github.com/gin-gonic/gin.(*Engine).handleHTTPRequest
+	/Users/jiangyi/go/pkg/mod/github.com/gin-gonic/gin@v1.11.0/gin.go:689
+github.com/gin-gonic/gin.(*Engine).ServeHTTP
+	/Users/jiangyi/go/pkg/mod/github.com/gin-gonic/gin@v1.11.0/gin.go:643
+net/http.serverHandler.ServeHTTP
+	/opt/homebrew/Cellar/go/1.25.6/libexec/src/net/http/server.go:3340
+net/http.(*conn).serve
+	/opt/homebrew/Cellar/go/1.25.6/libexec/src/net/http/server.go:2109
+2026-01-23 14:35:00	[31mERROR[0m	common/response.go:71	接口错误	{"method": "POST", "path": "/api/upload", "query": "", "ip": "::1", "user-agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36", "msg": "写入oss文件失败", "file": "/Users/jiangyi/Desktop/study/jy-admin/server/api/upload/uploadfile.go", "line": 59, "func": "UploadFile", "error": "上传文件到COS失败: PUT https://beij-1304949087.cos.ap-beijing.myqcloud.com/uploads/0d5046807e0d9dc45b5f4be28148c418_20260123143442.jpeg: 403 InvalidAccessKeyId(Message: The access key Id format you provided is invalid., RequestId: Njk3MzE2OGRfZmFmNDUxZV8xMGVmOV8xNThlZjhl, TraceId: OGVmYzZiMmQzYjA2OWNhODk0NTRkMTBiOWVmMDAxODc0OWRkZjk0ZDM1NmI1M2E2MTRlY2MzZDhmNmI5MWI1OTQyYWVlY2QwZTk2MDVmZDQ3MmI2Y2I4ZmI5ZmM4ODFjODI5NWYxNjBlMjI5ZDdlMzMyOGMyZGUxNGFjMGM2N2M=)"}
+jiangyi.com/model/common.FailWithError
+	/Users/jiangyi/Desktop/study/jy-admin/server/model/common/response.go:71
+jiangyi.com/api/upload.(*Api).UploadFile
+	/Users/jiangyi/Desktop/study/jy-admin/server/api/upload/uploadfile.go:59
+github.com/gin-gonic/gin.(*Context).Next
+	/Users/jiangyi/go/pkg/mod/github.com/gin-gonic/gin@v1.11.0/context.go:192
+jiangyi.com/middleware.JWTAuth.func1
+	/Users/jiangyi/Desktop/study/jy-admin/server/middleware/jwt.go:34
+github.com/gin-gonic/gin.(*Context).Next
+	/Users/jiangyi/go/pkg/mod/github.com/gin-gonic/gin@v1.11.0/context.go:192
+github.com/gin-gonic/gin.CustomRecoveryWithWriter.func1
+	/Users/jiangyi/go/pkg/mod/github.com/gin-gonic/gin@v1.11.0/recovery.go:92
+github.com/gin-gonic/gin.(*Context).Next
+	/Users/jiangyi/go/pkg/mod/github.com/gin-gonic/gin@v1.11.0/context.go:192
+github.com/gin-gonic/gin.LoggerWithConfig.func1
+	/Users/jiangyi/go/pkg/mod/github.com/gin-gonic/gin@v1.11.0/logger.go:249
+github.com/gin-gonic/gin.(*Context).Next
+	/Users/jiangyi/go/pkg/mod/github.com/gin-gonic/gin@v1.11.0/context.go:192
+jiangyi.com/middleware.ErrorLoggerMiddleware.func1
+	/Users/jiangyi/Desktop/study/jy-admin/server/middleware/logger.go:58
+github.com/gin-gonic/gin.(*Context).Next
+	/Users/jiangyi/go/pkg/mod/github.com/gin-gonic/gin@v1.11.0/context.go:192
+jiangyi.com/middleware.LoggerMiddleware.func1
+	/Users/jiangyi/Desktop/study/jy-admin/server/middleware/logger.go:19
+github.com/gin-gonic/gin.(*Context).Next
+	/Users/jiangyi/go/pkg/mod/github.com/gin-gonic/gin@v1.11.0/context.go:192
+github.com/gin-gonic/gin.(*Engine).handleHTTPRequest
+	/Users/jiangyi/go/pkg/mod/github.com/gin-gonic/gin@v1.11.0/gin.go:689
+github.com/gin-gonic/gin.(*Engine).ServeHTTP
+	/Users/jiangyi/go/pkg/mod/github.com/gin-gonic/gin@v1.11.0/gin.go:643
+net/http.serverHandler.ServeHTTP
+	/opt/homebrew/Cellar/go/1.25.6/libexec/src/net/http/server.go:3340
+net/http.(*conn).serve
+	/opt/homebrew/Cellar/go/1.25.6/libexec/src/net/http/server.go:2109
+2026-01-23 14:35:00	[34mINFO[0m	gin@v1.11.0/context.go:192	HTTP请求	{"status": 200, "method": "POST", "path": "/api/upload", "query": "", "ip": "::1", "user-agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36", "cost": "52.923300166s"}
+2026-01-23 14:35:05	[34mINFO[0m	gin@v1.11.0/context.go:192	HTTP请求	{"status": 200, "method": "GET", "path": "/api/user/userinfo", "query": "", "ip": "::1", "user-agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36", "cost": "7.684667ms"}
+2026-01-23 14:35:05	[34mINFO[0m	gin@v1.11.0/context.go:192	HTTP请求	{"status": 200, "method": "GET", "path": "/api/authority/getMenus", "query": "", "ip": "::1", "user-agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36", "cost": "6.823583ms"}
+2026-01-23 14:35:05	[33mWARN[0m	gin@v1.11.0/context.go:192	HTTP请求警告	{"status": 404, "method": "GET", "path": "/api/uploads/file/4eb71cdf366eba0ad7dccba248fd043e_20260116163231.jpeg", "query": "", "ip": "::1", "user-agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36", "cost": "69.791µs"}
+2026-01-23 14:35:10	[34mINFO[0m	gin@v1.11.0/context.go:192	HTTP请求	{"status": 200, "method": "GET", "path": "/api/upload/list", "query": "page=1&page_size=10", "ip": "::1", "user-agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36", "cost": "1.682875ms"}
+2026-01-23 14:35:10	[33mWARN[0m	gin@v1.11.0/context.go:192	HTTP请求警告	{"status": 404, "method": "GET", "path": "/api/uploads/file/c4ca4238a0b923820dcc509a6f75849b_20260116163606.jpeg", "query": "", "ip": "::1", "user-agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36", "cost": "51.5µs"}
+2026-01-23 14:35:10	[33mWARN[0m	gin@v1.11.0/context.go:192	HTTP请求警告	{"status": 404, "method": "GET", "path": "/api/uploads/file/f76a1b81d4e4fa1d10174e62503974f3_20260116161101.jpg", "query": "", "ip": "::1", "user-agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36", "cost": "190.375µs"}
+2026-01-23 14:35:10	[33mWARN[0m	gin@v1.11.0/context.go:192	HTTP请求警告	{"status": 404, "method": "GET", "path": "/api/uploads/file/c4ca4238a0b923820dcc509a6f75849b_20260116113228.jpeg", "query": "", "ip": "::1", "user-agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36", "cost": "68.375µs"}
+2026-01-23 14:35:10	[33mWARN[0m	gin@v1.11.0/context.go:192	HTTP请求警告	{"status": 404, "method": "GET", "path": "/api/uploads/file/0d5046807e0d9dc45b5f4be28148c418_20260116161235.jpeg", "query": "", "ip": "::1", "user-agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36", "cost": "56.625µs"}
+2026-01-23 14:35:10	[33mWARN[0m	gin@v1.11.0/context.go:192	HTTP请求警告	{"status": 404, "method": "GET", "path": "/api/uploads/file/4eb71cdf366eba0ad7dccba248fd043e_20260116163231.jpeg", "query": "", "ip": "::1", "user-agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36", "cost": "57.125µs"}
+2026-01-23 14:35:10	[33mWARN[0m	gin@v1.11.0/context.go:192	HTTP请求警告	{"status": 404, "method": "GET", "path": "/api/uploads/file/1f6be4333bd89e3a67ca47e614ab8bf4_20260116170405.jpg", "query": "", "ip": "::1", "user-agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36", "cost": "42.5µs"}
+2026-01-23 14:35:10	[33mWARN[0m	gin@v1.11.0/context.go:192	HTTP请求警告	{"status": 404, "method": "GET", "path": "/api/uploads/file/3c4d0d19bcfdd593d104b152b2d332ae_20260116175906.jpg", "query": "", "ip": "::1", "user-agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36", "cost": "25.625µs"}
+2026-01-23 14:35:10	[33mWARN[0m	gin@v1.11.0/context.go:192	HTTP请求警告	{"status": 404, "method": "GET", "path": "/api/uploads/file/6229f1b4224c42c4541ea81a1aed1aef_20260116175852.jpg", "query": "", "ip": "::1", "user-agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36", "cost": "124.041µs"}
+2026-01-23 14:39:16	[34mINFO[0m	server/main.go:17	日志系统初始化成功	{"level": "info", "format": "console", "output": "both"}
+2026-01-23 14:39:16	[34mINFO[0m	server/main.go:19	文件存储初始化	{"type": "腾讯云COS", "region": "ap-beijing", "bucket": "beij-1304949087", "path-prefix": "uploads"}
+2026-01-23 14:39:30	[34mINFO[0m	gin@v1.11.0/context.go:192	HTTP请求	{"status": 200, "method": "POST", "path": "/api/upload", "query": "", "ip": "::1", "user-agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36", "cost": "9.846179417s"}
+2026-01-23 14:39:30	[34mINFO[0m	gin@v1.11.0/context.go:192	HTTP请求	{"status": 200, "method": "GET", "path": "/api/upload/list", "query": "page=1&page_size=10", "ip": "::1", "user-agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36", "cost": "2.702208ms"}
+2026-01-23 14:39:56	[34mINFO[0m	gin@v1.11.0/context.go:192	HTTP请求	{"status": 200, "method": "GET", "path": "/api/user/userinfo", "query": "", "ip": "::1", "user-agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36", "cost": "1.707208ms"}
+2026-01-23 14:39:56	[34mINFO[0m	gin@v1.11.0/context.go:192	HTTP请求	{"status": 200, "method": "GET", "path": "/api/authority/getMenus", "query": "", "ip": "::1", "user-agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36", "cost": "2.852292ms"}
+2026-01-23 14:39:56	[33mWARN[0m	gin@v1.11.0/context.go:192	HTTP请求警告	{"status": 404, "method": "GET", "path": "/api/uploads/file/4eb71cdf366eba0ad7dccba248fd043e_20260116163231.jpeg", "query": "", "ip": "::1", "user-agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36", "cost": "86.666µs"}
+2026-01-23 14:40:00	[34mINFO[0m	gin@v1.11.0/context.go:192	HTTP请求	{"status": 200, "method": "GET", "path": "/api/upload/list", "query": "page=1&page_size=10", "ip": "::1", "user-agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36", "cost": "1.167ms"}
+2026-01-23 14:40:00	[33mWARN[0m	gin@v1.11.0/context.go:192	HTTP请求警告	{"status": 404, "method": "GET", "path": "/api/uploads/file/c4ca4238a0b923820dcc509a6f75849b_20260116163606.jpeg", "query": "", "ip": "::1", "user-agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36", "cost": "66.584µs"}
+2026-01-23 14:40:00	[33mWARN[0m	gin@v1.11.0/context.go:192	HTTP请求警告	{"status": 404, "method": "GET", "path": "/api/uploads/file/c4ca4238a0b923820dcc509a6f75849b_20260116113228.jpeg", "query": "", "ip": "::1", "user-agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36", "cost": "99.458µs"}
+2026-01-23 14:40:00	[33mWARN[0m	gin@v1.11.0/context.go:192	HTTP请求警告	{"status": 404, "method": "GET", "path": "/api/uploads/file/f76a1b81d4e4fa1d10174e62503974f3_20260116161101.jpg", "query": "", "ip": "::1", "user-agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36", "cost": "148.417µs"}
+2026-01-23 14:40:00	[33mWARN[0m	gin@v1.11.0/context.go:192	HTTP请求警告	{"status": 404, "method": "GET", "path": "/api/uploads/file/0d5046807e0d9dc45b5f4be28148c418_20260116161235.jpeg", "query": "", "ip": "::1", "user-agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36", "cost": "368.417µs"}
+2026-01-23 14:40:00	[33mWARN[0m	gin@v1.11.0/context.go:192	HTTP请求警告	{"status": 404, "method": "GET", "path": "/api/uploads/file/4eb71cdf366eba0ad7dccba248fd043e_20260116163231.jpeg", "query": "", "ip": "::1", "user-agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36", "cost": "110.042µs"}
+2026-01-23 14:40:00	[33mWARN[0m	gin@v1.11.0/context.go:192	HTTP请求警告	{"status": 404, "method": "GET", "path": "/api/uploads/file/1f6be4333bd89e3a67ca47e614ab8bf4_20260116170405.jpg", "query": "", "ip": "::1", "user-agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36", "cost": "150.792µs"}
+2026-01-23 14:40:00	[33mWARN[0m	gin@v1.11.0/context.go:192	HTTP请求警告	{"status": 404, "method": "GET", "path": "/api/uploads/file/6229f1b4224c42c4541ea81a1aed1aef_20260116175852.jpg", "query": "", "ip": "::1", "user-agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36", "cost": "231.333µs"}
+2026-01-23 14:40:00	[33mWARN[0m	gin@v1.11.0/context.go:192	HTTP请求警告	{"status": 404, "method": "GET", "path": "/api/uploads/file/3c4d0d19bcfdd593d104b152b2d332ae_20260116175906.jpg", "query": "", "ip": "::1", "user-agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36", "cost": "126.084µs"}
+2026-01-23 14:40:14	[34mINFO[0m	gin@v1.11.0/context.go:192	HTTP请求	{"status": 200, "method": "DELETE", "path": "/api/upload", "query": "", "ip": "::1", "user-agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36", "cost": "269.085625ms"}
+2026-01-23 14:40:14	[34mINFO[0m	gin@v1.11.0/context.go:192	HTTP请求	{"status": 200, "method": "GET", "path": "/api/upload/list", "query": "page=1&page_size=10", "ip": "::1", "user-agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36", "cost": "1.197083ms"}
+2026-01-23 14:40:16	[34mINFO[0m	gin@v1.11.0/context.go:192	HTTP请求	{"status": 200, "method": "DELETE", "path": "/api/upload", "query": "", "ip": "::1", "user-agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36", "cost": "266.600958ms"}
+2026-01-23 14:40:16	[34mINFO[0m	gin@v1.11.0/context.go:192	HTTP请求	{"status": 200, "method": "GET", "path": "/api/upload/list", "query": "page=1&page_size=10", "ip": "::1", "user-agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36", "cost": "1.767ms"}
+2026-01-23 14:40:18	[34mINFO[0m	gin@v1.11.0/context.go:192	HTTP请求	{"status": 200, "method": "DELETE", "path": "/api/upload", "query": "", "ip": "::1", "user-agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36", "cost": "580.807917ms"}
+2026-01-23 14:40:18	[34mINFO[0m	gin@v1.11.0/context.go:192	HTTP请求	{"status": 200, "method": "GET", "path": "/api/upload/list", "query": "page=1&page_size=10", "ip": "::1", "user-agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36", "cost": "1.109208ms"}
+2026-01-23 14:40:19	[34mINFO[0m	gin@v1.11.0/context.go:192	HTTP请求	{"status": 200, "method": "DELETE", "path": "/api/upload", "query": "", "ip": "::1", "user-agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36", "cost": "266.099083ms"}
+2026-01-23 14:40:19	[34mINFO[0m	gin@v1.11.0/context.go:192	HTTP请求	{"status": 200, "method": "GET", "path": "/api/upload/list", "query": "page=1&page_size=10", "ip": "::1", "user-agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36", "cost": "1.032417ms"}
+2026-01-23 14:40:21	[34mINFO[0m	gin@v1.11.0/context.go:192	HTTP请求	{"status": 200, "method": "DELETE", "path": "/api/upload", "query": "", "ip": "::1", "user-agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36", "cost": "264.663041ms"}
+2026-01-23 14:40:21	[34mINFO[0m	gin@v1.11.0/context.go:192	HTTP请求	{"status": 200, "method": "GET", "path": "/api/upload/list", "query": "page=1&page_size=10", "ip": "::1", "user-agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36", "cost": "1.000584ms"}
+2026-01-23 14:40:22	[34mINFO[0m	gin@v1.11.0/context.go:192	HTTP请求	{"status": 200, "method": "DELETE", "path": "/api/upload", "query": "", "ip": "::1", "user-agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36", "cost": "248.203833ms"}
+2026-01-23 14:40:22	[34mINFO[0m	gin@v1.11.0/context.go:192	HTTP请求	{"status": 200, "method": "GET", "path": "/api/upload/list", "query": "page=1&page_size=10", "ip": "::1", "user-agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36", "cost": "684.209µs"}
+2026-01-23 14:40:24	[34mINFO[0m	gin@v1.11.0/context.go:192	HTTP请求	{"status": 200, "method": "DELETE", "path": "/api/upload", "query": "", "ip": "::1", "user-agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36", "cost": "591.372083ms"}
+2026-01-23 14:40:24	[34mINFO[0m	gin@v1.11.0/context.go:192	HTTP请求	{"status": 200, "method": "GET", "path": "/api/upload/list", "query": "page=1&page_size=10", "ip": "::1", "user-agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36", "cost": "954.417µs"}
+2026-01-23 14:40:25	[34mINFO[0m	gin@v1.11.0/context.go:192	HTTP请求	{"status": 200, "method": "DELETE", "path": "/api/upload", "query": "", "ip": "::1", "user-agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36", "cost": "245.664916ms"}
+2026-01-23 14:40:25	[34mINFO[0m	gin@v1.11.0/context.go:192	HTTP请求	{"status": 200, "method": "GET", "path": "/api/upload/list", "query": "page=1&page_size=10", "ip": "::1", "user-agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36", "cost": "942µs"}
+2026-01-23 14:40:27	[34mINFO[0m	gin@v1.11.0/context.go:192	HTTP请求	{"status": 200, "method": "DELETE", "path": "/api/upload", "query": "", "ip": "::1", "user-agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36", "cost": "960.812208ms"}
+2026-01-23 14:40:27	[34mINFO[0m	gin@v1.11.0/context.go:192	HTTP请求	{"status": 200, "method": "GET", "path": "/api/upload/list", "query": "page=1&page_size=10", "ip": "::1", "user-agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36", "cost": "793.875µs"}
+2026-01-23 14:40:29	[34mINFO[0m	gin@v1.11.0/context.go:192	HTTP请求	{"status": 200, "method": "GET", "path": "/api/user/userinfo", "query": "", "ip": "::1", "user-agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36", "cost": "1.306708ms"}
+2026-01-23 14:40:30	[34mINFO[0m	gin@v1.11.0/context.go:192	HTTP请求	{"status": 200, "method": "GET", "path": "/api/authority/getMenus", "query": "", "ip": "::1", "user-agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36", "cost": "10.380333ms"}
+2026-01-23 14:40:30	[33mWARN[0m	gin@v1.11.0/context.go:192	HTTP请求警告	{"status": 404, "method": "GET", "path": "/api/uploads/file/4eb71cdf366eba0ad7dccba248fd043e_20260116163231.jpeg", "query": "", "ip": "::1", "user-agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36", "cost": "275.125µs"}
+2026-01-23 14:40:32	[34mINFO[0m	gin@v1.11.0/context.go:192	HTTP请求	{"status": 200, "method": "GET", "path": "/api/upload/list", "query": "page=1&page_size=10", "ip": "::1", "user-agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36", "cost": "940µs"}
+2026-01-23 14:40:35	[34mINFO[0m	gin@v1.11.0/context.go:192	HTTP请求	{"status": 200, "method": "GET", "path": "/api/user/userinfo", "query": "", "ip": "::1", "user-agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36", "cost": "3.964834ms"}
+2026-01-23 14:40:35	[34mINFO[0m	gin@v1.11.0/context.go:192	HTTP请求	{"status": 200, "method": "GET", "path": "/api/authority/getMenus", "query": "", "ip": "::1", "user-agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36", "cost": "6.845458ms"}
+2026-01-23 14:40:35	[33mWARN[0m	gin@v1.11.0/context.go:192	HTTP请求警告	{"status": 404, "method": "GET", "path": "/api/uploads/file/4eb71cdf366eba0ad7dccba248fd043e_20260116163231.jpeg", "query": "", "ip": "::1", "user-agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36", "cost": "44.167µs"}
+2026-01-23 14:40:40	[34mINFO[0m	gin@v1.11.0/context.go:192	HTTP请求	{"status": 200, "method": "GET", "path": "/api/upload/list", "query": "page=1&page_size=10", "ip": "::1", "user-agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36", "cost": "884.292µs"}
+2026-01-23 14:40:43	[34mINFO[0m	gin@v1.11.0/context.go:192	HTTP请求	{"status": 200, "method": "GET", "path": "/api/user/userinfo", "query": "", "ip": "::1", "user-agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36", "cost": "1.703959ms"}
+2026-01-23 14:40:44	[34mINFO[0m	gin@v1.11.0/context.go:192	HTTP请求	{"status": 200, "method": "GET", "path": "/api/authority/getMenus", "query": "", "ip": "::1", "user-agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36", "cost": "7.086625ms"}
+2026-01-23 14:40:44	[33mWARN[0m	gin@v1.11.0/context.go:192	HTTP请求警告	{"status": 404, "method": "GET", "path": "/api/uploads/file/4eb71cdf366eba0ad7dccba248fd043e_20260116163231.jpeg", "query": "", "ip": "::1", "user-agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36", "cost": "49.291µs"}
+2026-01-23 14:41:03	[34mINFO[0m	gin@v1.11.0/context.go:192	HTTP请求	{"status": 200, "method": "GET", "path": "/api/upload/list", "query": "page=1&page_size=10", "ip": "::1", "user-agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36", "cost": "1.534541ms"}
+2026-01-23 14:41:12	[34mINFO[0m	gin@v1.11.0/context.go:192	HTTP请求	{"status": 200, "method": "POST", "path": "/api/upload", "query": "", "ip": "::1", "user-agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36", "cost": "5.618026375s"}
+2026-01-23 14:41:12	[34mINFO[0m	gin@v1.11.0/context.go:192	HTTP请求	{"status": 200, "method": "GET", "path": "/api/upload/list", "query": "page=1&page_size=10", "ip": "::1", "user-agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36", "cost": "941.708µs"}
+2026-01-23 14:41:56	[34mINFO[0m	gin@v1.11.0/context.go:192	HTTP请求	{"status": 200, "method": "GET", "path": "/api/user/userinfo", "query": "", "ip": "::1", "user-agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36", "cost": "3.584458ms"}
+2026-01-23 14:41:56	[34mINFO[0m	gin@v1.11.0/context.go:192	HTTP请求	{"status": 200, "method": "GET", "path": "/api/authority/getMenus", "query": "", "ip": "::1", "user-agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36", "cost": "2.393083ms"}
+2026-01-23 14:41:57	[33mWARN[0m	gin@v1.11.0/context.go:192	HTTP请求警告	{"status": 404, "method": "GET", "path": "/api/uploads/file/4eb71cdf366eba0ad7dccba248fd043e_20260116163231.jpeg", "query": "", "ip": "::1", "user-agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36", "cost": "90.417µs"}
+2026-01-23 14:42:13	[34mINFO[0m	gin@v1.11.0/context.go:192	HTTP请求	{"status": 200, "method": "GET", "path": "/api/user/userinfo", "query": "", "ip": "::1", "user-agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36", "cost": "853.625µs"}
+2026-01-23 14:42:14	[34mINFO[0m	gin@v1.11.0/context.go:192	HTTP请求	{"status": 200, "method": "GET", "path": "/api/authority/getMenus", "query": "", "ip": "::1", "user-agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36", "cost": "2.656708ms"}
+2026-01-23 14:42:14	[33mWARN[0m	gin@v1.11.0/context.go:192	HTTP请求警告	{"status": 404, "method": "GET", "path": "/api/uploads/file/4eb71cdf366eba0ad7dccba248fd043e_20260116163231.jpeg", "query": "", "ip": "::1", "user-agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36", "cost": "46.25µs"}
+2026-01-23 14:42:27	[34mINFO[0m	gin@v1.11.0/context.go:192	HTTP请求	{"status": 200, "method": "GET", "path": "/api/user/userinfo", "query": "", "ip": "::1", "user-agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36", "cost": "3.263417ms"}
+2026-01-23 14:42:28	[34mINFO[0m	gin@v1.11.0/context.go:192	HTTP请求	{"status": 200, "method": "GET", "path": "/api/authority/getMenus", "query": "", "ip": "::1", "user-agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36", "cost": "40.969416ms"}
+2026-01-23 14:42:28	[33mWARN[0m	gin@v1.11.0/context.go:192	HTTP请求警告	{"status": 404, "method": "GET", "path": "/api/uploads/file/4eb71cdf366eba0ad7dccba248fd043e_20260116163231.jpeg", "query": "", "ip": "::1", "user-agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36", "cost": "67.666µs"}
+2026-01-23 14:42:31	[34mINFO[0m	gin@v1.11.0/context.go:192	HTTP请求	{"status": 200, "method": "GET", "path": "/api/upload/list", "query": "page=1&page_size=10", "ip": "::1", "user-agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36", "cost": "2.548584ms"}
+2026-01-23 14:42:33	[34mINFO[0m	gin@v1.11.0/context.go:192	HTTP请求	{"status": 200, "method": "GET", "path": "/api/user/userinfo", "query": "", "ip": "::1", "user-agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36", "cost": "1.212292ms"}
+2026-01-23 14:42:33	[34mINFO[0m	gin@v1.11.0/context.go:192	HTTP请求	{"status": 200, "method": "GET", "path": "/api/authority/getMenus", "query": "", "ip": "::1", "user-agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36", "cost": "6.849041ms"}
+2026-01-23 14:42:33	[33mWARN[0m	gin@v1.11.0/context.go:192	HTTP请求警告	{"status": 404, "method": "GET", "path": "/api/uploads/file/4eb71cdf366eba0ad7dccba248fd043e_20260116163231.jpeg", "query": "", "ip": "::1", "user-agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36", "cost": "159.125µs"}
+2026-01-23 14:42:36	[34mINFO[0m	gin@v1.11.0/context.go:192	HTTP请求	{"status": 200, "method": "GET", "path": "/api/upload/list", "query": "page=1&page_size=10", "ip": "::1", "user-agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36", "cost": "51.179958ms"}
+2026-01-23 14:42:41	[34mINFO[0m	gin@v1.11.0/context.go:192	HTTP请求	{"status": 200, "method": "GET", "path": "/api/user/userinfo", "query": "", "ip": "::1", "user-agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36", "cost": "2.851667ms"}
+2026-01-23 14:42:41	[34mINFO[0m	gin@v1.11.0/context.go:192	HTTP请求	{"status": 200, "method": "GET", "path": "/api/authority/getMenus", "query": "", "ip": "::1", "user-agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36", "cost": "4.394208ms"}
+2026-01-23 14:42:42	[33mWARN[0m	gin@v1.11.0/context.go:192	HTTP请求警告	{"status": 404, "method": "GET", "path": "/api/uploads/file/4eb71cdf366eba0ad7dccba248fd043e_20260116163231.jpeg", "query": "", "ip": "::1", "user-agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36", "cost": "39.75µs"}
+2026-01-23 14:42:50	[34mINFO[0m	gin@v1.11.0/context.go:192	HTTP请求	{"status": 200, "method": "GET", "path": "/api/user/userinfo", "query": "", "ip": "::1", "user-agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36", "cost": "1.367708ms"}
+2026-01-23 14:42:50	[34mINFO[0m	gin@v1.11.0/context.go:192	HTTP请求	{"status": 200, "method": "GET", "path": "/api/authority/getMenus", "query": "", "ip": "::1", "user-agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36", "cost": "3.462042ms"}
+2026-01-23 14:42:50	[33mWARN[0m	gin@v1.11.0/context.go:192	HTTP请求警告	{"status": 404, "method": "GET", "path": "/api/uploads/file/4eb71cdf366eba0ad7dccba248fd043e_20260116163231.jpeg", "query": "", "ip": "::1", "user-agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36", "cost": "85.666µs"}
+2026-01-23 14:42:55	[34mINFO[0m	gin@v1.11.0/context.go:192	HTTP请求	{"status": 200, "method": "GET", "path": "/api/user/userinfo", "query": "", "ip": "::1", "user-agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36", "cost": "11.019125ms"}
+2026-01-23 14:42:55	[34mINFO[0m	gin@v1.11.0/context.go:192	HTTP请求	{"status": 200, "method": "GET", "path": "/api/authority/getMenus", "query": "", "ip": "::1", "user-agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36", "cost": "5.441208ms"}
+2026-01-23 14:42:55	[33mWARN[0m	gin@v1.11.0/context.go:192	HTTP请求警告	{"status": 404, "method": "GET", "path": "/api/uploads/file/4eb71cdf366eba0ad7dccba248fd043e_20260116163231.jpeg", "query": "", "ip": "::1", "user-agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36", "cost": "90.625µs"}
+2026-01-23 14:43:49	[34mINFO[0m	gin@v1.11.0/context.go:192	HTTP请求	{"status": 200, "method": "GET", "path": "/api/upload/list", "query": "page=1&page_size=10", "ip": "::1", "user-agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36", "cost": "2.293916ms"}
+2026-01-23 14:43:57	[34mINFO[0m	gin@v1.11.0/context.go:192	HTTP请求	{"status": 200, "method": "POST", "path": "/api/upload", "query": "", "ip": "::1", "user-agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36", "cost": "5.774780125s"}
+2026-01-23 14:43:57	[34mINFO[0m	gin@v1.11.0/context.go:192	HTTP请求	{"status": 200, "method": "GET", "path": "/api/upload/list", "query": "page=1&page_size=10", "ip": "::1", "user-agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36", "cost": "622.708µs"}
+2026-01-23 14:46:44	[34mINFO[0m	gin@v1.11.0/context.go:192	HTTP请求	{"status": 200, "method": "GET", "path": "/api/upload/list", "query": "page=1&page_size=10", "ip": "::1", "user-agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36", "cost": "892.292µs"}
+2026-01-23 14:47:23	[34mINFO[0m	gin@v1.11.0/context.go:192	HTTP请求	{"status": 200, "method": "GET", "path": "/api/upload/list", "query": "page=1&page_size=10", "ip": "::1", "user-agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36", "cost": "1.351958ms"}
+2026-01-23 14:47:35	[34mINFO[0m	gin@v1.11.0/context.go:192	HTTP请求	{"status": 200, "method": "GET", "path": "/api/user/userinfo", "query": "", "ip": "::1", "user-agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36", "cost": "3.764167ms"}
+2026-01-23 14:47:35	[34mINFO[0m	gin@v1.11.0/context.go:192	HTTP请求	{"status": 200, "method": "GET", "path": "/api/authority/getMenus", "query": "", "ip": "::1", "user-agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36", "cost": "3.720417ms"}
+2026-01-23 14:47:35	[33mWARN[0m	gin@v1.11.0/context.go:192	HTTP请求警告	{"status": 404, "method": "GET", "path": "/api/uploads/file/4eb71cdf366eba0ad7dccba248fd043e_20260116163231.jpeg", "query": "", "ip": "::1", "user-agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36", "cost": "272.333µs"}
+2026-01-23 14:47:37	[34mINFO[0m	gin@v1.11.0/context.go:192	HTTP请求	{"status": 200, "method": "GET", "path": "/api/upload/list", "query": "page=1&page_size=10", "ip": "::1", "user-agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36", "cost": "2.426584ms"}
+2026-01-23 14:49:37	[34mINFO[0m	gin@v1.11.0/context.go:192	HTTP请求	{"status": 200, "method": "GET", "path": "/api/user/userinfo", "query": "", "ip": "::1", "user-agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36", "cost": "3.850875ms"}
+2026-01-23 14:49:37	[34mINFO[0m	gin@v1.11.0/context.go:192	HTTP请求	{"status": 200, "method": "GET", "path": "/api/authority/getMenus", "query": "", "ip": "::1", "user-agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36", "cost": "40.88675ms"}
+2026-01-23 14:49:38	[33mWARN[0m	gin@v1.11.0/context.go:192	HTTP请求警告	{"status": 404, "method": "GET", "path": "/api/uploads/file/4eb71cdf366eba0ad7dccba248fd043e_20260116163231.jpeg", "query": "", "ip": "::1", "user-agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36", "cost": "257.459µs"}
+2026-01-23 14:49:40	[34mINFO[0m	gin@v1.11.0/context.go:192	HTTP请求	{"status": 200, "method": "GET", "path": "/api/upload/list", "query": "page=1&page_size=10", "ip": "::1", "user-agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36", "cost": "560.458µs"}
+2026-01-23 14:59:17	[34mINFO[0m	server/main.go:17	日志系统初始化成功	{"level": "info", "format": "console", "output": "both"}
+2026-01-23 14:59:17	[34mINFO[0m	server/main.go:19	文件存储初始化	{"type": "腾讯云COS", "region": "ap-beijing", "bucket": "beij-1304949087", "path-prefix": "uploads"}
+2026-01-23 14:59:20	[34mINFO[0m	gin@v1.11.0/context.go:192	HTTP请求	{"status": 200, "method": "GET", "path": "/api/user/userinfo", "query": "", "ip": "::1", "user-agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36", "cost": "13.94ms"}
+2026-01-23 14:59:21	[34mINFO[0m	gin@v1.11.0/context.go:192	HTTP请求	{"status": 200, "method": "GET", "path": "/api/authority/getMenus", "query": "", "ip": "::1", "user-agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36", "cost": "5.948834ms"}
+2026-01-23 14:59:21	[33mWARN[0m	gin@v1.11.0/context.go:192	HTTP请求警告	{"status": 404, "method": "GET", "path": "/api/uploads/file/4eb71cdf366eba0ad7dccba248fd043e_20260116163231.jpeg", "query": "", "ip": "::1", "user-agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36", "cost": "105.625µs"}
+2026-01-23 14:59:23	[34mINFO[0m	gin@v1.11.0/context.go:192	HTTP请求	{"status": 200, "method": "GET", "path": "/api/upload/list", "query": "page=1&page_size=10", "ip": "::1", "user-agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36", "cost": "1.900542ms"}
+2026-01-23 15:00:25	[34mINFO[0m	gin@v1.11.0/context.go:192	HTTP请求	{"status": 200, "method": "GET", "path": "/api/user/userinfo", "query": "", "ip": "::1", "user-agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36", "cost": "12.629583ms"}
+2026-01-23 15:00:25	[34mINFO[0m	gin@v1.11.0/context.go:192	HTTP请求	{"status": 200, "method": "GET", "path": "/api/authority/getMenus", "query": "", "ip": "::1", "user-agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36", "cost": "60.749625ms"}
+2026-01-23 15:00:25	[33mWARN[0m	gin@v1.11.0/context.go:192	HTTP请求警告	{"status": 404, "method": "GET", "path": "/api/uploads/file/4eb71cdf366eba0ad7dccba248fd043e_20260116163231.jpeg", "query": "", "ip": "::1", "user-agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36", "cost": "127.709µs"}
+2026-01-23 15:00:29	[34mINFO[0m	gin@v1.11.0/context.go:192	HTTP请求	{"status": 200, "method": "GET", "path": "/api/upload/list", "query": "page=1&page_size=10", "ip": "::1", "user-agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36", "cost": "1.283375ms"}
+2026-01-23 15:00:50	[34mINFO[0m	gin@v1.11.0/context.go:192	HTTP请求	{"status": 200, "method": "POST", "path": "/api/upload", "query": "", "ip": "::1", "user-agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36", "cost": "9.579209916s"}
+2026-01-23 15:00:50	[34mINFO[0m	gin@v1.11.0/context.go:192	HTTP请求	{"status": 200, "method": "GET", "path": "/api/upload/list", "query": "page=1&page_size=10", "ip": "::1", "user-agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36", "cost": "712.083µs"}
+2026-01-23 15:03:55	[34mINFO[0m	gin@v1.11.0/context.go:192	HTTP请求	{"status": 200, "method": "POST", "path": "/api/upload", "query": "", "ip": "::1", "user-agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36", "cost": "16.432539s"}
+2026-01-23 15:03:55	[34mINFO[0m	gin@v1.11.0/context.go:192	HTTP请求	{"status": 200, "method": "GET", "path": "/api/upload/list", "query": "page=1&page_size=10", "ip": "::1", "user-agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36", "cost": "1.732625ms"}

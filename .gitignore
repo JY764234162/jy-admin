@@ -1,0 +1,27 @@
+# 环境变量文件（包含敏感信息）
+deploy/.env
+.env
+.env.*
+
+# 配置文件（可能包含敏感信息）
+server/config.dev.yaml
+server/config.prod.yaml
+server/config.local.yaml
+server/*.yaml
+!server/config.docker.yaml
+!server/config.example.yaml
+
+# 调试文件和大文件
+**/__debug_bin*
+**/*.db
+**/*.log
+**/logs/
+**/uploads/
+
+# IDE 和系统文件
+.DS_Store
+.vscode/
+.idea/
+*.swp
+*.swo
+*~

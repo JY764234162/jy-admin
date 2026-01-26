@@ -5,7 +5,7 @@ import type { ColumnsType } from "antd/es/table";
 import type { GetProp, UploadFile, UploadProps } from "antd";
 import type { RcFile } from "antd/es/upload";
 import { userApi, uploadApi, authorityApi } from "@/api";
-import { getImageUrl } from "@/utils/image";
+import { getImageUrl, normalizeFileUrl } from "@/utils/image";
 import type { User, UserListParams } from "@/api/types";
 import type { Authority } from "@/api/authority";
 import styles from "./index.module.css";
@@ -269,15 +269,13 @@ export const Component = () => {
         throw new Error(uploadRes.msg || "文件上传失败");
       }
 
-      // 获取文件相对路径（不拼接域名，直接保存相对路径到数据库）
-      let filePath = uploadRes.data.url || uploadRes.data.filePath || "";
+      // 获取文件URL（可能是完整URL（COS）或相对路径（本地存储））
+      const rawUrl = uploadRes.data.url || uploadRes.data.filePath || "";
 
-      // 确保路径格式正确（以 / 开头）
-      if (filePath && !filePath.startsWith("/")) {
-        filePath = "/" + filePath;
-      }
+      // 规范化文件URL（COS 返回完整URL，本地存储返回相对路径）
+      const filePath = normalizeFileUrl(rawUrl);
 
-      // 用于预览的完整URL（仅用于显示）
+      // 用于预览的完整URL（getImageUrl 会自动处理完整URL和相对路径）
       const fileUrl = getImageUrl(filePath);
 
       // 更新上传进度

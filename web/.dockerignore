@@ -1,0 +1,14 @@
+# 排除 node_modules，避免覆盖从 deps 层复制的依赖
+**/node_modules
+**/.git
+**/.DS_Store
+**/dist
+**/build
+**/.next
+**/.cache
+**/coverage
+**/.env.local
+**/.env.*.local
+**/logs
+**/*.log
+

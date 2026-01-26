@@ -73,3 +73,23 @@ export const getImagePath = (imageUrl: string | undefined | null): string | unde
   }
 };
 
+/**
+ * 处理上传返回的文件URL
+ * 支持 COS 完整URL 和本地存储相对路径
+ * @param fileUrl 后端返回的文件URL（可能是完整URL或相对路径）
+ * @returns 处理后的文件URL（用于保存到数据库）
+ */
+export const normalizeFileUrl = (fileUrl: string | undefined | null): string => {
+  if (!fileUrl) {
+    return "";
+  }
+
+  // 如果是完整URL（COS存储），直接返回
+  if (fileUrl.startsWith("http://") || fileUrl.startsWith("https://")) {
+    return fileUrl;
+  }
+
+  // 如果是相对路径（本地存储），确保以 / 开头
+  return fileUrl.startsWith("/") ? fileUrl : `/${fileUrl}`;
+};
+

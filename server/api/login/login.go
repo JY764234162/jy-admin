@@ -5,6 +5,7 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/mojocn/base64Captcha"
+	"go.uber.org/zap"
 	"jiangyi.com/global"
 	"jiangyi.com/model/common"
 	"jiangyi.com/model/system"
@@ -46,6 +47,13 @@ func (l *Api) Login(ctx *gin.Context) {
 	}
 
 	key := ctx.ClientIP()
+
+	// 记录登录尝试
+	global.JY_LOG.Info("登录尝试",
+		zap.String("username", params.Username),
+		zap.String("ip", key),
+		zap.String("user-agent", ctx.Request.UserAgent()),
+	)
 	// 判断验证码是否开启
 	openCaptcha := global.JY_Config.Captcha.OpenCaptcha               // 是否开启防爆次数
 	openCaptchaTimeOut := global.JY_Config.Captcha.OpenCaptchaTimeout // 缓存超时时间
@@ -59,6 +67,12 @@ func (l *Api) Login(ctx *gin.Context) {
 	if oc && (params.Code == "" || params.CodeId == "" || !store.Verify(params.CodeId, params.Code, true)) {
 		// 验证码次数+1
 		global.JY_BlackCache.Increment(key, 1)
+		global.JY_LOG.Warn("登录失败：验证码错误",
+			zap.String("username", params.Username),
+			zap.String("ip", key),
+			zap.Bool("has_code", params.Code != ""),
+			zap.Bool("has_code_id", params.CodeId != ""),
+		)
 		common.FailWithMsg(ctx, "验证码错误")
 		return
 	}
@@ -68,6 +82,11 @@ func (l *Api) Login(ctx *gin.Context) {
 	err = global.JY_DB.Where("username = ?", params.Username).First(&user).Error
 	if err != nil {
 		global.JY_BlackCache.Increment(key, 1)
+		global.JY_LOG.Warn("登录失败：用户不存在",
+			zap.String("username", params.Username),
+			zap.String("ip", key),
+			zap.Error(err),
+		)
 		common.FailWithError(ctx, "用户不存在或密码错误", err)
 		return
 	}
@@ -75,6 +94,11 @@ func (l *Api) Login(ctx *gin.Context) {
 	// 使用 bcrypt 验证密码
 	if !utils.BcryptCheck(params.Password, user.Password) {
 		global.JY_BlackCache.Increment(key, 1)
+		global.JY_LOG.Warn("登录失败：密码错误",
+			zap.String("username", params.Username),
+			zap.String("ip", key),
+			zap.Uint("user_id", user.ID),
+		)
 		common.FailWithMsg(ctx, "用户不存在或密码错误")
 		return
 	}
@@ -82,6 +106,11 @@ func (l *Api) Login(ctx *gin.Context) {
 	// 检查用户状态（只有用户被禁用时才不允许登录）
 	if !user.Enable {
 		global.JY_BlackCache.Increment(key, 1)
+		global.JY_LOG.Warn("登录失败：用户已被禁用",
+			zap.String("username", params.Username),
+			zap.String("ip", key),
+			zap.Uint("user_id", user.ID),
+		)
 		common.FailWithMsg(ctx, "用户已被禁用，无法登录")
 		return
 	}
@@ -99,9 +128,24 @@ func (l *Api) Login(ctx *gin.Context) {
 	})
 	token, err := j.CreateToken(claims)
 	if err != nil {
+		global.JY_LOG.Error("登录失败：Token生成失败",
+			zap.String("username", params.Username),
+			zap.String("ip", key),
+			zap.Uint("user_id", user.ID),
+			zap.Error(err),
+		)
 		common.FailWithError(ctx, "获取token失败", err)
 		return
 	}
+
+	// 记录登录成功
+	global.JY_LOG.Info("登录成功",
+		zap.String("username", params.Username),
+		zap.String("ip", key),
+		zap.Uint("user_id", user.ID),
+		zap.String("authority_id", user.AuthorityId),
+		zap.String("nick_name", user.NickName),
+	)
 
 	common.OkWithDetailed(ctx, gin.H{
 		"user":      user,
