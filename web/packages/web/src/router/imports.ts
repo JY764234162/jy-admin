@@ -36,7 +36,7 @@ export const dynamicLazyMap: Record<string, () => Promise<any>> = {
   "react-flow": () => import("@/pages/visualization/react-flow"),
 
   // ========== 编辑器 ==========
-  "monaco-react": () => import("@/pages/editor/monaco-react"),
+  // "monaco-react": () => import("@/pages/editor/monaco-react"),
   "rich-editor": () => import("@/pages/editor/rich-editor"),
   "audio-editor": () => import("@/pages/editor/audio-editor"),
 

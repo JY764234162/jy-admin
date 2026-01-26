@@ -103,9 +103,9 @@ export const Component = () => {
     {
       icon: <EditOutlined />,
       title: "编辑器",
-      description: "Monaco编辑器集成、富文本编辑器实现，支持代码高亮、diff对比等功能",
+      description: "富文本编辑器实现，支持代码高亮、文本编辑等功能",
       path: "/editor",
-      tags: ["Monaco", "富文本", "编辑"],
+      tags: ["富文本", "编辑"],
     },
     {
       icon: <FileTextOutlined />,
@@ -158,7 +158,6 @@ export const Component = () => {
     "Vite",
     "React Router",
     "Redux Toolkit",
-    "Monaco Editor",
     "Three.js",
     "PDF.js",
     "React Flow",
