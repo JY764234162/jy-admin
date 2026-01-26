@@ -83,6 +83,9 @@ services:
     build:
       context: ./web
       dockerfile: Dockerfile
+      # 启用构建缓存
+      args:
+        BUILDKIT_INLINE_CACHE: 1
     container_name: jy-admin-frontend
     restart: always
     ports:

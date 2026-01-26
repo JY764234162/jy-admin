@@ -68,8 +68,8 @@ export default defineConfig(({ mode }: ConfigEnv) => {
       manifest: true,
       emptyOutDir: true,
       outDir: "../../docs",
-      // 启用压缩
-      minify: "terser",
+      // 使用 esbuild 压缩（比 terser 快且资源占用更少）
+      minify: "esbuild",
       // 代码分割优化
       rollupOptions: {
         input: {
@@ -118,6 +118,11 @@ export default defineConfig(({ mode }: ConfigEnv) => {
       cssCodeSplit: true,
       // 目标浏览器，更现代的浏览器可以减小体积
       target: ["es2015", "edge88", "firefox78", "chrome87", "safari14"],
+      // 限制构建并发，避免资源耗尽（4核服务器建议2-3）
+      // 减少 chunk 数量，降低内存占用
+      chunkSizeWarningLimit: 1000,
+      // 优化构建性能
+      reportCompressedSize: false, // 禁用压缩大小报告，加快构建
     },
   };
 });

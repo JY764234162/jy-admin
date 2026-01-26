@@ -51,13 +51,16 @@ RUN pnpm config set registry https://registry.npmmirror.com
 RUN --mount=type=cache,id=pnpm,target=/pnpm/store \
     pnpm install --frozen-lockfile
 
-# 设置 Node.js 内存限制和并行构建
-ENV NODE_OPTIONS="--max-old-space-size=4096"
+# 设置 Node.js 内存限制（4GB服务器建议使用2GB，留出空间给系统和其他进程）
+# 限制并发任务，避免资源耗尽
+ENV NODE_OPTIONS="--max-old-space-size=2048"
 ENV NODE_ENV=production
 
-# 构建前端（启用并行构建）
+# 构建前端（限制并发，避免资源耗尽）
+# package.json 中的 build 脚本已经包含了 tsc -b && vite build
 RUN cd packages/web && \
-    echo "Starting build..." && \
+    echo "Starting build (TypeScript + Vite)..." && \
+    echo "Memory limit: 2GB" && \
     pnpm run build
 
 # 运行层：Nginx 服务
