@@ -21,7 +21,6 @@ require (
 )
 
 require (
-	github.com/gin-contrib/cors v1.7.6
 	github.com/tencentyun/cos-go-sdk-v5 v0.7.72
 	gorm.io/driver/mysql v1.6.0
 	gorm.io/driver/sqlite v1.6.0
@@ -87,5 +86,6 @@ require (
 	golang.org/x/text v0.28.0 // indirect
 	golang.org/x/tools v0.35.0 // indirect
 	google.golang.org/protobuf v1.36.9 // indirect
+	gopkg.in/check.v1 v1.0.0-20201130134442-10cb98267c6c // indirect
 	gopkg.in/yaml.v2 v2.4.0 // indirect
 )
