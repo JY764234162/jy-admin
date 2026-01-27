@@ -69,6 +69,18 @@ func InitViper() {
 		fmt.Println("已从环境变量 MYSQL_PASSWORD 读取 MySQL 密码")
 	}
 
+	// 支持从 COS_SECRET_ID 环境变量读取 COS SecretId（优先级最高）
+	if cosSecretId := os.Getenv("COS_SECRET_ID"); cosSecretId != "" {
+		global.JY_Config.Cos.SecretId = cosSecretId
+		fmt.Println("已从环境变量 COS_SECRET_ID 读取 COS SecretId")
+	}
+
+	// 支持从 COS_SECRET_KEY 环境变量读取 COS SecretKey（优先级最高）
+	if cosSecretKey := os.Getenv("COS_SECRET_KEY"); cosSecretKey != "" {
+		global.JY_Config.Cos.SecretKey = cosSecretKey
+		fmt.Println("已从环境变量 COS_SECRET_KEY 读取 COS SecretKey")
+	}
+
 	fmt.Printf("读取配置成功: %s.yaml (GIN_MODE: %s, 环境: %s)\n", configName, ginMode, env)
 	global.JY_Viper = v
 }

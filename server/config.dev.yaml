@@ -1,0 +1,74 @@
+# Docker 环境配置文件
+# 用于 Docker Compose 部署
+
+system:
+  db-type: mysql
+  oss-type: tencent-cos                    # 对象存储类型: local, tencent-cos
+  router-prefix: '/api/'
+  port: 7777
+  iplimit-count: 10000
+  iplimit-time: 3600
+  use-strict-auth: true
+  disable-auto-migrate: true        # 生产环境禁用自动迁移
+  read-timeout: 300
+  write-timeout: 300
+
+jwt:
+  # 通过环境变量 JWT_SIGNING_KEY 设置
+  signing-key: ${JWT_SIGNING_KEY:jy_admin_secret_key}
+  expires-time: 7d
+  buffer-time: 1d
+  issuer: JY-Admin-Production
+
+mysql:
+  path: '127.0.0.1'                     # 宿主机连接容器内的 MySQL
+  port: '3306'
+  config: 'charset=utf8mb4&parseTime=True&loc=Local&timeout=10s&readTimeout=30s&writeTimeout=30s&allowNativePasswords=true'
+  db-name: 'jy_admin'
+  username: 'jy_admin'
+  password: '123456'  # 从环境变量读取
+  prefix: ''
+  engine: 'InnoDB'
+  max-idle-conns: 10
+  max-open-conns: 100
+  log-mode: warn
+  log-zap: false
+  singular: false
+
+local:
+  path: uploads/file
+  store-path: uploads/file
+
+# 腾讯云COS配置（当 system.oss-type 设置为 tencent-cos 时使用）
+# 建议通过环境变量设置敏感信息：
+# export COS_SECRET_ID="your-secret-id"
+# export COS_SECRET_KEY="your-secret-key"
+
+cos:
+  secret-id: ${COS_SECRET_ID}      # 腾讯云 SecretId（必填）
+  secret-key: ${COS_SECRET_KEY}     # 腾讯云 SecretKey（必填）
+  region: ap-beijing               # COS 地域，如：ap-guangzhou, ap-beijing, ap-shanghai
+  bucket: beij-1304949087           # 存储桶名称（必填）
+  domain: ""                         # 自定义域名（可选），如：cdn.example.com
+  path-prefix: "uploads"             # 路径前缀（可选），文件将存储在此前缀下
+  use-https: true                    # 是否使用 HTTPS（推荐开启）
+  use-cdn: false                     # 是否使用 CDN 加速域名（如果配置了 CDN 可开启）
+
+captcha:
+  key-long: 6
+  img-width: 300
+  img-height: 100
+  open-captcha: 0
+  open-captcha-timeout: 3600
+
+log:
+  level: info
+  format: json                       # Docker 环境使用 JSON 格式
+  output: both                       # 同时输出到控制台和文件（便于 Docker 日志查看）
+  path: /app/logs
+  file-name: app.log
+  max-size: 100
+  max-backups: 30
+  max-age: 90
+  compress: true
+

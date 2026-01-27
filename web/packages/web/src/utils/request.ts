@@ -1,5 +1,6 @@
 import axios, { AxiosInstance, InternalAxiosRequestConfig, AxiosResponse, AxiosError } from "axios";
 import { localStg } from "./storage";
+import { router } from "@/router/routers";
 
 // API 路径前缀
 const API_PREFIX = import.meta.env.VITE_API_PREFIX || "/api";
@@ -47,12 +48,11 @@ service.interceptors.response.use(
       window.$message?.error(res.msg || "请求失败");
 
       // 401: Token 过期或未登录
-      if (res.code === 401 || response.status === 401) {
+      if (res.code === 401||res.code === 7 || response.status === 401) {
         // 清除 token 和用户信息（只清除 localStorage，避免循环依赖）
         // store 会在重新加载时从 localStorage 读取，如果 token 不存在会自动重置
         localStg.remove("token");
-        localStg.remove("userInfo");
-        window.location.href = "/login";
+        router.navigate("/login", { replace: true });
       }
 
       return Promise.reject(new Error(res.msg || "请求失败"));
@@ -72,8 +72,7 @@ service.interceptors.response.use(
           // 清除 token 和用户信息（只清除 localStorage，避免循环依赖）
           // store 会在重新加载时从 localStorage 读取，如果 token 不存在会自动重置
           localStg.remove("token");
-          localStg.remove("userInfo");
-          window.location.href = "/login";
+          router.navigate("/login", { replace: true });
           break;
         }
         case 403:

@@ -12,9 +12,9 @@ services:
       MYSQL_USER: ${MYSQL_USER}
       MYSQL_PASSWORD: ${MYSQL_PASSWORD}
       TZ: Asia/Shanghai
-    # ⚠️ 不暴露端口到主机，只在 Docker 网络内访问
-    # ports:
-    #   - "3306:3306"
+    # 暴露端口到主机（用于本地开发连接）
+    ports:
+      - "3306:3306"
     volumes:
       - mysql_data:/var/lib/mysql
       - ./init.sql:/docker-entrypoint-initdb.d/init.sql:ro
