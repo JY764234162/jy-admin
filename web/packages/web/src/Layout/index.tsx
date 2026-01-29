@@ -48,8 +48,6 @@ export const Layout: React.FC = memo(() => {
     }
   }, [location]);
 
-
-
   //初始化弱视和灰度
   useEffect(() => {
     toggleAuxiliaryColorModes(settings.colourWeakness);
@@ -61,25 +59,21 @@ export const Layout: React.FC = memo(() => {
       {settings.layout.mode === "vertical" ? (
         <AntdLayout className="h-screen w-screen">
           <GlobalSider isMobile={isMobile} />
-          <AntdLayout>
+          <AntdLayout className="flex flex-col h-full">
             <GlobalHeader />
-            <div className="flex flex-col h-full">
-              <Content key={location.pathname} style={{ overflow: "auto" }} ref={scrollRef} className="scroll-bar">
-                <Outlet />
-              </Content>
-              <GlobalFooter />
-            </div>
+            <Content key={location.pathname} style={{ overflow: "auto" }} ref={scrollRef} className="scroll-bar">
+              <Outlet />
+            </Content>
+            <GlobalFooter />
           </AntdLayout>
         </AntdLayout>
       ) : (
         <AntdLayout className="h-screen w-screen">
           <GlobalHeader />
-          <div className="flex flex-col h-full">
-            <Content key={location.pathname} style={{ overflow: "auto" }} ref={scrollRef} className="scroll-bar">
-              <Outlet />
-            </Content>
-            <GlobalFooter />
-          </div>
+          <Content key={location.pathname} style={{ overflow: "auto" }} ref={scrollRef} className="scroll-bar">
+            <Outlet />
+          </Content>
+          <GlobalFooter />
         </AntdLayout>
       )}
       <SettingDrawer />

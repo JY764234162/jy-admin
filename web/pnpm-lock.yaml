@@ -144,6 +144,9 @@ importers:
       '@micro-zoe/micro-app':
         specifier: ^1.0.0-rc.26
         version: 1.0.0-rc.26
+      '@microsoft/fetch-event-source':
+        specifier: ^2.0.1
+        version: 2.0.1
       '@packages/utils':
         specifier: workspace:*
         version: link:../utils
@@ -1496,6 +1499,9 @@ packages:
 
   '@micro-zoe/micro-app@1.0.0-rc.26':
     resolution: {integrity: sha512-3et9FXPAhsQPHaZb/HhZxLiWjUQ07V02me5KfPR0ggLs8ewM1QUbFiZjtfoZ1qXdkqeCazayVnSSxX3hdA33pw==}
+
+  '@microsoft/fetch-event-source@2.0.1':
+    resolution: {integrity: sha512-W6CLUJ2eBMw3Rec70qrsEW0jOm/3twwJv21mrmj2yORiaVmVYGS4sSS5yUwvQc1ZlDLYGPnClVWmUUMagKNsfA==}
 
   '@monogrid/gainmap-js@3.1.0':
     resolution: {integrity: sha512-Obb0/gEd/HReTlg8ttaYk+0m62gQJmCblMOjHSMHRrBP2zdfKMHLCRbh/6ex9fSUJMKdjjIEiohwkbGD3wj2Nw==}
@@ -9355,6 +9361,8 @@ snapshots:
   '@mediapipe/tasks-vision@0.10.17': {}
 
   '@micro-zoe/micro-app@1.0.0-rc.26': {}
+
+  '@microsoft/fetch-event-source@2.0.1': {}
 
   '@monogrid/gainmap-js@3.1.0(three@0.175.0)':
     dependencies:

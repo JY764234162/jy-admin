@@ -120,6 +120,14 @@ func registerRouter(Router *gin.Engine) *gin.Engine {
 		privateGroup.PUT("/menu", apiGroup.MenuApi.UpdateMenu)
 		privateGroup.DELETE("/menu/:id", apiGroup.MenuApi.DeleteMenu)
 	}
+	//AI对话管理
+	{
+		privateGroup.POST("/ai/conversation", apiGroup.AIApi.CreateConversation)
+		privateGroup.GET("/ai/conversation/list", apiGroup.AIApi.GetConversationList)
+		privateGroup.GET("/ai/conversation/:id/messages", apiGroup.AIApi.GetMessageList)
+		privateGroup.DELETE("/ai/conversation/:id", apiGroup.AIApi.DeleteConversation)
+		privateGroup.POST("/ai/chat", apiGroup.AIApi.ChatMessage)
+	}
 
 	Router.GET("/swagger/*any", ginSwagger.WrapHandler(swaggerFiles.Handler))
 
