@@ -1,4 +1,3 @@
-
 -- MySQL dump 10.13  Distrib 8.0.45, for Linux (aarch64)
 --
 -- Host: localhost    Database: jy_admin
@@ -15,14 +14,69 @@
 /*!40014 SET @OLD_FOREIGN_KEY_CHECKS=@@FOREIGN_KEY_CHECKS, FOREIGN_KEY_CHECKS=0 */;
 /*!40101 SET @OLD_SQL_MODE=@@SQL_MODE, SQL_MODE='NO_AUTO_VALUE_ON_ZERO' */;
 /*!40111 SET @OLD_SQL_NOTES=@@SQL_NOTES, SQL_NOTES=0 */;
-SET @MYSQLDUMP_TEMP_LOG_BIN = @@SESSION.SQL_LOG_BIN;
-SET @@SESSION.SQL_LOG_BIN= 0;
 
 --
--- GTID state at the beginning of the backup 
+-- Table structure for table `ai_conversations`
 --
 
-SET @@GLOBAL.GTID_PURGED=/*!80000 '+'*/ '5c883786-f66a-11f0-80ad-928fc9f63b95:1-39';
+DROP TABLE IF EXISTS `ai_conversations`;
+/*!40101 SET @saved_cs_client     = @@character_set_client */;
+/*!50503 SET character_set_client = utf8mb4 */;
+CREATE TABLE `ai_conversations` (
+  `id` bigint unsigned NOT NULL AUTO_INCREMENT,
+  `created_at` datetime(3) DEFAULT NULL,
+  `updated_at` datetime(3) DEFAULT NULL,
+  `deleted_at` datetime(3) DEFAULT NULL,
+  `user_id` bigint unsigned DEFAULT NULL COMMENT '用户ID',
+  `title` longtext COLLATE utf8mb4_unicode_ci COMMENT '会话标题',
+  `last_msg` text COLLATE utf8mb4_unicode_ci COMMENT '最后一条消息',
+  `message_count` bigint DEFAULT '0' COMMENT '消息数量',
+  PRIMARY KEY (`id`),
+  KEY `idx_ai_conversations_deleted_at` (`deleted_at`),
+  KEY `idx_ai_conversations_user_id` (`user_id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+/*!40101 SET character_set_client = @saved_cs_client */;
+
+--
+-- Dumping data for table `ai_conversations`
+--
+
+LOCK TABLES `ai_conversations` WRITE;
+/*!40000 ALTER TABLE `ai_conversations` DISABLE KEYS */;
+/*!40000 ALTER TABLE `ai_conversations` ENABLE KEYS */;
+UNLOCK TABLES;
+
+--
+-- Table structure for table `ai_messages`
+--
+
+DROP TABLE IF EXISTS `ai_messages`;
+/*!40101 SET @saved_cs_client     = @@character_set_client */;
+/*!50503 SET character_set_client = utf8mb4 */;
+CREATE TABLE `ai_messages` (
+  `id` bigint unsigned NOT NULL AUTO_INCREMENT,
+  `created_at` datetime(3) DEFAULT NULL,
+  `updated_at` datetime(3) DEFAULT NULL,
+  `deleted_at` datetime(3) DEFAULT NULL,
+  `conversation_id` bigint unsigned DEFAULT NULL COMMENT '会话ID',
+  `role` longtext COLLATE utf8mb4_unicode_ci COMMENT '角色: user, assistant',
+  `content` text COLLATE utf8mb4_unicode_ci COMMENT '消息内容',
+  `user_id` bigint unsigned DEFAULT NULL COMMENT '用户ID',
+  PRIMARY KEY (`id`),
+  KEY `idx_ai_messages_deleted_at` (`deleted_at`),
+  KEY `idx_ai_messages_conversation_id` (`conversation_id`),
+  KEY `idx_ai_messages_user_id` (`user_id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+/*!40101 SET character_set_client = @saved_cs_client */;
+
+--
+-- Dumping data for table `ai_messages`
+--
+
+LOCK TABLES `ai_messages` WRITE;
+/*!40000 ALTER TABLE `ai_messages` DISABLE KEYS */;
+/*!40000 ALTER TABLE `ai_messages` ENABLE KEYS */;
+UNLOCK TABLES;
 
 --
 -- Table structure for table `customers`
@@ -286,4 +340,4 @@ UNLOCK TABLES;
 /*!40101 SET COLLATION_CONNECTION=@OLD_COLLATION_CONNECTION */;
 /*!40111 SET SQL_NOTES=@OLD_SQL_NOTES */;
 
--- Dump completed on 2026-01-27 10:12:25
+-- Dump completed on 2026-02-26 16:07:36
