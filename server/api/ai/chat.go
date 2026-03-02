@@ -74,8 +74,8 @@ func (a *Api) ChatMessage(c *gin.Context) {
 	c.Header("Content-Type", "text/event-stream")
 	c.Header("Cache-Control", "no-cache")
 	c.Header("Connection", "keep-alive")
-	c.Header("X-Accel-Buffering", "no")          // 禁用 nginx 缓冲（例如在 Nginx 反向代理下）
-	c.Header("Transfer-Encoding", "chunked")     // 显式使用分块传输，确保是流式
+	c.Header("X-Accel-Buffering", "no")      // 禁用 nginx 缓冲（例如在 Nginx 反向代理下）
+	c.Header("Transfer-Encoding", "chunked") // 显式使用分块传输，确保是流式
 	c.Status(http.StatusOK)
 
 	// 创建流式响应
@@ -300,6 +300,9 @@ func (a *Api) callAIAPIStream(messages []business.AIMessage, newContent string, 
 
 		// 把每一小段内容回调给上层，由 ChatMessage 封装为 SSE JSON 再推给前端
 		callback(content)
+
+		// 稍微放慢节奏，让前端能明显看到打字机效果
+		time.Sleep(40 * time.Millisecond)
 	}
 
 	if err := scanner.Err(); err != nil {

@@ -53,8 +53,15 @@ export const UserAvatar = () => {
     <Dropdown menu={{ items: menuItems }} placement="bottomRight">
       <div style={{ display: "flex", alignItems: "center", gap: 8, cursor: "pointer", padding: "0 8px" }}>
         <Avatar src={avatarUrl} icon={!avatarUrl ? <UserOutlined /> : undefined} size="default" />
-        <span style={{ fontSize: 14 }}>{displayName}</span>
+        <span style={{
+          fontSize: 14,
+          flex: 1,
+          overflow: "hidden",
+          textOverflow: "ellipsis",
+          whiteSpace: "pre",
+        }}>{displayName}</span>
+
       </div>
-    </Dropdown>
+    </Dropdown >
   );
 };

@@ -1,0 +1,6 @@
+.markdown{
+  background: "transparent",
+}
+.markdown code{
+  white-space: pre-wrap !important;
+}

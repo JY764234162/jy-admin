@@ -2,11 +2,12 @@ import React, { useState, useEffect, useRef } from "react";
 import { flushSync } from "react-dom";
 import { Bubble, Conversations, Sender, type ConversationsProps } from "@ant-design/x";
 import { UserOutlined, PlusOutlined, MessageOutlined, DeleteOutlined } from "@ant-design/icons";
-import { Button, Layout, theme, Empty, Flex, Avatar, message as antdMessage } from "antd";
+import { Button, Layout, theme, Empty, Flex, Avatar, message as antdMessage, Select } from "antd";
 import { aiApi, type AIConversation, type AIMessage } from "@/api/ai";
 import MDEditor from "@uiw/react-md-editor";
-const { Sider, Content } = Layout;
-
+import { useSelector } from "react-redux";
+import { layoutSlice } from "@/store/slice/layout";
+import styles from "./index.module.css";
 // 前端消息类型（适配 UI 组件）
 interface Message {
   id: string;
@@ -49,15 +50,15 @@ export const Component = () => {
   // 滚动到底部的引用 & 消息列表滚动容器
   const messageScrollRef = useRef<HTMLDivElement>(null);
   const loadingMoreRef = useRef(false);
+  // 来自全局布局配置的移动端标记
+  const isMobile = useSelector(layoutSlice.selectors.getIsMobile);
 
-  // 自动滚动到底部
+  // 滚动到底部（仅在特定时机手动调用）
   const scrollToBottom = () => {
-    messageScrollRef.current?.scrollTo({ top: 9999, behavior: "smooth" });
+    const el = messageScrollRef.current;
+    if (!el) return;
+    el.scrollTop = el.scrollHeight;
   };
-
-  useEffect(() => {
-    scrollToBottom();
-  }, [messages, activeKey]);
 
   // 加载会话列表
   const loadSessions = async () => {
@@ -100,6 +101,8 @@ export const Component = () => {
         const messageList = toDisplayOrder((list || []) as AIMessage[]);
         setMessages((prev) => ({ ...prev, [key]: messageList }));
         setMessagePagination((prev) => ({ ...prev, [key]: { page: 1, total } }));
+        // 首次加载某个会话的消息后，滚动到底部一次
+        setTimeout(() => scrollToBottom(), 0);
       } else {
         antdMessage.error(res.msg || "加载消息失败");
         setMessages((prev) => ({ ...prev, [key]: [] }));
@@ -290,6 +293,9 @@ export const Component = () => {
       };
     });
 
+    // 发送消息后默认滚动到底部一次
+    setTimeout(() => scrollToBottom(), 0);
+
     setInputValue("");
     setLoading(true);
 
@@ -301,7 +307,7 @@ export const Component = () => {
           content: userContent,
         },
         (chunk: string) => {
-          // 在 onmessage 里组装消息：每次收到 chunk 都累加并 setMessages，用 flushSync 强制立即渲染（打字机效果）
+          // 在 onmessage 里组装消息：每次收到分片就累加并更新 UI，具体打字速度由后端控制
           fullText += chunk;
           setMessages((prev) => {
             const currentMsgs = prev[activeKey] || [];
@@ -375,8 +381,6 @@ export const Component = () => {
           setLoading(false);
           // 刷新会话列表以更新最后消息
           loadSessions();
-          // 滚动到底部
-          setTimeout(() => scrollToBottom(), 0);
         }
       );
     } catch (error) {
@@ -417,45 +421,85 @@ export const Component = () => {
   };
 
   return (
-    <Flex style={{ height: "100%" }}>
-      <Flex
-        vertical
-        style={{
-          width: 280,
-          background: "#f5f5f5",
-          borderRight: "1px solid rgba(0, 0, 0, 0.06)",
-        }}
-      >
-        <div style={{ padding: "12px" }}>
-          <Button type="primary" icon={<PlusOutlined />} onClick={handleAddSession} block loading={loadingSessions}>
-            新对话
-          </Button>
-        </div>
-        <div style={{ flex: 1, overflowY: "auto", padding: "0 12px 12px" }}>
-          {loadingSessions ? (
-            <div style={{ textAlign: "center", padding: "20px", color: "#999" }}>加载中...</div>
-          ) : (
-            <Conversations
-              items={conversationItems}
-              activeKey={activeKey}
-              onActiveChange={handleMenuChange}
-              menu={(item) => ({
-                items: [
-                  {
-                    label: "删除会话",
-                    key: "delete",
-                    icon: <DeleteOutlined />,
-                    danger: true,
-                    onClick: () => handleDeleteSession(item.key),
-                  },
-                ],
-              })}
-            />
-          )}
-        </div>
-      </Flex>
+    <Flex style={{ height: "100%", flexDirection: isMobile ? "column" : "row" }}>
+      {!isMobile && (
+        <Flex
+          vertical
+          style={{
+            width: 280,
+            background: "#f5f5f5",
+            borderRight: "1px solid rgba(0, 0, 0, 0.06)",
+          }}
+        >
+          <div style={{ padding: "12px" }}>
+            <Button type="primary" icon={<PlusOutlined />} onClick={handleAddSession} block loading={loadingSessions}>
+              新对话
+            </Button>
+          </div>
+          <div style={{ flex: 1, overflowY: "auto", padding: "0 12px 12px" }}>
+            {loadingSessions ? (
+              <div style={{ textAlign: "center", padding: "20px", color: "#999" }}>加载中...</div>
+            ) : (
+              <Conversations
+                items={conversationItems}
+                activeKey={activeKey}
+                onActiveChange={handleMenuChange}
+                menu={(item) => ({
+                  items: [
+                    {
+                      label: "删除会话",
+                      key: "delete",
+                      icon: <DeleteOutlined />,
+                      danger: true,
+                      onClick: () => handleDeleteSession(item.key),
+                    },
+                  ],
+                })}
+              />
+            )}
+          </div>
+        </Flex>
+      )}
 
-      <Flex vertical style={{ background: "#fff", flex: 1 }}>
+      <Flex vertical style={{ background: "#fff", flex: 1, overflow: "hidden" }}>
+        {/* 移动端顶部会话选择器 */}
+        {isMobile && (
+          <div
+            style={{
+              padding: "12px 16px",
+              borderBottom: "1px solid rgba(0, 0, 0, 0.06)",
+              background: "#fafafa",
+            }}
+          >
+            <Flex gap={8} align="center">
+              <Select
+                allowClear
+                placeholder="选择会话"
+                style={{ flex: 1 }}
+                loading={loadingSessions}
+                value={activeKey || undefined}
+                onChange={(val) => {
+                  if (!val) {
+                    setActiveKey("");
+                    return;
+                  }
+                  handleMenuChange(val);
+                }}
+                options={sessions.map((s) => ({
+                  label: s.title || "新对话",
+                  value: s.ID.toString(),
+                }))}
+              />
+              <Button
+                type="primary"
+                icon={<PlusOutlined />}
+                onClick={handleAddSession}
+                loading={loadingSessions}
+              />
+            </Flex>
+          </div>
+        )}
+
         {activeKey ? (
           <>
             <div
@@ -463,16 +507,24 @@ export const Component = () => {
               style={{
                 flex: 1,
                 overflowY: "auto",
-                padding: "24px",
-                height: "calc(100% - 100px)", // 减去底部输入框的高度
+                // 移动端顶部有会话选择器，这里减少一点内边距，并去掉固定高度，确保只中间区域滚动
+                padding: isMobile ? "12px 12px 12px" : "24px",
+                minHeight: 0,
               }}
               onScroll={() => {
                 const el = messageScrollRef.current;
-                if (!el || loadingMoreRef.current) return;
-                const pagination = messagePagination[activeKey];
-                if (!pagination || pagination.page * PAGE_SIZE >= pagination.total) return;
-                // 向上滚动接近顶部时加载更多
-                if (el.scrollTop < 80) loadMoreHistory();
+                if (!el) return;
+
+                const { scrollTop, scrollHeight, clientHeight } = el;
+
+                // 如果用户已经滚到接近顶部，认为是在浏览历史，关闭自动跟随底部，并触发上拉加载
+                if (scrollTop < 80) {
+                  if (loadingMoreRef.current) return;
+                  const pagination = messagePagination[activeKey];
+                  if (!pagination || pagination.page * PAGE_SIZE >= pagination.total) return;
+                  loadMoreHistory();
+                  return;
+                }
               }}
             >
               {(() => {
@@ -536,12 +588,23 @@ export const Component = () => {
                         <span style={{ opacity: 0.8, fontSize: 12 }}>AI 正在思考…</span>
                       </span>
                     ) : msg.role === "ai" ? (
-                      <div data-color-mode="light">
+                      <div
+                        data-color-mode="light"
+                        className={styles.markdown}
+                        style={{
+                          maxWidth: "100%",
+                          overflowX: "hidden",
+                        }}
+                      >
                         <MDEditor.Markdown
                           source={msg.content}
                           style={{
                             background: "transparent",
                             fontSize: 14,
+                            maxWidth: "100%",
+                            overflowX: "auto",
+                            wordBreak: "break-word",
+                            whiteSpace: "pre-wrap",
                           }}
                         />
                       </div>
@@ -566,11 +629,10 @@ export const Component = () => {
 
             <div
               style={{
-                padding: "24px",
+                padding: isMobile ? "12px 12px 16px" : "24px",
                 background: "rgba(255, 255, 255, 0.9)",
                 backdropFilter: "blur(10px)",
                 borderTop: "1px solid rgba(0, 0, 0, 0.06)",
-                // 移除绝对定位，使用 Flex 布局
                 zIndex: 10,
               }}
             >
