@@ -605,7 +605,6 @@ export const Component = () => {
                               maxWidth: "100%",
                               overflowX: "auto",
                               wordBreak: "break-word",
-                              whiteSpace: "pre-wrap",
                             }}
                           />
                         </div>
