@@ -4,6 +4,7 @@ import { Bubble, Conversations, Sender, type ConversationsProps } from "@ant-des
 import { UserOutlined, PlusOutlined, MessageOutlined, DeleteOutlined } from "@ant-design/icons";
 import { Button, Layout, theme, Empty, Flex, Avatar, message as antdMessage } from "antd";
 import { aiApi, type AIConversation, type AIMessage } from "@/api/ai";
+import MDEditor from "@uiw/react-md-editor";
 const { Sider, Content } = Layout;
 
 // 前端消息类型（适配 UI 组件）
@@ -534,6 +535,16 @@ export const Component = () => {
                         </span>
                         <span style={{ opacity: 0.8, fontSize: 12 }}>AI 正在思考…</span>
                       </span>
+                    ) : msg.role === "ai" ? (
+                      <div data-color-mode="light">
+                        <MDEditor.Markdown
+                          source={msg.content}
+                          style={{
+                            background: "transparent",
+                            fontSize: 14,
+                          }}
+                        />
+                      </div>
                     ) : (
                       msg.content
                     ),
