@@ -81,6 +81,12 @@ func InitViper() {
 		fmt.Println("已从环境变量 COS_SECRET_KEY 读取 COS SecretKey")
 	}
 
+	// 支持从 LONGCAT_APP_KEY 环境变量读取 LongCat 大模型的 App Key（优先级最高）
+	if longcatKey := os.Getenv("LONGCAT_APP_KEY"); longcatKey != "" {
+		global.JY_Config.AI.LongCatAppKey = longcatKey
+		fmt.Println("已从环境变量 LONGCAT_APP_KEY 读取 LongCat App Key")
+	}
+
 	fmt.Printf("读取配置成功: %s.yaml (GIN_MODE: %s, 环境: %s)\n", configName, ginMode, env)
 	global.JY_Viper = v
 }

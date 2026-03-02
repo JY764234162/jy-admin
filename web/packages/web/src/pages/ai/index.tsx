@@ -18,6 +18,21 @@ interface Message {
 export const Component = () => {
   const { token } = theme.useToken();
 
+  // 定义全局 keyframes（只注入一次）
+  useEffect(() => {
+    if (typeof document === "undefined") return;
+    if (document.getElementById("jy-ai-loading-style")) return;
+    const style = document.createElement("style");
+    style.id = "jy-ai-loading-style";
+    style.innerHTML = `
+      @keyframes jy-ai-dot {
+        0%, 80%, 100% { transform: scale(0.6); opacity: 0.4; }
+        40% { transform: scale(1); opacity: 1; }
+      }
+    `;
+    document.head.appendChild(style);
+  }, []);
+
   const PAGE_SIZE = 10;
 
   // 状态管理
@@ -470,7 +485,58 @@ export const Component = () => {
               <Bubble.List
                 items={[...currentMessages].reverse().map((msg) => ({
                   key: msg.id,
-                  content: msg.content,
+                  content:
+                    msg.status === "loading" && msg.role === "ai" ? (
+                      <span
+                        style={{
+                          display: "inline-flex",
+                          alignItems: "center",
+                          gap: 8,
+                        }}
+                      >
+                        <span
+                          style={{
+                            display: "inline-flex",
+                            alignItems: "center",
+                            gap: 4,
+                          }}
+                        >
+                          <span
+                            style={{
+                              width: 6,
+                              height: 6,
+                              borderRadius: "50%",
+                              backgroundColor: "rgba(255, 255, 255, 0.8)",
+                              animation: "jy-ai-dot 1s infinite ease-in-out",
+                              animationDelay: "0s",
+                            }}
+                          />
+                          <span
+                            style={{
+                              width: 6,
+                              height: 6,
+                              borderRadius: "50%",
+                              backgroundColor: "rgba(255, 255, 255, 0.8)",
+                              animation: "jy-ai-dot 1s infinite ease-in-out",
+                              animationDelay: "0.15s",
+                            }}
+                          />
+                          <span
+                            style={{
+                              width: 6,
+                              height: 6,
+                              borderRadius: "50%",
+                              backgroundColor: "rgba(255, 255, 255, 0.8)",
+                              animation: "jy-ai-dot 1s infinite ease-in-out",
+                              animationDelay: "0.3s",
+                            }}
+                          />
+                        </span>
+                        <span style={{ opacity: 0.8, fontSize: 12 }}>AI 正在思考…</span>
+                      </span>
+                    ) : (
+                      msg.content
+                    ),
                   role: msg.role,
                   variant: msg.role === "user" ? "shadow" : "filled",
                   placement: msg.role === "user" ? "end" : "start",
@@ -482,7 +548,7 @@ export const Component = () => {
                       }}
                     />
                   ),
-                  // loading: msg.status === "loading",
+                  loading: msg.status === "loading" && msg.role === "ai",
                 }))}
               />
             </div>

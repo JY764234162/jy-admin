@@ -54,6 +54,7 @@ services:
       GIN_MODE: release
       JWT_SIGNING_KEY: ${JWT_SIGNING_KEY}
       MYSQL_PASSWORD: ${MYSQL_PASSWORD}
+      LONGCAT_APP_KEY: ${LONGCAT_APP_KEY}
     # ⚠️ 不暴露端口到主机，只在 Docker 网络内访问
     # ports:
     #   - "7777:7777"

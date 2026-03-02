@@ -9,4 +9,5 @@ type Config struct {
 	Cos     Cos     `mapstructure:"cos"`
 	Captcha Captcha `mapstructure:"captcha"`
 	Log     Log     `mapstructure:"log"`
+	AI      AI      `mapstructure:"ai"`
 }

@@ -1,6 +1,7 @@
 package ai
 
 import (
+	"bufio"
 	"encoding/json"
 	"fmt"
 	"math/rand"
@@ -73,7 +74,9 @@ func (a *Api) ChatMessage(c *gin.Context) {
 	c.Header("Content-Type", "text/event-stream")
 	c.Header("Cache-Control", "no-cache")
 	c.Header("Connection", "keep-alive")
-	c.Header("X-Accel-Buffering", "no") // 禁用 nginx 缓冲
+	c.Header("X-Accel-Buffering", "no")          // 禁用 nginx 缓冲（例如在 Nginx 反向代理下）
+	c.Header("Transfer-Encoding", "chunked")     // 显式使用分块传输，确保是流式
+	c.Status(http.StatusOK)
 
 	// 创建流式响应
 	flusher, ok := c.Writer.(http.Flusher)
@@ -147,22 +150,160 @@ func (a *Api) ChatMessage(c *gin.Context) {
 // StreamCallback 流式回调函数类型
 type StreamCallback func(chunk string)
 
-// callAIAPIStream 调用 AI API（Mock 实现，模拟流式返回）
+// callAIAPIStream 调用外部 LongCat AI API（优先），如果未配置 APP KEY，则回退到本地 Mock 实现
 func (a *Api) callAIAPIStream(messages []business.AIMessage, newContent string, callback StreamCallback) error {
-	// 生成基于用户输入的智能回复
-	response := a.generateMockResponse(messages, newContent)
+	apiKey := global.JY_Config.AI.LongCatAppKey
 
-	// 模拟流式返回：逐字符发送，模拟真实的 AI API 流式响应
-	// 这样可以更好地测试前端的流式接收功能
-	runes := []rune(response)
-	for i := 0; i < len(runes); i++ {
-		chunk := string(runes[i])
-		callback(chunk)
+	// 如果没有配置真实模型的 KEY，继续走原来的本地 Mock 逻辑，避免影响现有功能
+	if apiKey == "" {
+		// 生成基于用户输入的智能回复
+		response := a.generateMockResponse(messages, newContent)
 
-		// 模拟流式输出速度：0.05 秒一个字
-		if i < len(runes)-1 {
-			time.Sleep(50 * time.Millisecond)
+		// 模拟流式返回：逐字符发送
+		runes := []rune(response)
+		for i := 0; i < len(runes); i++ {
+			chunk := string(runes[i])
+			callback(chunk)
+
+			// 模拟流式输出速度：0.05 秒一个字
+			if i < len(runes)-1 {
+				time.Sleep(50 * time.Millisecond)
+			}
 		}
+		return nil
+	}
+
+	// === 调用 LongCat OpenAI 兼容流式接口 ===
+	// 构造对话历史（带上下文），注意 role 映射
+	type chatMessage struct {
+		Role    string `json:"role"`
+		Content string `json:"content"`
+	}
+
+	// 为了降低首 Token 延迟，只携带最近 N 条历史消息
+	const maxHistoryMessages = 20
+	if len(messages) > maxHistoryMessages {
+		messages = messages[len(messages)-maxHistoryMessages:]
+	}
+
+	var chatMessages []chatMessage
+
+	// 追加一个简短的 system 提示，约束输出风格，避免啰嗦
+	chatMessages = append(chatMessages, chatMessage{
+		Role:    "system",
+		Content: "你是一个中文助手，请用简洁、直接的方式回答问题，优先给出结论，避免过长的解释。",
+	})
+
+	for _, m := range messages {
+		role := "user"
+		if m.Role == "assistant" {
+			role = "assistant"
+		}
+		chatMessages = append(chatMessages, chatMessage{
+			Role:    role,
+			Content: m.Content,
+		})
+	}
+	// 追加当前用户最新一条消息
+	chatMessages = append(chatMessages, chatMessage{
+		Role:    "user",
+		Content: newContent,
+	})
+
+	// 参数调优：
+	// - max_tokens: 限制为 1024，减少生成长度，加快返回
+	// - temperature: 0.7，保证一定随机性
+	// - top_p: 0.9，配合温度控制采样
+	payload := map[string]interface{}{
+		"model":       "LongCat-Flash-Chat",
+		"messages":    chatMessages,
+		"max_tokens":  1024,
+		"temperature": 0.7,
+		"top_p":       0.9,
+		"stream":      true,
+	}
+
+	body, err := json.Marshal(payload)
+	if err != nil {
+		return fmt.Errorf("marshal LongCat payload error: %w", err)
+	}
+
+	req, err := http.NewRequest(
+		http.MethodPost,
+		"https://api.longcat.chat/openai/v1/chat/completions",
+		strings.NewReader(string(body)),
+	)
+	if err != nil {
+		return fmt.Errorf("create LongCat request error: %w", err)
+	}
+	req.Header.Set("Authorization", "Bearer "+apiKey)
+	req.Header.Set("Content-Type", "application/json")
+
+	client := &http.Client{
+		Timeout: 60 * time.Second,
+	}
+
+	resp, err := client.Do(req)
+	if err != nil {
+		return fmt.Errorf("call LongCat API error: %w", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		return fmt.Errorf("LongCat API status: %d", resp.StatusCode)
+	}
+
+	// 按行读取 SSE：形如 `data: {...}` / `data: [DONE]`
+	scanner := bufio.NewScanner(resp.Body)
+
+	// 解析 LongCat(OpenAI) 流式返回的数据格式
+	type delta struct {
+		Content string `json:"content"`
+	}
+	type choice struct {
+		Delta delta `json:"delta"`
+	}
+	type streamChunk struct {
+		Choices []choice `json:"choices"`
+	}
+
+	for scanner.Scan() {
+		line := scanner.Text()
+		// 只处理以 data: 开头的 SSE 行，兼容 "data:" 和 "data: "
+		if !strings.HasPrefix(line, "data:") {
+			continue
+		}
+
+		// 去掉前缀 "data:"，再 trim 掉多余空格
+		data := strings.TrimSpace(strings.TrimPrefix(line, "data:"))
+		if data == "" {
+			continue
+		}
+		if data == "[DONE]" {
+			// 外部流结束，由上层 ChatMessage 统一发 done 标记
+			break
+		}
+
+		var chunk streamChunk
+		if err := json.Unmarshal([]byte(data), &chunk); err != nil {
+			global.JY_LOG.Error("解析 LongCat 流式数据失败", zap.Error(err), zap.String("data", data))
+			continue
+		}
+
+		if len(chunk.Choices) == 0 {
+			continue
+		}
+		content := chunk.Choices[0].Delta.Content
+		if content == "" {
+			continue
+		}
+
+		// 把每一小段内容回调给上层，由 ChatMessage 封装为 SSE JSON 再推给前端
+		callback(content)
+	}
+
+	if err := scanner.Err(); err != nil {
+		return fmt.Errorf("read LongCat stream error: %w", err)
 	}
 
 	return nil

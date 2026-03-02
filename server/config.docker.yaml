@@ -72,3 +72,10 @@ log:
   max-age: 90
   compress: true
 
+ai:
+  # LongCat OpenAI 兼容接口的 App Key
+  # 推荐在 Docker 中通过环境变量 LONGCAT_APP_KEY 注入，例如：
+  #   - LONGCAT_APP_KEY=your_app_key
+  # 也可以直接在这里写死，但不推荐在生产环境提交到仓库
+  longcat-app-key: ${LONGCAT_APP_KEY}
+
