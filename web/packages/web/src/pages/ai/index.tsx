@@ -539,78 +539,79 @@ export const Component = () => {
                 items={[...currentMessages].reverse().map((msg) => ({
                   key: msg.id,
                   content:
-                    msg.status === "loading" && msg.role === "ai" ? (
-                      <span
-                        style={{
-                          display: "inline-flex",
-                          alignItems: "center",
-                          gap: 8,
-                        }}
-                      >
+                    loading && !msg.content && msg.role === "ai"
+                      ? (
                         <span
                           style={{
                             display: "inline-flex",
                             alignItems: "center",
-                            gap: 4,
+                            gap: 8,
                           }}
                         >
                           <span
                             style={{
-                              width: 6,
-                              height: 6,
-                              borderRadius: "50%",
-                              backgroundColor: "rgba(255, 255, 255, 0.8)",
-                              animation: "jy-ai-dot 1s infinite ease-in-out",
-                              animationDelay: "0s",
+                              display: "inline-flex",
+                              alignItems: "center",
+                              gap: 4,
                             }}
-                          />
-                          <span
-                            style={{
-                              width: 6,
-                              height: 6,
-                              borderRadius: "50%",
-                              backgroundColor: "rgba(255, 255, 255, 0.8)",
-                              animation: "jy-ai-dot 1s infinite ease-in-out",
-                              animationDelay: "0.15s",
-                            }}
-                          />
-                          <span
-                            style={{
-                              width: 6,
-                              height: 6,
-                              borderRadius: "50%",
-                              backgroundColor: "rgba(255, 255, 255, 0.8)",
-                              animation: "jy-ai-dot 1s infinite ease-in-out",
-                              animationDelay: "0.3s",
-                            }}
-                          />
+                          >
+                            <span
+                              style={{
+                                width: 6,
+                                height: 6,
+                                borderRadius: "50%",
+                                backgroundColor: "rgba(255, 255, 255, 0.8)",
+                                animation: "jy-ai-dot 1s infinite ease-in-out",
+                                animationDelay: "0s",
+                              }}
+                            />
+                            <span
+                              style={{
+                                width: 6,
+                                height: 6,
+                                borderRadius: "50%",
+                                backgroundColor: "rgba(255, 255, 255, 0.8)",
+                                animation: "jy-ai-dot 1s infinite ease-in-out",
+                                animationDelay: "0.15s",
+                              }}
+                            />
+                            <span
+                              style={{
+                                width: 6,
+                                height: 6,
+                                borderRadius: "50%",
+                                backgroundColor: "rgba(255, 255, 255, 0.8)",
+                                animation: "jy-ai-dot 1s infinite ease-in-out",
+                                animationDelay: "0.3s",
+                              }}
+                            />
+                          </span>
+                          <span style={{ opacity: 0.8, fontSize: 12 }}>AI 正在思考…</span>
                         </span>
-                        <span style={{ opacity: 0.8, fontSize: 12 }}>AI 正在思考…</span>
-                      </span>
-                    ) : msg.role === "ai" ? (
-                      <div
-                        data-color-mode="light"
-                        className={styles.markdown}
-                        style={{
-                          maxWidth: "100%",
-                          overflowX: "hidden",
-                        }}
-                      >
-                        <MDEditor.Markdown
-                          source={msg.content}
+                      ) : msg.role === "ai" ? (
+                        <div
+                          data-color-mode="light"
+                          className={styles.markdown}
                           style={{
-                            background: "transparent",
-                            fontSize: 14,
                             maxWidth: "100%",
-                            overflowX: "auto",
-                            wordBreak: "break-word",
-                            whiteSpace: "pre-wrap",
+                            overflowX: "hidden",
                           }}
-                        />
-                      </div>
-                    ) : (
-                      msg.content
-                    ),
+                        >
+                          <MDEditor.Markdown
+                            source={msg.content}
+                            style={{
+                              background: "transparent",
+                              fontSize: 14,
+                              maxWidth: "100%",
+                              overflowX: "auto",
+                              wordBreak: "break-word",
+                              whiteSpace: "pre-wrap",
+                            }}
+                          />
+                        </div>
+                      ) : (
+                        msg.content
+                      ),
                   role: msg.role,
                   variant: msg.role === "user" ? "shadow" : "filled",
                   placement: msg.role === "user" ? "end" : "start",
@@ -622,7 +623,6 @@ export const Component = () => {
                       }}
                     />
                   ),
-                  loading: msg.status === "loading" && msg.role === "ai",
                 }))}
               />
             </div>
