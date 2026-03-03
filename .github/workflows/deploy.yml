@@ -1,15 +1,20 @@
 name: Deploy to Server
 
+# 触发条件
 on:
   push:
     branches: [main]
   workflow_dispatch: {}
 
+# 并发控制
 concurrency:
   group: deploy-${{ github.ref }}
   cancel-in-progress: true
 
+
+# 任务
 jobs:
+  # 部署任务
   deploy:
     runs-on: ubuntu-latest
     steps:
