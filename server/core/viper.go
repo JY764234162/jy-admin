@@ -107,6 +107,6 @@ func InitViper() {
 		fmt.Println("已从环境变量 LONGCAT_MODEL 读取 LongCat 模型名称")
 	}
 
-	fmt.Printf("读取配置成功: %s.yaml (GIN_MODE: %s, 环境: %s)\n", configName, ginMode, env)
+	fmt.Printf("读取配置成功: %s.yaml (GIN_MODE: %s, 环境: %s, 配置: %v)\n", configName, ginMode, env, global.JY_Config)
 	global.JY_Viper = v
 }

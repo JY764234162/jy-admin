@@ -45,6 +45,8 @@ jobs:
             git checkout -f main
             git pull --ff-only
 
+            # 可选：清理未跟踪文件，保证环境干净（如不需要可注释）
+            git clean -fd
 
             # 执行部署脚本（会负责 docker compose up -d --build）
             chmod +x ./deploy.sh
