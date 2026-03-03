@@ -24,8 +24,8 @@ mysql:
   path: 'mysql'                     # Docker 容器名（推荐）
   port: '3306'
   config: 'charset=utf8mb4&parseTime=True&loc=Local&timeout=10s&readTimeout=30s&writeTimeout=30s'
-  db-name: 'jy_admin'
-  username: 'jy_admin'
+  db-name: ${MYSQL_DATABASE}
+  username: ${MYSQL_USER}
   password: ${MYSQL_PASSWORD}  # 从环境变量读取
   prefix: ''
   engine: 'InnoDB'

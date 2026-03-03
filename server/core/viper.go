@@ -63,6 +63,20 @@ func InitViper() {
 		fmt.Println("已从环境变量 JWT_SIGNING_KEY 读取 JWT 密钥")
 	}
 
+	// 支持从 MYSQL_DATABASE 环境变量读取 MySQL 数据库名称（优先级最高）
+	if mysqlDatabase := os.Getenv("MYSQL_DATABASE"); mysqlDatabase != "" {
+		global.JY_Config.Mysql.Dbname = mysqlDatabase
+		fmt.Println("已从环境变量 MYSQL_DATABASE 读取 MySQL 数据库名称")
+	}
+
+	// 支持从 MYSQL_USER 环境变量读取 MySQL 用户名（优先级最高）
+
+	// 支持从 MYSQL_USER 环境变量读取 MySQL 用户名（优先级最高）
+	if mysqlUser := os.Getenv("MYSQL_USER"); mysqlUser != "" {
+		global.JY_Config.Mysql.Username = mysqlUser
+		fmt.Println("已从环境变量 MYSQL_USER 读取 MySQL 用户名")
+	}
+
 	// 支持从 MYSQL_PASSWORD 环境变量读取 MySQL 密码（优先级最高）
 	if mysqlPassword := os.Getenv("MYSQL_PASSWORD"); mysqlPassword != "" {
 		global.JY_Config.Mysql.Password = mysqlPassword
