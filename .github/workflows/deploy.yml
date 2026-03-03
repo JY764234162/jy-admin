@@ -28,6 +28,7 @@ jobs:
           port: ${{ secrets.SERVER_PORT || 22 }}
           script: |
             set -euo pipefail
+            
             cd "${{ secrets.SERVER_PATH }}"
 
             # 拉取最新代码（已设置 upstream 时可直接 git pull）
