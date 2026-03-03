@@ -20,22 +20,23 @@ jobs:
     steps:
       - name: Deploy via SSH (git pull + deploy.sh)
         uses: appleboy/ssh-action@v1.2.0
+        env: 
+            JWT_SIGNING_KEY: ${{ secrets.JWT_SIGNING_KEY }}
+            MYSQL_PASSWORD: ${{ secrets.MYSQL_PASSWORD }}
+            MYSQL_ROOT_PASSWORD: ${{ secrets.MYSQL_ROOT_PASSWORD }}
+            MYSQL_DATABASE: ${{ secrets.MYSQL_DATABASE }}
+            MYSQL_USER: ${{ secrets.MYSQL_USER }}
+            COS_SECRET_ID: ${{ secrets.COS_SECRET_ID }}
+            COS_SECRET_KEY: ${{ secrets.COS_SECRET_KEY }}
+            LONGCAT_APP_KEY: ${{ secrets.LONGCAT_APP_KEY }}
+            LONGCAT_MODEL: ${{ vars.LONGCAT_MODEL }}
         with:
           host: ${{ secrets.SERVER_HOST }}
           username: ${{ secrets.SERVER_USER }}
           #  ssh私钥(需要本地生成私钥并添加到github仓库的secrets中)
           key: ${{ secrets.SERVER_SSH_KEY }}
           port: ${{ secrets.SERVER_PORT  }}
-          envs: |
-            JWT_SIGNING_KEY=${{ secrets.JWT_SIGNING_KEY }}
-            MYSQL_PASSWORD=${{ secrets.MYSQL_PASSWORD }}
-            MYSQL_ROOT_PASSWORD=${{ secrets.MYSQL_ROOT_PASSWORD }}
-            MYSQL_DATABASE=${{ secrets.MYSQL_DATABASE }}
-            MYSQL_USER=${{ secrets.MYSQL_USER }}
-            COS_SECRET_ID=${{ secrets.COS_SECRET_ID }}
-            COS_SECRET_KEY=${{ secrets.COS_SECRET_KEY }}
-            LONGCAT_APP_KEY=${{ secrets.LONGCAT_APP_KEY }}
-            LONGCAT_MODEL=${{ vars.LONGCAT_MODEL }}
+          
           script: |
             set -euo pipefail
 
