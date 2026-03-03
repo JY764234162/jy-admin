@@ -78,4 +78,10 @@ ai:
   #   - LONGCAT_APP_KEY=your_app_key
   # 也可以直接在这里写死，但不推荐在生产环境提交到仓库
   longcat-app-key: ${LONGCAT_APP_KEY}
+  # LongCat 模型名称（四选一）
+  # - LongCat-Flash-Chat
+  # - LongCat-Flash-Thinking
+  # - LongCat-Flash-Thinking-2601
+  # - LongCat-Flash-Lite
+  longcat-model: ${LONGCAT_MODEL:LongCat-Flash-Chat}
 

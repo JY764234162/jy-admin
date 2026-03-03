@@ -210,12 +210,17 @@ func (a *Api) callAIAPIStream(messages []business.AIMessage, newContent string, 
 		Content: newContent,
 	})
 
+	model := global.JY_Config.AI.LongCatModel
+	if model == "" {
+		model = "LongCat-Flash-Chat"
+	}
+
 	// 参数调优：
 	// - max_tokens: 限制为 1024，减少生成长度，加快返回
 	// - temperature: 0.7，保证一定随机性
 	// - top_p: 0.9，配合温度控制采样
 	payload := map[string]interface{}{
-		"model":       "LongCat-Flash-Chat",
+		"model":       model,
 		"messages":    chatMessages,
 		"max_tokens":  1024,
 		"temperature": 0.7,

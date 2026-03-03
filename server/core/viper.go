@@ -87,6 +87,12 @@ func InitViper() {
 		fmt.Println("已从环境变量 LONGCAT_APP_KEY 读取 LongCat App Key")
 	}
 
+	// 支持从 LONGCAT_MODEL 环境变量读取 LongCat 模型名称（优先级最高）
+	if longcatModel := os.Getenv("LONGCAT_MODEL"); longcatModel != "" {
+		global.JY_Config.AI.LongCatModel = longcatModel
+		fmt.Println("已从环境变量 LONGCAT_MODEL 读取 LongCat 模型名称")
+	}
+
 	fmt.Printf("读取配置成功: %s.yaml (GIN_MODE: %s, 环境: %s)\n", configName, ginMode, env)
 	global.JY_Viper = v
 }
