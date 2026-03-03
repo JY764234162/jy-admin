@@ -38,6 +38,8 @@ jobs:
             LONGCAT_MODEL=${{ vars.LONGCAT_MODEL }}
           script: |
             set -euo pipefail
+
+            printenv
             
             cd "${{ secrets.SERVER_PATH }}"
 
