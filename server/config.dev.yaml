@@ -39,10 +39,6 @@ local:
   path: uploads/file
   store-path: uploads/file
 
-# 腾讯云COS配置（当 system.oss-type 设置为 tencent-cos 时使用）
-# 建议通过环境变量设置敏感信息：
-# export COS_SECRET_ID="your-secret-id"
-# export COS_SECRET_KEY="your-secret-key"
 
 cos:
   secret-id: ${COS_SECRET_ID}      # 腾讯云 SecretId（必填）

@@ -49,12 +49,13 @@ services:
     container_name: jy-admin-backend
     restart: always
     environment:
+      GIN_MODE: release
       COS_SECRET_ID: ${COS_SECRET_ID}
       COS_SECRET_KEY: ${COS_SECRET_KEY}
-      GIN_MODE: release
       JWT_SIGNING_KEY: ${JWT_SIGNING_KEY}
       MYSQL_PASSWORD: ${MYSQL_PASSWORD}
       LONGCAT_APP_KEY: ${LONGCAT_APP_KEY}
+      LONGCAT_MODEL: ${LONGCAT_MODEL}
     # ⚠️ 不暴露端口到主机，只在 Docker 网络内访问
     # ports:
     #   - "7777:7777"
