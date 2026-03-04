@@ -41,7 +41,6 @@ jobs:
             MYSQL_DATABASE,MYSQL_USER,
             COS_SECRET_ID,COS_SECRET_KEY,
             LONGCAT_APP_KEY,LONGCAT_MODEL,
-            DEPLOY_ENV,BUILD_ID
           script: |
             set -euo pipefail
 
@@ -51,7 +50,7 @@ jobs:
 
             # 拉取最新代码（已设置 upstream 时可直接 git pull）
             git checkout -f main
-            git pull --ff-only
+            git pull origin main
 
             # 可选：清理未跟踪文件，保证环境干净（如不需要可注释）
             # git clean -fd
