@@ -7,7 +7,10 @@ services:
     container_name: jy-admin-mysql
     restart: always
     environment:
-      
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD}
+      MYSQL_DATABASE: ${MYSQL_DATABASE}
+      MYSQL_USER: ${MYSQL_USER}
+      MYSQL_PASSWORD: ${MYSQL_PASSWORD}
       TZ: Asia/Shanghai
     # 暴露端口到主机（用于本地开发连接）
     volumes:
@@ -47,7 +50,14 @@ services:
     restart: always
     environment:
       GIN_MODE: release
-      
+      COS_SECRET_ID: ${COS_SECRET_ID}
+      COS_SECRET_KEY: ${COS_SECRET_KEY}
+      JWT_SIGNING_KEY: ${JWT_SIGNING_KEY}
+      MYSQL_USER: ${MYSQL_USER}
+      MYSQL_DATABASE: ${MYSQL_DATABASE}
+      MYSQL_PASSWORD: ${MYSQL_PASSWORD}
+      LONGCAT_APP_KEY: ${LONGCAT_APP_KEY}
+      LONGCAT_MODEL: ${LONGCAT_MODEL}
     # ⚠️ 不暴露端口到主机，只在 Docker 网络内访问
     # ports:
     #   - "7777:7777"

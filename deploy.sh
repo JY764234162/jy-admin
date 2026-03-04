@@ -51,13 +51,17 @@ fi
 # - 可选：LongCat（不填则后端回退到 Mock）
 MISSING_VARS=()
 
-# 必填：数据库与 JWT
+# 必填：数据库与 JWT与COS与LongCat
 REQUIRED_VARS=(
     JWT_SIGNING_KEY
     MYSQL_ROOT_PASSWORD
     MYSQL_DATABASE
     MYSQL_USER
     MYSQL_PASSWORD
+    COS_SECRET_ID
+    COS_SECRET_KEY
+    LONGCAT_APP_KEY
+    LONGCAT_MODEL
 )
 
 for var in "${REQUIRED_VARS[@]}"; do
@@ -66,26 +70,7 @@ for var in "${REQUIRED_VARS[@]}"; do
     fi
 done
 
-# 条件必填：COS（仅当配置选择 tencent-cos）
-if [ -f "server/config.docker.yaml" ] && grep -Eq '^\s*oss-type:\s*tencent-cos\s*$' "server/config.docker.yaml"; then
-    for var in COS_SECRET_ID COS_SECRET_KEY; do
-        if [ -z "${!var:-}" ]; then
-            MISSING_VARS+=("$var")
-        fi
-    done
-fi
 
-# 可选项：LongCat（缺失不阻止部署）
-WARNING_VARS=()
-OPTIONAL_VARS=(
-    LONGCAT_APP_KEY
-    LONGCAT_MODEL
-)
-for var in "${OPTIONAL_VARS[@]}"; do
-    if [ -z "${!var:-}" ]; then
-        WARNING_VARS+=("$var")
-    fi
-done
 
 if [ ${#MISSING_VARS[@]} -gt 0 ]; then 
     echo -e "${RED}错误: 以下环境变量未设置：${NC}"
@@ -99,18 +84,6 @@ if [ ${#MISSING_VARS[@]} -gt 0 ]; then
     exit 1
 fi
 
-# 检查是否使用默认值/可选项缺失（仅警告，不阻止部署）
-if [ "${JWT_SIGNING_KEY:-}" = "change-this-secret-key" ]; then
-    WARNING_VARS+=("JWT_SIGNING_KEY(默认值)")
-fi
-
-if [ ${#WARNING_VARS[@]} -gt 0 ]; then
-    echo -e "${YELLOW}警告: 以下环境变量未设置或使用了默认值（不影响启动，但建议补全/修改）：${NC}"
-    for var in "${WARNING_VARS[@]}"; do
-        echo -e "${YELLOW}  - $var${NC}"
-    done
-    echo -e "${YELLOW}建议: 本地可在 .env 配置；服务器/CI 可通过环境变量或 Secrets 注入${NC}\n"
-fi
 
 # 启用 BuildKit
 export DOCKER_BUILDKIT=1
@@ -142,7 +115,7 @@ echo -e "\n${GREEN}✓ 部署完成！${NC}\n"
 # 显示服务状态
 echo -e "${BLUE}服务状态：${NC}"
 if docker compose version &> /dev/null; then
-    docker compose ps
+    docker compose ps   
 else
     docker-compose ps
 fi
