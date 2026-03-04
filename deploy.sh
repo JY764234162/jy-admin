@@ -45,76 +45,71 @@ else
     fi
 fi
 
-# 检查关键环境变量（仅当存在 .env 时才检查）
-# - 没有 .env：按你的要求直接继续（不校验）
-if [ -f ".env" ]; then
-    # - 必填：MySQL + JWT（服务启动必需）
-    # - 条件必填：当 oss-type=tencent-cos 时，COS 配置必填
-    # - 可选：LongCat（不填则后端回退到 Mock）
-    MISSING_VARS=()
+# 检查关键环境变量（只检查是否为空，不检查默认值）
+# - 必填：MySQL + JWT（服务启动必需）
+# - 条件必填：当 oss-type=tencent-cos 时，COS 配置必填
+# - 可选：LongCat（不填则后端回退到 Mock）
+MISSING_VARS=()
 
-    # 必填：数据库与 JWT
-    REQUIRED_VARS=(
-        JWT_SIGNING_KEY
-        MYSQL_ROOT_PASSWORD
-        MYSQL_DATABASE
-        MYSQL_USER
-        MYSQL_PASSWORD
-    )
+# 必填：数据库与 JWT
+REQUIRED_VARS=(
+    JWT_SIGNING_KEY
+    MYSQL_ROOT_PASSWORD
+    MYSQL_DATABASE
+    MYSQL_USER
+    MYSQL_PASSWORD
+)
 
-    for var in "${REQUIRED_VARS[@]}"; do
+for var in "${REQUIRED_VARS[@]}"; do
+    if [ -z "${!var:-}" ]; then
+        MISSING_VARS+=("$var")
+    fi
+done
+
+# 条件必填：COS（仅当配置选择 tencent-cos）
+if [ -f "server/config.docker.yaml" ] && grep -Eq '^\s*oss-type:\s*tencent-cos\s*$' "server/config.docker.yaml"; then
+    for var in COS_SECRET_ID COS_SECRET_KEY; do
         if [ -z "${!var:-}" ]; then
             MISSING_VARS+=("$var")
         fi
     done
+fi
 
-    # 条件必填：COS（仅当配置选择 tencent-cos）
-    if [ -f "server/config.docker.yaml" ] && grep -Eq '^\s*oss-type:\s*tencent-cos\s*$' "server/config.docker.yaml"; then
-        for var in COS_SECRET_ID COS_SECRET_KEY; do
-            if [ -z "${!var:-}" ]; then
-                MISSING_VARS+=("$var")
-            fi
-        done
+# 可选项：LongCat（缺失不阻止部署）
+WARNING_VARS=()
+OPTIONAL_VARS=(
+    LONGCAT_APP_KEY
+    LONGCAT_MODEL
+)
+for var in "${OPTIONAL_VARS[@]}"; do
+    if [ -z "${!var:-}" ]; then
+        WARNING_VARS+=("$var")
     fi
+done
 
-    # 可选项：LongCat（缺失不阻止部署）
-    WARNING_VARS=()
-    OPTIONAL_VARS=(
-        LONGCAT_APP_KEY
-        LONGCAT_MODEL
-    )
-    for var in "${OPTIONAL_VARS[@]}"; do
-        if [ -z "${!var:-}" ]; then
-            WARNING_VARS+=("$var")
-        fi
+if [ ${#MISSING_VARS[@]} -gt 0 ]; then 
+    echo -e "${RED}错误: 以下环境变量未设置：${NC}"
+    for var in "${MISSING_VARS[@]}"; do
+        echo -e "${RED}  - $var${NC}"
     done
+    echo -e "${YELLOW}请通过以下任一方式设置这些环境变量：${NC}"
+    echo -e "${YELLOW}  1) 本地创建/编辑 .env 文件（可参考 .env.example）${NC}"
+    echo -e "${YELLOW}  2) 在执行脚本前导出环境变量（export XXX=...）${NC}"
+    echo -e "${YELLOW}  3) 在 CI/CD 中注入 Secrets/环境变量到服务器执行环境${NC}\n"
+    exit 1
+fi
 
-    if [ ${#MISSING_VARS[@]} -gt 0 ]; then
-        echo -e "${RED}错误: 以下环境变量未设置：${NC}"
-        for var in "${MISSING_VARS[@]}"; do
-            echo -e "${RED}  - $var${NC}"
-        done
-        echo -e "${YELLOW}请通过以下任一方式设置这些环境变量：${NC}"
-        echo -e "${YELLOW}  1) 本地创建/编辑 .env 文件（可参考 .env.example）${NC}"
-        echo -e "${YELLOW}  2) 在执行脚本前导出环境变量（export XXX=...）${NC}"
-        echo -e "${YELLOW}  3) 在 CI/CD 中注入 Secrets/环境变量到服务器执行环境${NC}\n"
-        exit 1
-    fi
+# 检查是否使用默认值/可选项缺失（仅警告，不阻止部署）
+if [ "${JWT_SIGNING_KEY:-}" = "change-this-secret-key" ]; then
+    WARNING_VARS+=("JWT_SIGNING_KEY(默认值)")
+fi
 
-    # 检查是否使用默认值/可选项缺失（仅警告，不阻止部署）
-    if [ "${JWT_SIGNING_KEY:-}" = "change-this-secret-key" ]; then
-        WARNING_VARS+=("JWT_SIGNING_KEY(默认值)")
-    fi
-
-    if [ ${#WARNING_VARS[@]} -gt 0 ]; then
-        echo -e "${YELLOW}警告: 以下环境变量未设置或使用了默认值（不影响启动，但建议补全/修改）：${NC}"
-        for var in "${WARNING_VARS[@]}"; do
-            echo -e "${YELLOW}  - $var${NC}"
-        done
-        echo -e "${YELLOW}建议: 本地可在 .env 配置；服务器/CI 可通过环境变量或 Secrets 注入${NC}\n"
-    fi
-else
-    echo -e "${YELLOW}提示: 未找到 .env，已跳过环境变量校验${NC}"
+if [ ${#WARNING_VARS[@]} -gt 0 ]; then
+    echo -e "${YELLOW}警告: 以下环境变量未设置或使用了默认值（不影响启动，但建议补全/修改）：${NC}"
+    for var in "${WARNING_VARS[@]}"; do
+        echo -e "${YELLOW}  - $var${NC}"
+    done
+    echo -e "${YELLOW}建议: 本地可在 .env 配置；服务器/CI 可通过环境变量或 Secrets 注入${NC}\n"
 fi
 
 # 启用 BuildKit
