@@ -60,6 +60,15 @@ export const Component = () => {
     el.scrollTop = el.scrollHeight;
   };
 
+  // 判断当前是否已经在底部（允许一点误差）
+  const isAtBottom = () => {
+    const el = messageScrollRef.current;
+    if (!el) return false;
+    // 必须“完全”在最底部（考虑浮点精度，允许极小误差）
+    const diff = el.scrollHeight - (el.scrollTop + el.clientHeight);
+    return Math.abs(diff) < 0.5;
+  };
+
   // 加载会话列表
   const loadSessions = async () => {
     setLoadingSessions(true);
@@ -307,6 +316,9 @@ export const Component = () => {
           content: userContent,
         },
         (chunk: string) => {
+          // 记录更新前是否在底部
+          const wasAtBottom = isAtBottom();
+
           // 在 onmessage 里组装消息：每次收到分片就累加并更新 UI，具体打字速度由后端控制
           fullText += chunk;
           setMessages((prev) => {
@@ -335,9 +347,15 @@ export const Component = () => {
               ],
             };
           });
+
+          // 如果之前在底部，则保持在底部；否则不动
+          if (wasAtBottom) {
+            requestAnimationFrame(() => scrollToBottom());
+          }
         },
         (error: Error) => {
           // 错误处理
+          const wasAtBottom = isAtBottom();
           console.error("流式请求错误:", error);
           antdMessage.error(error.message || "发送消息失败");
           setMessages((prev) => {
@@ -357,10 +375,14 @@ export const Component = () => {
             }
             return prev;
           });
+          if (wasAtBottom) {
+            requestAnimationFrame(() => scrollToBottom());
+          }
           setLoading(false);
         },
         () => {
           // 完成回调
+          const wasAtBottom = isAtBottom();
           setMessages((prev) => {
             const currentMsgs = prev[activeKey] || [];
             const aiMsgIndex = currentMsgs.findIndex((msg) => msg.id === aiMsgId);
@@ -378,6 +400,9 @@ export const Component = () => {
             }
             return prev;
           });
+          if (wasAtBottom) {
+            requestAnimationFrame(() => scrollToBottom());
+          }
           setLoading(false);
           // 刷新会话列表以更新最后消息
           loadSessions();
