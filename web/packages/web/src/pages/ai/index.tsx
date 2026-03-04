@@ -64,9 +64,8 @@ export const Component = () => {
   const isAtBottom = () => {
     const el = messageScrollRef.current;
     if (!el) return false;
-    // 必须“完全”在最底部（考虑浮点精度，允许极小误差）
-    const diff = el.scrollHeight - (el.scrollTop + el.clientHeight);
-    return Math.abs(diff) < 0.5;
+    const threshold = 20; // 允许 20px 误差
+    return el.scrollHeight - (el.scrollTop + el.clientHeight) <= threshold;
   };
 
   // 加载会话列表
