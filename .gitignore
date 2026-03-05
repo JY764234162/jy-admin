@@ -3,6 +3,11 @@ deploy/.env
 .env
 .env.*
 
+# SSL 证书（勿提交到仓库）
+certs/
+*.key
+*.pem
+
 
 # 调试文件和大文件
 **/__debug_bin*
