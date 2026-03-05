@@ -120,4 +120,6 @@ volumes:
 
 networks:
   jy-admin-network:
-    driver: bridge
+    # 与其他 compose（例如 msfz-frontend）共享的外部网络，
+    # 需要在宿主机上先执行一次：docker network create jy-admin-network
+    external: true
