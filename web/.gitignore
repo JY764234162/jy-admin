@@ -10,4 +10,4 @@ package-lock.json
 .LSOverride
 
 vite.config.ts.timestamp-*
-docs
+dist

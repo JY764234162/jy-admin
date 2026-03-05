@@ -69,7 +69,8 @@ export default defineConfig(({ mode }: ConfigEnv) => {
     build: {
       manifest: true,
       emptyOutDir: true,
-      outDir: "../../docs",
+      // 构建产物输出到当前包下的 dist（web/packages/web/dist）
+      outDir: "dist",
       // 使用 esbuild 压缩（比 terser 快且资源占用更少）
       minify: "esbuild",
       // 代码分割优化

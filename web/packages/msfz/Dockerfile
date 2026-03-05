@@ -1,39 +1,72 @@
-## 多阶段构建：Node 构建前端，Nginx 负责静态资源服务
+# 如果需要用 CI/CD，请设置环境变量：
+# variables:
+#   DOCKER_BUILDKIT: 1
 
-# 构建阶段
-FROM node:20-alpine AS build
+# 基础层：设置环境
+FROM node:20-slim AS base
+
+ENV PNPM_HOME="/pnpm"
+ENV PATH="$PNPM_HOME:$PATH"
+
+# 启用 corepack（内置 pnpm 支持）
+RUN corepack enable
 
 WORKDIR /app
 
-# 仅拷贝依赖清单，优先利用缓存（pnpm）
-COPY package.json pnpm-lock.yaml ./
+# 依赖层：只复制依赖文件，最大化缓存利用
+FROM base AS deps
 
-RUN corepack enable \
-  && corepack prepare pnpm@10.13.1 --activate \
-  && pnpm install --frozen-lockfile
-# 拷贝源代码并构建
-COPY . .
+# 先复制根目录的 package 文件
+COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
 
-# 使用项目里的构建命令（vite build），输出目录由 vite.config.ts 决定
-RUN pnpm build
 
-# 运行阶段
+
+# 安装依赖（使用缓存挂载加速）
+# 配置国内代理
+RUN pnpm config set registry https://registry.npmmirror.com
+RUN --mount=type=cache,id=pnpm,target=/pnpm/store \
+    pnpm install --frozen-lockfile
+
+# 构建层：构建前端项目
+FROM base AS build
+
+# 复制所有配置文件
+COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
+
+# 复制所有源代码（.dockerignore 会排除 node_modules）
+COPY packages ./packages
+
+# 配置 pnpm 使用国内镜像
+RUN pnpm config set registry https://registry.npmmirror.com
+
+# 安装依赖（使用缓存挂载加速，会利用 deps 层已下载的包）
+# 这样可以确保所有 workspace 依赖和链接都正确
+RUN --mount=type=cache,id=pnpm,target=/pnpm/store \
+    pnpm install --frozen-lockfile
+
+
+# 构建前端（分离 TypeScript 编译和 Vite 构建，确保内存释放）
+# 先编译 TypeScript，然后单独运行 Vite 构建
+RUN cd packages/msfz && \
+    pnpm exec vite build
+
+# 运行层：Nginx 服务
 FROM nginx:alpine
 
-WORKDIR /usr/share/nginx/html
+LABEL MAINTAINER="jy-admin"
 
-# 清空默认静态资源
-RUN rm -rf ./*
+# 复制 Nginx 配置（此 Dockerfile 位于 packages/msfz，下方路径基于构建上下文：msfz 根目录）
+COPY packages/msfz/nginx.conf /etc/nginx/conf.d/default.conf
 
-# 从构建阶段拷贝打包产物
-# 默认假设 Vite 的 outDir 配置为 docs
-COPY --from=build /app/dist ./msfz/
+# 从构建层复制构建产物（构建产物在 msfz/packages/msfz/dist，对应构建阶段的 /app/packages/msfz/dist）
+COPY --from=build /app/packages/msfz/dist /usr/share/nginx/html
 
-# 自定义 Nginx 配置以支持 SPA（前端路由）
-COPY ./nginx.conf /etc/nginx/conf.d/default.conf
+# 验证构建产物
+RUN ls -al /usr/share/nginx/html
 
-
+# 暴露端口
 EXPOSE 80
 
+# 启动 Nginx
 CMD ["nginx", "-g", "daemon off;"]
 

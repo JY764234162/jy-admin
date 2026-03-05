@@ -69,11 +69,11 @@ FROM nginx:alpine
 
 LABEL MAINTAINER="jy-admin"
 
-# 复制 Nginx 配置（nginx.conf 需要放在 web 根目录）
-COPY nginx.conf /etc/nginx/conf.d/default.conf
+# 复制 Nginx 配置（此 Dockerfile 位于 packages/web，下方路径基于构建上下文：web 根目录）
+COPY packages/web/nginx.conf /etc/nginx/conf.d/default.conf
 
-# 从构建层复制构建产物（构建产物在 web/docs）
-COPY --from=build /app/docs /usr/share/nginx/html
+# 从构建层复制构建产物（构建产物在 web/packages/web/dist，对应构建阶段的 /app/packages/web/dist）
+COPY --from=build /app/packages/web/dist /usr/share/nginx/html
 
 # 验证构建产物
 RUN ls -al /usr/share/nginx/html

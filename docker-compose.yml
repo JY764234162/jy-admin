@@ -90,7 +90,7 @@ services:
   frontend:
     build:
       context: ./web
-      dockerfile: Dockerfile
+      dockerfile: packages/web/Dockerfile
       # 启用构建缓存
       args:
         BUILDKIT_INLINE_CACHE: 1
@@ -101,7 +101,7 @@ services:
       - "443:443" # 前端服务端口（注意：443端口需要root权限）
     volumes:
       # 证书目录：宿主机 ./certs 挂载到容器 /etc/nginx/certs（勿提交 certs/ 到仓库）
-      - ./certs:/etc/nginx/certs:ro
+      - ./web/packages/web/certs:/etc/nginx/certs:ro
     depends_on:
       - backend
     networks:
@@ -110,6 +110,22 @@ services:
     memswap_limit: 512m # 内存+Swap 限制：512MB（允许使用 256MB Swap）
     cpus: 0.5 # CPU 限制：0.5 核
 
+  msfz:
+    build:  
+      context: ./web
+      dockerfile: packages/msfz/Dockerfile
+      # 启用构建缓存
+      args:
+        BUILDKIT_INLINE_CACHE: 1
+    container_name: jy-admin-msfz
+    restart: always
+    volumes:
+      # 证书目录：宿主机 ./certs 挂载到容器 /etc/nginx/certs（勿提交 certs/ 到仓库）
+      - ./web/packages/msfz/certs:/etc/nginx/certs:ro
+    networks:
+      - jy-admin-network
+
+      
 volumes:
   mysql_data:
     driver: local
