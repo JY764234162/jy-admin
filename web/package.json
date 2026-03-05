@@ -8,6 +8,7 @@
   },
   "scripts": {
     "dev": "pnpm -F web run dev",
+    "dev:msfz": "pnpm -F msfz run dev",
     "preview": "pnpm -F web run preview",
     "build": "pnpm -F web run build",
     "format": "pnpm -F web run format",
