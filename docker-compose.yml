@@ -98,6 +98,7 @@ services:
     restart: always
     ports:
       - "80:80" # 前端服务端口（注意：80端口需要root权限）
+      - "443:443" # 前端服务端口（注意：443端口需要root权限）
     volumes:
       # 证书目录：宿主机 ./certs 挂载到容器 /etc/nginx/certs（勿提交 certs/ 到仓库）
       - ./certs:/etc/nginx/certs:ro
