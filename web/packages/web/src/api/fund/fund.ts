@@ -4,7 +4,7 @@
  */
 
 /** 开发环境由 Vite 代理，生产环境需在 Nginx 中代理 /api-fund 到 https://api.fund.eastmoney.com */
-const FUND_API_BASE = "/api-fundeastmoney";
+const FUND_API_BASE = "/api-fund";
 
 /** 解析百分比字符串如 "4.94%" -> 0.0494，"---" -> null */
 function parsePercent(s: string): number | null {

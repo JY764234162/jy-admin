@@ -53,10 +53,10 @@ export default defineConfig(({ mode }: ConfigEnv) => {
       proxy: {
         // 基金数据接口（东方财富），避免浏览器 CORS
         // 注意：必须放在 /api 前面，否则 /api 会先匹配到 /api-fund
-        "/api-fundeastmoney": {
+        "/api-fund": {
           target: "https://api.fund.eastmoney.com",
           changeOrigin: true,
-          rewrite: (path) => path.replace(/^\/api-fundeastmoney/, ""),
+          rewrite: (path) => path.replace(/^\/api-fund/, ""),
         },
 
         // 代理 /api 路径到后端服务器
