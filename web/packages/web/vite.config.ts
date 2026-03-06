@@ -51,12 +51,19 @@ export default defineConfig(({ mode }: ConfigEnv) => {
         port: 3000,
       },
       proxy: {
+        // 基金数据接口（东方财富），避免浏览器 CORS
+        // 注意：必须放在 /api 前面，否则 /api 会先匹配到 /api-fund
+        "/api-fundeastmoney": {
+          target: "https://api.fund.eastmoney.com",
+          changeOrigin: true,
+          rewrite: (path) => path.replace(/^\/api-fundeastmoney/, ""),
+        },
+
         // 代理 /api 路径到后端服务器
         "/api": {
           target: "http://localhost:7777",
           changeOrigin: true,
           rewrite: (path) => path, // 保持路径不变
-          // 如果需要，可以配置 websocket 代理
           ws: true,
         },
       },

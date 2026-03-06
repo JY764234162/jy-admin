@@ -21,6 +21,8 @@ declare namespace StorageType {
   interface Local {
     themeMode: App.ThemeMode;
     settings: App.Setting;
+    /** 基金分析页-自选基金代码列表 */
+    fundSelectedCodes: string[];
     /** The token */
     token: string;
     /** The user info */

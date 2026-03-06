@@ -30,7 +30,7 @@ export default function App() {
   return (
     <AntdProvider>
       <AppProvider>
-        <Watermark className="h-full" content={settings.watermark.visible ? settings.watermark?.text : ""} {...watermarkProps}>
+        <Watermark className="h-full" content={settings.watermark.visible ? settings.watermark?.text : ""} {...watermarkProps} >
           <Router />
         </Watermark>
       </AppProvider>

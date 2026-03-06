@@ -59,8 +59,8 @@ services:
       LONGCAT_APP_KEY: ${LONGCAT_APP_KEY}
       LONGCAT_MODEL: ${LONGCAT_MODEL}
     # ⚠️ 不暴露端口到主机，只在 Docker 网络内访问
-    # ports:
-    #   - "7777:7777"
+    ports:
+      - "7777:7777"
     volumes:
       - backend_uploads:/app/uploads
       - backend_logs:/app/logs
