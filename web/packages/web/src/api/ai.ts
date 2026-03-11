@@ -43,6 +43,10 @@ export interface MessageListParams {
   pageSize?: number;
 }
 
+export interface ChatStreamHandle {
+  abort: () => void;
+}
+
 /**
  * AI 对话 API
  */
@@ -87,7 +91,7 @@ export const aiApi = {
     onChunk: (chunk: string) => void,
     onError?: (error: Error) => void,
     onComplete?: () => void
-  ): Promise<void> => {
+  ): Promise<ChatStreamHandle> => {
     const API_PREFIX = import.meta.env.VITE_API_PREFIX || "/api";
     const VITE_API_BASE_URL = import.meta.env.VITE_API_BASE_URL || "";
     const url = `${VITE_API_BASE_URL}${API_PREFIX}/ai/chat`;
@@ -111,6 +115,7 @@ export const aiApi = {
     };
 
     try {
+      // 注意：fetchEventSource 会一直跑到 close/abort
       await fetchEventSource(url, {
         method: "POST",
         headers,
@@ -164,9 +169,11 @@ export const aiApi = {
     } catch (error) {
       // AbortError 表示主动关闭，不当作错误
       if (error instanceof Error && error.name === "AbortError") {
-        return;
+        return { abort: () => ctrl.abort() };
       }
       onError?.(error instanceof Error ? error : new Error(String(error)));
     }
+
+    return { abort: () => ctrl.abort() };
   },
 };

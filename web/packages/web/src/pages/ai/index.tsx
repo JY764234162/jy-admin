@@ -1,21 +1,12 @@
 import React, { useState, useEffect, useRef } from "react";
-import { flushSync } from "react-dom";
 import { Bubble, Conversations, Sender, type ConversationsProps } from "@ant-design/x";
 import { UserOutlined, PlusOutlined, MessageOutlined, DeleteOutlined } from "@ant-design/icons";
-import { Button, Layout, theme, Empty, Flex, Avatar, message as antdMessage, Select } from "antd";
-import { aiApi, type AIConversation, type AIMessage } from "@/api/ai";
+import { Button, theme, Empty, Flex, Avatar, Select } from "antd";
 import MDEditor from "@uiw/react-md-editor";
 import { useSelector } from "react-redux";
 import { layoutSlice } from "@/store/slice/layout";
 import styles from "./index.module.css";
-// 前端消息类型（适配 UI 组件）
-interface Message {
-  id: string;
-  content: string;
-  role: "user" | "ai";
-  status?: "loading" | "success" | "error";
-  timestamp: number;
-}
+import { useAIChat } from "./useAIChat";
 
 export const Component = () => {
   const { token } = theme.useToken();
@@ -35,21 +26,12 @@ export const Component = () => {
     document.head.appendChild(style);
   }, []);
 
-  const PAGE_SIZE = 10;
-
-  // 状态管理
-  const [sessions, setSessions] = useState<AIConversation[]>([]);
-  const [activeKey, setActiveKey] = useState<string>("");
-  const [messages, setMessages] = useState<Record<string, Message[]>>({});
   const [inputValue, setInputValue] = useState("");
-  const [loading, setLoading] = useState(false);
-  const [loadingSessions, setLoadingSessions] = useState(false);
-  // 每个会话的分页：{ page, total }，用于上拉加载更多
-  const [messagePagination, setMessagePagination] = useState<Record<string, { page: number; total: number }>>({});
 
   // 滚动到底部的引用 & 消息列表滚动容器
   const messageScrollRef = useRef<HTMLDivElement>(null);
   const loadingMoreRef = useRef(false);
+  const autoScrollRef = useRef(true);
   // 来自全局布局配置的移动端标记
   const isMobile = useSelector(layoutSlice.selectors.getIsMobile);
 
@@ -60,375 +42,86 @@ export const Component = () => {
     el.scrollTop = el.scrollHeight;
   };
 
+  // 更稳的贴底：等待 DOM 更新后再滚（两次 rAF 规避内容高度延迟变化）
+  const scrollToBottomSoon = () => {
+    requestAnimationFrame(() => {
+      scrollToBottom();
+      requestAnimationFrame(() => scrollToBottom());
+    });
+  };
+
   // 判断当前是否已经在底部（允许一点误差）
   const isAtBottom = () => {
     const el = messageScrollRef.current;
     if (!el) return false;
-    const threshold = 20; // 允许 20px 误差
+    const threshold = 80; // 允许更大误差，避免“差一点点”导致不跟随
     return el.scrollHeight - (el.scrollTop + el.clientHeight) <= threshold;
   };
 
-  // 加载会话列表
-  const loadSessions = async () => {
-    setLoadingSessions(true);
-    try {
-      const res = await aiApi.getConversationList({ page: 1, pageSize: 100 });
-      if (res.code === 0 && res.data) {
-        const sessionList = res.data.list || [];
-        setSessions(sessionList);
-        // 如果有会话且没有激活的，激活第一个
-        if (sessionList.length > 0 && !activeKey) {
-          setActiveKey(sessionList[0].ID.toString());
-        }
-      }
-    } catch (error) {
-      console.error("加载会话列表失败:", error);
-      antdMessage.error("加载会话列表失败");
-    } finally {
-      setLoadingSessions(false);
-    }
-  };
+  const {
+    PAGE_SIZE,
+    sessions,
+    activeKey,
+    setActiveKey,
+    currentMessages,
+    loading,
+    loadingSessions,
+    messagePagination,
+    loadMoreHistory,
+    addSession,
+    deleteSession,
+    sendMessage,
+  } = useAIChat({
+    pageSize: 10,
+    onAfterMessagesChange: () => {
+      // 跟随开关只由 onScroll 决定：
+      // - 用户离开底部(autoScroll=false)：更新时不贴底
+      // - 用户回到底部(autoScroll=true)：更新时持续贴底
+      if (!autoScrollRef.current) return;
+      scrollToBottomSoon();
+    },
+  });
 
-  // 后端返回时间倒序（最新在前），转为展示顺序：旧在上、新在下（正序）
-  const toDisplayOrder = (list: { ID: number; content: string; role: string; createdAt: string }[]): Message[] =>
-    [...list].reverse().map((msg) => ({
-      id: `msg-${msg.ID}`,
-      content: msg.content,
-      role: msg.role === "user" ? "user" : "ai",
-      status: "success" as const,
-      timestamp: new Date(msg.createdAt).getTime(),
-    }));
+  // 流式输出过程中，内容高度可能在消息更新之后继续变化（Markdown/图片/字体渲染）
+  // 用 ResizeObserver 在“需要跟随”时持续贴底，避免偶发不生效
+  useEffect(() => {
+    const el = messageScrollRef.current;
+    if (!el) return;
+    if (!("ResizeObserver" in window)) return;
 
-  // 加载会话消息（第一页，默认最近 10 条）
-  const loadMessages = async (conversationId: number) => {
-    const key = conversationId.toString();
-    try {
-      const res = await aiApi.getMessageList(conversationId, { page: 1, pageSize: PAGE_SIZE });
-      if (res.code === 0 && res.data) {
-        const { list = [], total = 0 } = res.data;
-        const messageList = toDisplayOrder((list || []) as AIMessage[]);
-        setMessages((prev) => ({ ...prev, [key]: messageList }));
-        setMessagePagination((prev) => ({ ...prev, [key]: { page: 1, total } }));
-        // 首次加载某个会话的消息后，滚动到底部一次
-        setTimeout(() => scrollToBottom(), 0);
-      } else {
-        antdMessage.error(res.msg || "加载消息失败");
-        setMessages((prev) => ({ ...prev, [key]: [] }));
-        setMessagePagination((prev) => ({ ...prev, [key]: { page: 0, total: 0 } }));
-      }
-    } catch (error) {
-      console.error("加载消息失败:", error);
-      antdMessage.error("加载消息失败");
-      setMessages((prev) => ({ ...prev, [key]: [] }));
-      setMessagePagination((prev) => ({ ...prev, [key]: { page: 0, total: 0 } }));
-    }
-  };
+    const ro = new ResizeObserver(() => {
+      if (!loading) return;
+      if (!autoScrollRef.current) return;
+      scrollToBottomSoon();
+    });
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, [loading]);
 
-  // 上拉加载更多历史消息（拼接到当前消息前面）
-  const loadMoreHistory = async () => {
+  // 切换会话时：默认开启自动贴底，并滚到最下面（等消息渲染后）
+  useEffect(() => {
     if (!activeKey) return;
-    const conversationId = parseInt(activeKey);
-    if (isNaN(conversationId)) return;
-
-    const pagination = messagePagination[activeKey];
-    if (!pagination || loadingMoreRef.current) return;
-    const { page, total } = pagination;
-    if (page * PAGE_SIZE >= total) return; // 没有更多
-
-    loadingMoreRef.current = true;
-    const nextPage = page + 1;
-    try {
-      const res = await aiApi.getMessageList(conversationId, {
-        page: nextPage,
-        pageSize: PAGE_SIZE,
-      });
-      if (res.code === 0 && res.data) {
-        const { list = [] } = res.data;
-        const olderMessages = toDisplayOrder((list || []) as AIMessage[]);
-        if (olderMessages.length === 0) {
-          setMessagePagination((prev) => ({
-            ...prev,
-            [activeKey]: { ...prev[activeKey], page: nextPage },
-          }));
-          loadingMoreRef.current = false;
-          return;
-        }
-
-        const scrollEl = messageScrollRef.current;
-        const prevScrollHeight = scrollEl?.scrollHeight ?? 0;
-        const prevScrollTop = scrollEl?.scrollTop ?? 0;
-
-        setMessages((prev) => {
-          const currentMsgs = prev[activeKey] || [];
-          return {
-            ...prev,
-            [activeKey]: [...olderMessages, ...currentMsgs],
-          };
-        });
-        setMessagePagination((prev) => ({
-          ...prev,
-          [activeKey]: { page: nextPage, total },
-        }));
-
-        // 保持滚动位置：新内容在顶部插入，将滚动条下移插入高度
-        requestAnimationFrame(() => {
-          if (scrollEl) {
-            const newScrollHeight = scrollEl.scrollHeight;
-            scrollEl.scrollTop = prevScrollTop + (newScrollHeight - prevScrollHeight);
-          }
-          loadingMoreRef.current = false;
-        });
-      } else {
-        loadingMoreRef.current = false;
-      }
-    } catch (error) {
-      console.error("加载更多消息失败:", error);
-      loadingMoreRef.current = false;
-    }
-  };
-
-  // 初始化加载会话列表
-  useEffect(() => {
-    loadSessions();
-  }, []);
-
-  // 当切换会话时加载消息
-  useEffect(() => {
-    if (activeKey) {
-      const conversationId = parseInt(activeKey);
-      if (!isNaN(conversationId) && !messages[activeKey]) {
-        loadMessages(conversationId);
-      }
-    }
+    autoScrollRef.current = true;
+    scrollToBottomSoon();
   }, [activeKey]);
-
-  const currentMessages = messages[activeKey] || [];
 
   // 新建会话
   const handleAddSession = async () => {
-    try {
-      const res = await aiApi.createConversation({ title: "新对话" });
-      if (res.code === 0 && res.data) {
-        const newSession = res.data;
-        setSessions([newSession, ...sessions]);
-        setMessages((prev) => ({ ...prev, [newSession.ID.toString()]: [] }));
-        setMessagePagination((prev) => ({ ...prev, [newSession.ID.toString()]: { page: 0, total: 0 } }));
-        setActiveKey(newSession.ID.toString());
-      } else {
-        antdMessage.error(res.msg || "创建会话失败");
-      }
-    } catch (error) {
-      console.error("创建会话失败:", error);
-      antdMessage.error("创建会话失败");
-    }
+    await addSession();
   };
 
   // 删除会话
   const handleDeleteSession = async (key: string) => {
-    const conversationId = parseInt(key);
-    if (isNaN(conversationId)) return;
-
-    try {
-      const res = await aiApi.deleteConversation(conversationId);
-      if (res.code === 0) {
-        const newSessions = sessions.filter((s) => s.ID !== conversationId);
-        setSessions(newSessions);
-        // 删除消息缓存
-        setMessages((prev) => {
-          const newMessages = { ...prev };
-          delete newMessages[key];
-          return newMessages;
-        });
-        setMessagePagination((prev) => {
-          const next = { ...prev };
-          delete next[key];
-          return next;
-        });
-
-        // 如果删除的是当前选中的，切换到第一个
-        if (activeKey === key) {
-          if (newSessions.length > 0) {
-            setActiveKey(newSessions[0].ID.toString());
-          } else {
-            setActiveKey("");
-          }
-        }
-        antdMessage.success("删除成功");
-      } else {
-        antdMessage.error(res.msg || "删除失败");
-      }
-    } catch (error) {
-      console.error("删除会话失败:", error);
-      antdMessage.error("删除会话失败");
-    }
+    await deleteSession(key);
   };
 
   // 发送消息
   const handleSend = async () => {
     if (!inputValue.trim() || !activeKey) return;
-
-    const conversationId = parseInt(activeKey);
-    if (isNaN(conversationId)) {
-      antdMessage.error("会话ID无效");
-      return;
-    }
-
-    const userContent = inputValue.trim();
-    const userMsg: Message = {
-      id: `user-${Date.now()}`,
-      content: userContent,
-      role: "user",
-      status: "success",
-      timestamp: Date.now(),
-    };
-
-    const aiMsgId = `ai-${Date.now()}`;
-    let fullText = "";
-    const initialAiMsg: Message = {
-      id: aiMsgId,
-      content: "",
-      role: "ai",
-      status: "loading",
-      timestamp: Date.now(),
-    };
-
-    // 一次更新：用户消息 + AI 占位都追加到末尾。顺序：旧在上、新在下（时间正序）
-    setMessages((prev) => {
-      const currentMsgs = prev[activeKey] || [];
-      return {
-        ...prev,
-        [activeKey]: [...currentMsgs, userMsg, initialAiMsg],
-      };
-    });
-
-    // 发送消息后默认滚动到底部一次
-    setTimeout(() => scrollToBottom(), 0);
-
+    const content = inputValue.trim();
     setInputValue("");
-    setLoading(true);
-
-    // 调用后端流式 API
-    try {
-      await aiApi.chatMessage(
-        {
-          conversationId,
-          content: userContent,
-        },
-        (chunk: string) => {
-          // 记录更新前是否在底部
-          const wasAtBottom = isAtBottom();
-
-          // 在 onmessage 里组装消息：每次收到分片就累加并更新 UI，具体打字速度由后端控制
-          fullText += chunk;
-          setMessages((prev) => {
-            const currentMsgs = prev[activeKey] || [];
-            const aiMsgIndex = currentMsgs.findIndex((msg) => msg.id === aiMsgId);
-            if (aiMsgIndex !== -1) {
-              const updatedMsgs = currentMsgs.slice();
-              updatedMsgs[aiMsgIndex] = {
-                ...updatedMsgs[aiMsgIndex],
-                content: fullText,
-                status: "loading" as const,
-              };
-              return { ...prev, [activeKey]: updatedMsgs };
-            }
-            return {
-              ...prev,
-              [activeKey]: [
-                ...currentMsgs,
-                {
-                  id: aiMsgId,
-                  content: fullText,
-                  role: "ai",
-                  status: "loading",
-                  timestamp: Date.now(),
-                },
-              ],
-            };
-          });
-
-          // 如果之前在底部，则保持在底部；否则不动
-          if (wasAtBottom) {
-            requestAnimationFrame(() => scrollToBottom());
-          }
-        },
-        (error: Error) => {
-          // 错误处理
-          const wasAtBottom = isAtBottom();
-          console.error("流式请求错误:", error);
-          antdMessage.error(error.message || "发送消息失败");
-          setMessages((prev) => {
-            const currentMsgs = prev[activeKey] || [];
-            const aiMsgIndex = currentMsgs.findIndex((msg) => msg.id === aiMsgId);
-            if (aiMsgIndex !== -1) {
-              const updatedMsgs = [...currentMsgs];
-              updatedMsgs[aiMsgIndex] = {
-                ...updatedMsgs[aiMsgIndex],
-                content: fullText || "发送失败，请重试",
-                status: "error" as const,
-              };
-              return {
-                ...prev,
-                [activeKey]: updatedMsgs,
-              };
-            }
-            return prev;
-          });
-          if (wasAtBottom) {
-            requestAnimationFrame(() => scrollToBottom());
-          }
-          setLoading(false);
-        },
-        () => {
-          // 完成回调
-          const wasAtBottom = isAtBottom();
-          setMessages((prev) => {
-            const currentMsgs = prev[activeKey] || [];
-            const aiMsgIndex = currentMsgs.findIndex((msg) => msg.id === aiMsgId);
-            if (aiMsgIndex !== -1) {
-              const updatedMsgs = [...currentMsgs];
-              updatedMsgs[aiMsgIndex] = {
-                ...updatedMsgs[aiMsgIndex],
-                content: fullText,
-                status: "success" as const,
-              };
-              return {
-                ...prev,
-                [activeKey]: updatedMsgs,
-              };
-            }
-            return prev;
-          });
-          if (wasAtBottom) {
-            requestAnimationFrame(() => scrollToBottom());
-          }
-          setLoading(false);
-          // 刷新会话列表以更新最后消息
-          loadSessions();
-        }
-      );
-    } catch (error) {
-      console.error("发送消息失败:", error);
-      antdMessage.error("发送消息失败");
-      setMessages((prev) => {
-        const currentMsgs = prev[activeKey] || [];
-        const withoutAi = currentMsgs.filter((msg) => msg.id !== aiMsgId);
-        return {
-          ...prev,
-          [activeKey]: [
-            ...withoutAi,
-            {
-              id: aiMsgId,
-              content: "发送失败，请重试",
-              role: "ai",
-              status: "error",
-              timestamp: Date.now(),
-            },
-          ],
-        };
-      });
-      setLoading(false);
-    }
+    autoScrollRef.current = true; // 主动发送后默认跟随到底部
+    await sendMessage(content);
   };
 
   // Conversations 组件的 items 配置
@@ -441,6 +134,7 @@ export const Component = () => {
 
   // 处理菜单点击
   const handleMenuChange: ConversationsProps["onActiveChange"] = (key) => {
+    autoScrollRef.current = true;
     setActiveKey(key);
   };
 
@@ -539,14 +233,30 @@ export const Component = () => {
                 const el = messageScrollRef.current;
                 if (!el) return;
 
-                const { scrollTop, scrollHeight, clientHeight } = el;
+                const { scrollTop } = el;
+                const nowAtBottom = isAtBottom();
+                autoScrollRef.current = nowAtBottom;
+
+                // 用户手动滚回到底部：立刻贴底并恢复“跟随输出”
+                if (nowAtBottom && loading) {
+                  scrollToBottomSoon();
+                }
 
                 // 如果用户已经滚到接近顶部，认为是在浏览历史，关闭自动跟随底部，并触发上拉加载
                 if (scrollTop < 80) {
                   if (loadingMoreRef.current) return;
                   const pagination = messagePagination[activeKey];
                   if (!pagination || pagination.page * PAGE_SIZE >= pagination.total) return;
-                  loadMoreHistory();
+                  const prevScrollHeight = el.scrollHeight;
+                  const prevScrollTop = el.scrollTop;
+                  loadingMoreRef.current = true;
+                  Promise.resolve(loadMoreHistory()).finally(() => {
+                    requestAnimationFrame(() => {
+                      const newScrollHeight = el.scrollHeight;
+                      el.scrollTop = prevScrollTop + (newScrollHeight - prevScrollHeight);
+                      loadingMoreRef.current = false;
+                    });
+                  });
                   return;
                 }
               }}

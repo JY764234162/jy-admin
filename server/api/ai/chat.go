@@ -165,9 +165,9 @@ func (a *Api) callAIAPIStream(messages []business.AIMessage, newContent string, 
 			chunk := string(runes[i])
 			callback(chunk)
 
-			// 模拟流式输出速度：0.05 秒一个字
+			// 模拟流式输出速度：0.1 秒一个字（稍微放慢一点）
 			if i < len(runes)-1 {
-				time.Sleep(50 * time.Millisecond)
+				time.Sleep(100 * time.Millisecond)
 			}
 		}
 		return nil
@@ -306,8 +306,8 @@ func (a *Api) callAIAPIStream(messages []business.AIMessage, newContent string, 
 		// 把每一小段内容回调给上层，由 ChatMessage 封装为 SSE JSON 再推给前端
 		callback(content)
 
-		// 稍微放慢节奏，让前端能明显看到打字机效果
-		time.Sleep(40 * time.Millisecond)
+		// 稍微放慢节奏，让前端能明显看到打字机效果（适当降低速度）
+		time.Sleep(80 * time.Millisecond)
 	}
 
 	if err := scanner.Err(); err != nil {
