@@ -43,7 +43,7 @@ export const Component = () => {
     {
       label: "Github地址",
       children: (
-        <a href={repository.url} style={{ color: primary }} target="_blank" rel="noreferrer">
+        <a href={"https://github.com/JY764234162/jy-admin"} style={{ color: primary }} target="_blank" rel="noreferrer">
           Github地址
         </a>
       ),
@@ -51,7 +51,7 @@ export const Component = () => {
     {
       label: "项目预览地址",
       children: (
-        <a href={homepage} style={{ color: primary }} target="_blank" rel="noreferrer">
+        <a href={"http://jy-admin.site/"} style={{ color: primary }} target="_blank" rel="noreferrer">
           项目预览地址
         </a>
       ),

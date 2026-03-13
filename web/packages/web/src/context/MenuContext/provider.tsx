@@ -50,13 +50,13 @@ export const MenuContextProvider = memo(({ children }: { children: ReactNode }) 
 
   const onMenuOpenChange = useCallback(
     (openKeys: string[]) => {
-      if (isOnlyExpandCurrentParentMenu) {
+      if (isOnlyExpandCurrentParentMenu && settings.layout.mode === "vertical") {
         setOpenKeys([openKeys[openKeys.length - 1]]);
       } else {
         setOpenKeys(openKeys);
       }
     },
-    [isOnlyExpandCurrentParentMenu]
+    [isOnlyExpandCurrentParentMenu, settings.layout.mode]
   );
 
   useUpdateEffect(() => {
