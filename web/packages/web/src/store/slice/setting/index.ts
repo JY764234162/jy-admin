@@ -13,7 +13,7 @@ export const initialSetting: App.Setting = {
 
   //布局
   layout: {
-    mode: "horizontal",
+    mode: "vertical",
     reverseHorizontalMix: false,
     scrollMode: "content",
   },
