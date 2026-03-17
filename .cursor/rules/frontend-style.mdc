@@ -1,0 +1,19 @@
+---
+description: 样式与 UI 组件使用约定（仅样式文件生效）
+globs: web/packages/web/src/**/*.{css,scss,less}
+alwaysApply: false
+---
+
+# 前端样式规则
+
+## 技术栈约束
+
+- 项目使用 Ant Design 与 Tailwind（见 `tailwind.config.js`）并支持 `sass/less`。
+- 优先复用已有样式与组件能力，不重复造轮子。
+
+## 书写规范
+
+- 避免全局污染：样式作用域尽量限制在组件/页面目录内。
+- 命名保持一致：类名语义化，避免随意缩写；同类样式集中管理，减少重复定义。
+- 动画/过渡注意可访问性与性能：避免高频触发布局的属性（如 `top/left`），优先 `transform/opacity`。
+

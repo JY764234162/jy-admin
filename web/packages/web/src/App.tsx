@@ -4,6 +4,7 @@ import AntdProvider from "./context/AntdProvider";
 import { useSelector } from "react-redux";
 import { settingSlice } from "./store/slice/setting";
 import { Watermark, WatermarkProps } from "antd";
+import { AliveScope } from "@/components/KeepAlive";
 
 import { useUpdateEffect } from "ahooks";
 import { localStg } from "./utils/storage";
@@ -31,7 +32,9 @@ export default function App() {
     <AntdProvider>
       <AppProvider>
         <Watermark className="h-full" content={settings.watermark.visible ? settings.watermark?.text : ""} {...watermarkProps} >
-          <Router />
+          <AliveScope>
+            <Router />
+          </AliveScope>
         </Watermark>
       </AppProvider>
     </AntdProvider>

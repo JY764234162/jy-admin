@@ -152,6 +152,8 @@ export const Component = () => {
   ];
 
   const techStack = [
+    "Go + Gin",
+    "GORM (MySQL/SQLite)",
     "React 18",
     "TypeScript",
     "Ant Design",
@@ -170,10 +172,10 @@ export const Component = () => {
       <div className={styles.header}>
         <Space direction="vertical" size="large" style={{ width: "100%", textAlign: "center" }}>
           <Title level={1} style={{ margin: 0, fontSize: "3rem" }}>
-            前端学习示例项目
+            JY-Admin 全栈管理系统
           </Title>
           <Paragraph style={{ fontSize: "1.2rem", color: "#666", margin: 0 }}>
-            一个集成了各种前端技术栈的学习与实践项目
+            基于 Go(Gin) + React(Vite) 的后台管理系统，集成权限管理、文件存储、AI 对话与丰富的前端示例
           </Paragraph>
           <Space wrap size="middle">
             {techStack.slice(0, 6).map((tech) => (
@@ -206,14 +208,20 @@ export const Component = () => {
           <Space direction="vertical" size="large" style={{ width: "100%" }}>
             <Title level={3}>项目介绍</Title>
             <Paragraph>
-              这是一个前端学习与实践项目，涵盖了现代前端开发的各个方面。通过实际案例展示了
+              JY-Admin 是一个前后端一体的管理系统示例项目，后端基于
+              <Text strong> Go + Gin + GORM </Text>
+              实现认证、权限、文件存储等能力，前端基于
               <Text strong> React </Text>、
               <Text strong> TypeScript </Text>、
               <Text strong> Ant Design </Text>
-              等技术栈的使用方法和最佳实践。
+              构建通用后台界面与丰富的前端能力演示。
             </Paragraph>
             <Paragraph>
-              项目包含了从基础的 UI 组件到复杂的交互功能，从图像处理到数据可视化，从编辑器实现到文档预览等多个实用模块。每个模块都经过精心设计和实现，注重代码质量和用户体验。
+              系统包含用户 / 角色 / 菜单权限管理、文件上传与腾讯云 COS 对接、客户管理、AI 对话等后台功能，同时内置大量前端示例模块：从基础的 UI 组件到复杂的交互功能，从图像处理到数据可视化，从编辑器实现到文档预览等多个实用模块，既可以作为
+              <Text strong> 实战脚手架 </Text>
+              ，也可以作为
+              <Text strong> 学习与复用代码片段 </Text>
+              的仓库。
             </Paragraph>
 
             <Title level={4}>技术特点</Title>
@@ -225,16 +233,16 @@ export const Component = () => {
                 <Text strong>现代化工具链：</Text>采用 Vite 作为构建工具，提供极速的开发体验
               </li>
               <li>
-                <Text strong>状态管理：</Text>集成 Redux Toolkit、Zustand、Jotai 等多种状态管理方案
+                <Text strong>状态管理：</Text>以 Redux Toolkit 为主，结合局部状态方案管理布局、权限与业务数据
               </li>
               <li>
                 <Text strong>UI 框架：</Text>基于 Ant Design 构建美观一致的用户界面
               </li>
               <li>
-                <Text strong>代码规范：</Text>使用 ESLint、Prettier 确保代码质量
+                <Text strong>后端能力：</Text>Gin + GORM + JWT + Zap，支持 MySQL/SQLite、Token 黑名单与 Swagger 文档
               </li>
               <li>
-                <Text strong>类型安全：</Text>完整的 TypeScript 类型定义，提供更好的开发体验
+                <Text strong>工程与部署：</Text>pnpm workspace 管理多包，提供 Docker Compose 一键启动与 GitHub Actions 部署脚本
               </li>
             </ul>
 

@@ -1,0 +1,24 @@
+---
+description: pnpm workspace / 多包依赖与脚本约定（仅 web 目录配置生效）
+globs: web/**/*.{json,yaml,yml}
+alwaysApply: false
+---
+
+# Monorepo（pnpm workspace）规则
+
+## 依赖与版本
+
+- 依赖变更优先发生在正确的包内（例如前端应用在 `web/packages/web/package.json`）。
+- 包间依赖优先使用 workspace 协议（例如 `workspace:*`），避免手动写死内部包版本。
+- 不要随意升级大版本依赖；如必须升级，说明影响范围并同步修复破坏性变更。
+
+## scripts 使用
+
+- 启动/构建优先走已有 scripts：
+  - 前端应用：`pnpm -F web run dev|build|preview|lint|format`
+- 避免在 README/脚本里引入与现有工具链冲突的命令（例如混用 npm/yarn）。
+
+## 构建与路径别名
+
+- `@/` 别名已在前端包中配置（TS + Vite），新增别名需同时更新相关配置，避免只改一处导致类型/构建不一致。
+

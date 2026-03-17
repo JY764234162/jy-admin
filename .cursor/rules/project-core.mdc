@@ -1,0 +1,30 @@
+---
+description: 本仓库通用协作与修改规范（总是生效）
+alwaysApply: true
+---
+
+# 项目通用规则（jy-admin）
+
+## 仓库结构与运行方式
+
+- 仓库包含 `server/` 与 `web/`，前端主要在 `web/packages/web/`。
+- 使用 **pnpm workspace**（见 `web/package.json`、`web/pnpm-workspace.yaml`）。
+- 执行命令优先使用仓库已有 scripts（例如根目录常用 `pnpm -F web ...`）。
+
+## 变更原则
+
+- 优先做**最小可行改动**：只改与需求直接相关的文件，避免“顺手重构”导致 diff 膨胀。
+- 不引入与需求无关的新依赖；确需新增时，说明用途并选择稳定方案。
+- 保持现有代码风格：命名、目录、导入顺序、UI 交互与提示文案尽量沿用既有模式。
+
+## TypeScript/React 基线
+
+- 不写 `any` 的“扩散式”用法；确需 `any` 时限制作用域，并优先用可表达意图的类型替代。
+- 保持组件职责单一；能抽 `hook`/工具函数就抽到合适位置，避免组件文件无限膨胀。
+- 路径别名优先使用 `@/`（在 `web/packages/web/tsconfig.json` 与 `vite.config.ts` 已配置）。
+
+## 质量门禁
+
+- 修改后优先确保：`pnpm -F web run type-check`、`pnpm -F web run lint`（或对应包内脚本）可通过。
+- 只在与改动相关的范围内修复 lint/类型问题；不要一次性清全仓历史问题。
+

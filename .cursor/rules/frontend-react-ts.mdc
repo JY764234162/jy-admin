@@ -1,0 +1,29 @@
+---
+description: React + TypeScript 开发约定（仅前端源码生效）
+globs: web/packages/web/src/**/*.{ts,tsx}
+alwaysApply: false
+---
+
+# 前端（React/TS）规则
+
+## 目录与导入
+
+- 页面优先放在 `web/packages/web/src/pages/**`，通用组件放在 `web/packages/web/src/components/**`。
+- 导入顺序建议：第三方库 → 内部别名 `@/` → 相对路径；避免循环依赖。
+
+## 组件与状态
+
+- 组件默认使用函数组件与 hooks。
+- 状态管理保持一致：局部状态用 React state/hooks；跨页面/全局状态按项目现有选择（如已使用的 store 方案）接入，不要在同一模块混用多套方案。
+- effect/订阅类逻辑必须有清理；异步请求注意竞态（请求取消/忽略过期响应）。
+
+## 路由与页面
+
+- 新增页面时同步更新路由与导航入口（如果项目有集中路由表/菜单）。
+- 页面标题、loading、empty/error 状态要可用且一致（沿用项目已有组件/模式）。
+
+## 性能与可维护性
+
+- 避免在 render 中创建不必要的重对象/匿名函数导致子组件重复渲染；必要时使用 `useMemo/useCallback`。
+- 大组件优先拆分：视图与逻辑分离（hook + view），复杂计算移到工具函数。
+
