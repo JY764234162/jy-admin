@@ -1,8 +1,7 @@
 import { RouteObject, redirect } from "react-router-dom";
-import { Layout } from "@/Layout";
-import { NotFound } from "@/components/NotFound";
 import { localStg } from "@/utils/storage";
-//默认路由
+
+//默认路由（Layout/NotFound 懒加载，登录页首屏不加载）
 export const constantRoutes: RouteObject[] = [
   {
     id: "login",
@@ -31,7 +30,7 @@ export const constantRoutes: RouteObject[] = [
   {
     id: "layout",
     path: "/",
-    Component: Layout,
+    lazy: () => import("@/Layout").then((m) => ({ Component: m.Layout })),
     children: [],
     loader: () => {
       const token = localStg.get("token");
@@ -44,7 +43,7 @@ export const constantRoutes: RouteObject[] = [
   {
     id: "not-found",
     path: "*",
-    Component: NotFound,
+    lazy: () => import("@/components/NotFound").then((m) => ({ Component: m.NotFound })),
     loader: () => {
       return redirect("/login");
     },

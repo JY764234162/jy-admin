@@ -17,7 +17,7 @@ async function setupApp() {
   //打印
   setupConsole();
   //设置国际化
-  setupDayjs();
+  await setupDayjs();
   //版本更新提示
   setupAppUpdateNotification();
 

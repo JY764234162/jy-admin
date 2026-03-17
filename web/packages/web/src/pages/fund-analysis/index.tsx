@@ -3,7 +3,6 @@ import { Card, Table, Select, Input, Button, Space, message, Tag } from "antd";
 import { ReloadOutlined, PlusOutlined } from "@ant-design/icons";
 import { fundValueEstimationEm, type FundGuZhiItem } from "@/api/fund/fund";
 import { localStg } from "@/utils/storage";
-import fundList from "./fundList";
 import { useSelector } from "react-redux";
 import { layoutSlice } from "@/store/slice/layout";
 
@@ -31,6 +30,32 @@ export const Component = () => {
   const [loading, setLoading] = useState(false);
   const [data, setData] = useState<FundGuZhiItem[]>([]);
   const isMobile = useSelector(layoutSlice.selectors.getIsMobile);
+  const [fundOptions, setFundOptions] = useState<Array<{ label: string; value: string }>>([]);
+  const [fundOptionsLoading, setFundOptionsLoading] = useState(true);
+
+  // fundList 体积较大（~3MB+），延后到进入页面后再异步加载，避免把静态数据打进页面主 chunk
+  useEffect(() => {
+    let mounted = true;
+    (async () => {
+      try {
+        setFundOptionsLoading(true);
+        const mod = await import("./fundList");
+        if (!mounted) return;
+        const list = mod.default as Array<[string, string, string, string, string]>;
+        setFundOptions(
+          list.map((fundInfo) => ({
+            label: `${fundInfo[0]}-${fundInfo[2]}`,
+            value: fundInfo[0],
+          }))
+        );
+      } finally {
+        if (mounted) setFundOptionsLoading(false);
+      }
+    })();
+    return () => {
+      mounted = false;
+    };
+  }, []);
 
 
   useEffect(() => {
@@ -142,13 +167,12 @@ export const Component = () => {
           /> */}
           <Select
             placeholder="选择基金添加到自选"
-            options={fundList.map((fundInfo) => ({
-              label: `${fundInfo[0]}-${fundInfo[2]}`,
-              value: fundInfo[0],
-            }))}
+            options={fundOptions}
             style={{ width: 280 }}
             showSearch
             optionFilterProp="label"
+            loading={fundOptionsLoading}
+            disabled={fundOptionsLoading}
             filterOption={(input, option) => {
               const kw = (input ?? "").trim().toLowerCase();
               if (!kw) return true;

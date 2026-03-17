@@ -56,6 +56,7 @@ export const dynamicLazyMap: Record<string, () => Promise<any>> = {
   strictMode: () => import("@/pages/react/strictMode"),
   suspense: () => import("@/pages/react/suspense"),
   useSyncExternalStore: () => import("@/pages/react/useSyncExternalStore"),
+  "transition-deferredValue": () => import("@/pages/react/transition-deferredValue"),
 
   // ========== 样式 ==========
   "css-filter": () => import("@/pages/style/css-filter"),

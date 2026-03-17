@@ -3,9 +3,6 @@ import localeData from "dayjs/plugin/localeData";
 
 import { locale } from "dayjs";
 
-import "dayjs/locale/zh-cn";
-import "dayjs/locale/en";
-
 /**
  * Set dayjs locale
  *
@@ -22,8 +19,18 @@ export function setDayjsLocale(lang: "en-US" | "zh-CN" = "zh-CN") {
   locale(localMap[l]);
 }
 
-export function setupDayjs() {
+async function loadDayjsLocale(lang: "en-US" | "zh-CN") {
+  if (lang === "en-US") {
+    await import("dayjs/locale/en");
+    return;
+  }
+  await import("dayjs/locale/zh-cn");
+}
+
+export async function setupDayjs() {
   extend(localeData);
 
-  setDayjsLocale();
+  const l: "en-US" | "zh-CN" = (localStorage.getItem("lang") as any) || "zh-CN";
+  await loadDayjsLocale(l);
+  setDayjsLocale(l);
 }
