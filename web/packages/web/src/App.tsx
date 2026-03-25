@@ -32,10 +32,14 @@ export default function App() {
   const appContent: ReactNode = useMemo(() => {
     return settings.watermark.visible ? (
       <Watermark className="h-full" content={settings.watermark?.text} {...watermarkProps}>
-        {appContent}
+        <AliveScope>
+          <Router />
+        </AliveScope>
       </Watermark>
     ) : (
-      appContent
+      <AliveScope>
+        <Router />
+      </AliveScope>
     );
   }, [settings.watermark.visible]);
 

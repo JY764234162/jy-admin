@@ -28,6 +28,10 @@ export interface CreateConversationRequest {
   title: string;
 }
 
+export interface UpdateConversationTitleRequest {
+  title: string;
+}
+
 export interface ChatMessageRequest {
   conversationId: number;
   content: string;
@@ -70,6 +74,16 @@ export const aiApi = {
    */
   deleteConversation: (id: number): Promise<ApiResponse> => {
     return request.delete(`/ai/conversation/${id}`);
+  },
+
+  /**
+   * 更新会话标题
+   */
+  updateConversationTitle: (
+    id: number,
+    data: UpdateConversationTitleRequest
+  ): Promise<ApiResponse> => {
+    return request.put(`/ai/conversation/${id}/title`, data);
   },
 
   /**

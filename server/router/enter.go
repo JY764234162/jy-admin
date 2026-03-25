@@ -126,6 +126,7 @@ func registerRouter(Router *gin.Engine) *gin.Engine {
 		privateGroup.GET("/ai/conversation/list", apiGroup.AIApi.GetConversationList)
 		privateGroup.GET("/ai/conversation/:id/messages", apiGroup.AIApi.GetMessageList)
 		privateGroup.DELETE("/ai/conversation/:id", apiGroup.AIApi.DeleteConversation)
+		privateGroup.PUT("/ai/conversation/:id/title", apiGroup.AIApi.UpdateConversationTitle)
 		privateGroup.POST("/ai/chat", apiGroup.AIApi.ChatMessage)
 	}
 

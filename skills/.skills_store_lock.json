@@ -1,0 +1,35 @@
+{
+  "version": 1,
+  "skills": {
+    "github": {
+      "name": "Github",
+      "zip_url": "https://lightmake.site/api/v1/download?slug=github",
+      "source": "skillhub",
+      "version": "1.0.0"
+    },
+    "find-skills": {
+      "name": "Find Skills",
+      "zip_url": "https://lightmake.site/api/v1/download?slug=find-skills",
+      "source": "skillhub",
+      "version": "0.1.0"
+    },
+    "nano-pdf": {
+      "name": "Nano Pdf",
+      "zip_url": "https://lightmake.site/api/v1/download?slug=nano-pdf",
+      "source": "skillhub",
+      "version": "1.0.0"
+    },
+    "elite-longterm-memory": {
+      "name": "Elite Longterm Memory",
+      "zip_url": "https://lightmake.site/api/v1/download?slug=elite-longterm-memory",
+      "source": "skillhub",
+      "version": "1.2.3"
+    },
+    "self-improving-agent": {
+      "name": "self-improving-agent",
+      "zip_url": "https://lightmake.site/api/v1/download?slug=self-improving-agent",
+      "source": "skillhub",
+      "version": "1.0.11"
+    }
+  }
+}

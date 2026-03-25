@@ -1,12 +1,13 @@
 import React, { useState, useEffect, useRef } from "react";
 import { Bubble, Conversations, Sender, type ConversationsProps } from "@ant-design/x";
-import { UserOutlined, PlusOutlined, MessageOutlined, DeleteOutlined } from "@ant-design/icons";
-import { Button, theme, Empty, Flex, Avatar, Select } from "antd";
+import { UserOutlined, PlusOutlined, MessageOutlined, DeleteOutlined, EditOutlined } from "@ant-design/icons";
+import { Button, theme, Empty, Flex, Avatar, Select, Input, Modal, message as antdMessage } from "antd";
 import MDEditor from "@uiw/react-md-editor";
 import { useSelector } from "react-redux";
 import { layoutSlice } from "@/store/slice/layout";
 import styles from "./index.module.css";
 import { useAIChat } from "./useAIChat";
+import { aiApi } from "@/api/ai";
 
 export const Component = () => {
   const { token } = theme.useToken();
@@ -70,6 +71,7 @@ export const Component = () => {
     loadMoreHistory,
     addSession,
     deleteSession,
+    loadSessions,
     sendMessage,
   } = useAIChat({
     pageSize: 10,
@@ -113,6 +115,52 @@ export const Component = () => {
   // 删除会话
   const handleDeleteSession = async (key: string) => {
     await deleteSession(key);
+  };
+
+  // 重命名会话
+  const handleRenameSession = (key: string) => {
+    const conversationId = parseInt(key);
+    if (isNaN(conversationId)) {
+      antdMessage.error("会话ID无效");
+      return;
+    }
+
+    const currentSession = (sessions || []).find((s) => s.ID.toString() === key);
+    const initialTitle = currentSession?.title ?? "新对话";
+
+    let nextTitle = initialTitle;
+
+    Modal.confirm({
+      title: "重命名会话",
+      content: (
+        <Input
+          defaultValue={initialTitle}
+          maxLength={50}
+          placeholder="请输入会话名称"
+          onChange={(e) => {
+            nextTitle = e.target.value;
+          }}
+        />
+      ),
+      okText: "保存",
+      cancelText: "取消",
+      onOk: async () => {
+        const trimmed = (nextTitle || "").trim();
+        if (!trimmed) {
+          antdMessage.error("标题不能为空");
+          return false;
+        }
+
+        const res = await aiApi.updateConversationTitle(conversationId, { title: trimmed });
+        if (res.code === 0) {
+          antdMessage.success("更新成功");
+          await loadSessions();
+          return true;
+        }
+        antdMessage.error(res.msg || "更新失败");
+        return false;
+      },
+    });
   };
 
   // 发送消息
@@ -165,6 +213,12 @@ export const Component = () => {
                 menu={(item) => ({
                   items: [
                     {
+                      label: "重命名会话",
+                      key: "rename",
+                      icon: <EditOutlined />,
+                      onClick: () => handleRenameSession(item.key),
+                    },
+                    {
                       label: "删除会话",
                       key: "delete",
                       icon: <DeleteOutlined />,
@@ -214,6 +268,14 @@ export const Component = () => {
                 onClick={handleAddSession}
                 loading={loadingSessions}
               />
+                <Button
+                  icon={<EditOutlined />}
+                  onClick={() => {
+                    if (!activeKey) return;
+                    handleRenameSession(activeKey);
+                  }}
+                  disabled={!activeKey}
+                />
             </Flex>
           </div>
         )}
