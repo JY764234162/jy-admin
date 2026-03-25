@@ -257,7 +257,7 @@ export const Component = () => {
               type="file"
               ref={folderInputRef}
               onChange={handleFolderSelect}
-              /* @ts-expect-error */
+              /* @ts-expect-error: webkitdirectory 是 Chromium 非标准属性，React 类型中未声明 */
               webkitdirectory=""
               style={{ display: "none" }}
             />

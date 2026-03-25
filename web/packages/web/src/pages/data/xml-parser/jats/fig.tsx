@@ -1,4 +1,3 @@
-//@ts-nocheck
 import { useMemo } from "react";
 import xpath from "xpath";
 import { Alternatives } from "./alternatives";
@@ -14,7 +13,7 @@ export const Fig = (props: Props) => {
   const labelNode = () => {
     if (!node) return null;
     const main = xpath.select1("./label", node);
-    const sub = xpath.select("./title", node);
+    const sub = xpath.select1("./title", node);
     return main || sub;
   };
 
@@ -35,10 +34,13 @@ export const Fig = (props: Props) => {
    * 此处覆盖文献示例 ID：003c6bd440a0a00b9fde6a22b4851d1e5fb1ff30364b1f7b540f22ffacd22747
    * 此处覆盖文献示例 ID：4233c92cd9ebdcc4f7a18199b4ba45f8b3aecee7652072d41bf367684c558eb3
    */
-  const hasGraphic = !!xpath.select(".//graphic", node)?.length;
+  const graphicList = xpath.select(".//graphic", node);
+  const hasGraphic = Array.isArray(graphicList) && graphicList.length > 0;
   if (hasGraphic) {
     return null;
   }
+
+  const label = labelNode();
 
   //   console.log(
   //     attrsMap,
@@ -58,7 +60,7 @@ export const Fig = (props: Props) => {
       )}
       {isNode(graphic) && <Graphic node={graphic} baseUrl={baseUrl} zoom={1} />}
       <figcaption>
-        {isNode(labelNode()) && <strong>{textContent(labelNode())}</strong>}
+        {isNode(label) && <strong>{textContent(label)}</strong>}
         {isNode(captionNode) && <Translate node={captionNode} />}
       </figcaption>
     </figure>

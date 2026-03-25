@@ -12,14 +12,16 @@
     "module": "ESNext",
     "moduleResolution": "Node",
     "resolveJsonModule": true,
+    "types": ["vite/client"],
     "isolatedModules": true,
     "noEmit": true,
     "jsx": "react-jsx",
+    "noFallthroughCasesInSwitch": true,
     "baseUrl": ".",
     "paths": {
       "@/*": ["./src/*"]
     }
   },
-
-  "include": ["src", "index.js"]
+  "include": ["src", "index.js"],
+  "exclude": ["node_modules", "dist"]
 }

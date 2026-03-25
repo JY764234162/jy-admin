@@ -340,7 +340,7 @@ export const Component = () => {
   const exportAudioBufferAsMP3 = async (buffer: AudioBuffer, filename: string) => {
     try {
       // 动态导入 lamejs
-      // @ts-ignore
+      // @ts-expect-error: lamejs 无官方类型声明，运行时通过动态导入使用
       const lamejs = await import('lamejs');
       
       // 获取 Mp3Encoder
@@ -759,7 +759,7 @@ export const Component = () => {
 
           {regions.length === 0 && audioFile && (
             <div className={styles.emptyState}>
-              点击"添加选区"按钮来标记需要剪切的音频片段
+              点击&quot;添加选区&quot;按钮来标记需要剪切的音频片段
             </div>
           )}
         </div>

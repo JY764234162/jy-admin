@@ -46,8 +46,8 @@ export const Component = () => {
       <Card>
         <Card title={<span>图片列表-{count}</span>}>
           <Space direction="vertical" size="large" style={{ width: "100%" }}>
-            {imgList?.map((item) => {
-              return <Image src={item} alt="" />;
+            {imgList?.map((item, index) => {
+              return <Image key={`${images[index]?.id ?? index}`} src={item} alt="" />;
             })}
           </Space>
         </Card>
