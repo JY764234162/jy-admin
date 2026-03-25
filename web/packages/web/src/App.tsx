@@ -10,6 +10,7 @@ import { useUpdateEffect } from "ahooks";
 import { localStg } from "./utils/storage";
 import "@/styles/index.css";
 import "@/styles/scrollbar.scss";
+import { ReactNode, useMemo } from "react";
 const watermarkProps: WatermarkProps = {
   font: {
     fontSize: 16,
@@ -28,15 +29,19 @@ export default function App() {
     localStg.set("settings", settings);
   }, [settings]);
 
+  const appContent: ReactNode = useMemo(() => {
+    return settings.watermark.visible ? (
+      <Watermark className="h-full" content={settings.watermark?.text} {...watermarkProps}>
+        {appContent}
+      </Watermark>
+    ) : (
+      appContent
+    );
+  }, [settings.watermark.visible]);
+
   return (
     <AntdProvider>
-      <AppProvider>
-        <Watermark className="h-full" content={settings.watermark.visible ? settings.watermark?.text : ""} {...watermarkProps} >
-          <AliveScope>
-            <Router />
-          </AliveScope>
-        </Watermark>
-      </AppProvider>
+      <AppProvider>{appContent}</AppProvider>
     </AntdProvider>
   );
 }
