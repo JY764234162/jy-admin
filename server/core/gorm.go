@@ -83,7 +83,11 @@ func InitGorm() *gorm.DB {
 	}
 
 	// 设置连接池
-	sqlDB, _ := db.DB()
+	sqlDB, err := db.DB()
+	if err != nil {
+		fmt.Printf("获取数据库连接失败: %v\n", err)
+		panic(err)
+	}
 	sqlDB.SetMaxIdleConns(maxIdleConns)
 	sqlDB.SetMaxOpenConns(maxOpenConns)
 	sqlDB.SetConnMaxLifetime(time.Hour)
@@ -107,6 +111,7 @@ func RegisterTables() {
 
 	if err != nil {
 		fmt.Println("注册表失败", err)
+		return
 	}
 	fmt.Println("注册表成功")
 
