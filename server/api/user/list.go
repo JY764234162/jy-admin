@@ -39,7 +39,9 @@ func (a *Api) GetUserList(c *gin.Context) {
 		common.FailWithMsg(c, "统计失败")
 		return
 	}
-	err = db.Limit(search.PageSize).Offset((search.Page - 1) * search.PageSize).Find(&users).Error
+	err = db.Select("id, username, nickname, authority_id, email, phone, avatar, status, created_at").
+		Limit(search.PageSize).Offset((search.Page - 1) * search.PageSize).
+		Order("id DESC").Find(&users).Error
 	if err != nil {
 		common.FailWithMsg(c, "获取列表失败")
 		return

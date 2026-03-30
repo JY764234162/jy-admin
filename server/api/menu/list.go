@@ -25,7 +25,8 @@ type MenuTreeItem struct {
 // @Router       /menu/list [get]
 func (a *Api) GetMenuList(c *gin.Context) {
 	var menus []system.SysBaseMenu
-	err := global.JY_DB.Order("sort ASC").Find(&menus).Error
+	err := global.JY_DB.Select("id, parent_id, path, name, sort, enable, icon, keep_alive").
+		Order("sort ASC").Find(&menus).Error
 	if err != nil {
 		common.FailWithMsg(c, "获取菜单列表失败")
 		return
