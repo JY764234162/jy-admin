@@ -1,13 +1,16 @@
 package business
 
 import (
+	"time"
+
 	"gorm.io/gorm"
 )
 
 // AIConversation AI 会话表
 type AIConversation struct {
 	gorm.Model
-	UserID    uint   `json:"userId" gorm:"index;comment:用户ID"`
+	UpdatedAt time.Time `json:"updatedAt" gorm:"index;comment:更新时间"`
+	UserID    uint      `json:"userId" gorm:"index;comment:用户ID"`
 	Title     string `json:"title" gorm:"comment:会话标题"`
 	LastMsg   string `json:"lastMsg" gorm:"type:text;comment:最后一条消息"`
 	MessageCount int `json:"messageCount" gorm:"default:0;comment:消息数量"`

@@ -24,13 +24,13 @@ type SysAuthority struct {
 type SysBaseMenu struct {
 	gorm.Model
 	MenuLevel uint                                       `json:"-"`
-	ParentId  string                                     `json:"parentId" gorm:"comment:父菜单ID"`                  // 父菜单ID
+	ParentId  string                                     `json:"parentId" gorm:"index;comment:父菜单ID"`            // 父菜单ID
 	Path      string                                     `json:"path" gorm:"comment:路由path"`                     // 路由path
 	Name      string                                     `json:"name" gorm:"comment:路由name"`                     // 路由name
 	Hidden    bool                                       `json:"hidden" gorm:"comment:是否在列表隐藏"`                  // 是否在列表隐藏
 	Component string                                     `json:"component" gorm:"comment:对应前端文件路径"`              // 对应前端文件路径
 	Sort      int                                        `json:"sort" gorm:"comment:排序标记"`                       // 排序标记
-	Enable    bool                                       `json:"enable" gorm:"default:1;comment:菜单状态，1-启用，0-禁用"` // 菜单状态
+	Enable    bool                                       `json:"enable" gorm:"index;default:1;comment:菜单状态，1-启用，0-禁用"` // 菜单状态
 	Meta      `json:"meta" gorm:"embedded;comment:附加属性"` // 附加属性
 }
 
