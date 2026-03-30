@@ -91,7 +91,13 @@ export default defineConfig(({ mode }: ConfigEnv) => {
           404: path.resolve(__dirname, "./404.html"),
         },
         output: {
-          // 使用 Vite / Rollup 默认的代码分割策略，避免手动分包导致的循环依赖和运行时初始化顺序问题
+          // 手动分包配置：分离重型库以优化首屏加载
+          manualChunks: {
+            "vendor-react": ["react", "react-dom", "react-router-dom"],
+            "vendor-antd": ["antd", "@ant-design/icons"],
+            "vendor-three": ["three", "@react-three/fiber", "@react-three/drei"],
+            "vendor-pdf": ["pdfjs-dist"],
+          },
         },
         // 限制 Rollup 并发文件操作，降低内存峰值
         maxParallelFileOps: 2,
