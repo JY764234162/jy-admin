@@ -31,6 +31,8 @@ mysql:
   engine: 'InnoDB'
   max-idle-conns: 10
   max-open-conns: 100
+  conn-max-lifetime: 3600    # 连接最大生命周期，1小时
+  conn-max-idle-time: 600    # 空闲连接最大存活时间，10分钟
   log-mode: warn
   log-zap: false
   singular: false

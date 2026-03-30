@@ -90,8 +90,28 @@ func InitGorm() *gorm.DB {
 	}
 	sqlDB.SetMaxIdleConns(maxIdleConns)
 	sqlDB.SetMaxOpenConns(maxOpenConns)
-	sqlDB.SetConnMaxLifetime(time.Hour)
-	sqlDB.SetConnMaxIdleTime(10 * time.Minute)
+
+	// 设置连接生命周期
+	var connMaxLifetime time.Duration
+	if dbType == "mysql" {
+		connMaxLifetime = time.Duration(global.JY_Config.Mysql.ConnMaxLifetime) * time.Second
+	} else {
+		connMaxLifetime = time.Duration(global.JY_Config.Sqlite.ConnMaxLifetime) * time.Second
+	}
+	if connMaxLifetime > 0 {
+		sqlDB.SetConnMaxLifetime(connMaxLifetime)
+	}
+
+	// 设置空闲连接最大存活时间
+	var connMaxIdleTime time.Duration
+	if dbType == "mysql" {
+		connMaxIdleTime = time.Duration(global.JY_Config.Mysql.ConnMaxIdleTime) * time.Second
+	} else {
+		connMaxIdleTime = time.Duration(global.JY_Config.Sqlite.ConnMaxIdleTime) * time.Second
+	}
+	if connMaxIdleTime > 0 {
+		sqlDB.SetConnMaxIdleTime(connMaxIdleTime)
+	}
 
 	fmt.Printf("连接数据库成功: %s\n", dsn)
 	return db
