@@ -111,7 +111,7 @@ services:
     cpus: 0.5 # CPU 限制：0.5 核
 
   msfz:
-    build:  
+    build:
       context: ./web
       dockerfile: packages/msfz/Dockerfile
       # 启用构建缓存
@@ -119,11 +119,21 @@ services:
         BUILDKIT_INLINE_CACHE: 1
     container_name: jy-admin-msfz
     restart: always
+    ports:
+      - "8080:80"
     volumes:
       # 证书目录：宿主机 ./certs 挂载到容器 /etc/nginx/certs（勿提交 certs/ 到仓库）
       - ./web/packages/msfz/certs:/etc/nginx/certs:ro
     networks:
       - jy-admin-network
+    mem_limit: 256m
+    cpus: 0.5
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:80/"]
+      interval: 30s
+      timeout: 3s
+      retries: 3
+      start_period: 10s
 
       
 volumes:
