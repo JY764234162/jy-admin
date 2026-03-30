@@ -15,14 +15,15 @@ import (
 	"jiangyi.com/router"
 )
 
-func RunServer(port string, router *gin.Engine, readTimeout, writeTimeout time.Duration) {
+func RunServer(port string, router *gin.Engine, readTimeout, writeTimeout, idleTimeout time.Duration, maxHeaderBytes int) {
 	// 创建服务
 	srv := &http.Server{
 		Addr:           port,
 		Handler:        router,
 		ReadTimeout:    readTimeout,
 		WriteTimeout:   writeTimeout,
-		MaxHeaderBytes: 1 << 20,
+		IdleTimeout:    idleTimeout,
+		MaxHeaderBytes: maxHeaderBytes,
 	}
 
 	// 在goroutine中启动服务
@@ -42,8 +43,8 @@ func RunServer(port string, router *gin.Engine, readTimeout, writeTimeout time.D
 	<-quit
 	log.Println("关闭WEB服务...")
 
-	// 设置5秒的超时时间
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	// 设置优雅关闭超时
+	ctx, cancel := context.WithTimeout(context.Background(), time.Duration(global.JY_Config.System.ShutdownTimeout)*time.Second)
 
 	defer cancel()
 
@@ -63,6 +64,10 @@ func InitServer() {
 	readTimeout := global.JY_Config.System.ReadTimeout
 	//	获取写超时时间
 	writeTimeout := global.JY_Config.System.WriteTimeout
+	//	获取空闲超时时间
+	idleTimeout := global.JY_Config.System.IdleTimeout
+	//	获取最大头字节
+	maxHeaderBytes := global.JY_Config.System.MaxHeaderBytes
 	//	服务启动
 	fmt.Printf(`
 	默认自动化文档地址:http://127.0.0.1%s/swagger/index.html
@@ -71,5 +76,7 @@ func InitServer() {
 	RunServer(
 		address, ginRouter,
 		time.Duration(readTimeout)*time.Second,
-		time.Duration(writeTimeout)*time.Second)
+		time.Duration(writeTimeout)*time.Second,
+		time.Duration(idleTimeout)*time.Second,
+		maxHeaderBytes)
 }

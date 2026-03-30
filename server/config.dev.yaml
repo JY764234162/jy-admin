@@ -12,6 +12,9 @@ system:
   disable-auto-migrate: true        # 生产环境禁用自动迁移
   read-timeout: 300
   write-timeout: 300
+  shutdown-timeout: 10         # 优雅关闭超时（秒）
+  max-header-bytes: 1048576   # 1MB = 1<<20
+  idle-timeout: 90            # keep-alive 空闲超时（秒）
 
 jwt:
   # 通过环境变量 JWT_SIGNING_KEY 设置

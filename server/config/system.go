@@ -14,4 +14,7 @@ type System struct {
 	DisableAutoMigrate bool   `mapstructure:"disable-auto-migrate"`
 	ReadTimeout        int    `mapstructure:"read-timeout"`
 	WriteTimeout       int    `mapstructure:"write-timeout"`
+	ShutdownTimeout    int    `mapstructure:"shutdown-timeout"`
+	MaxHeaderBytes     int    `mapstructure:"max-header-bytes"`
+	IdleTimeout        int    `mapstructure:"idle-timeout"`
 }
