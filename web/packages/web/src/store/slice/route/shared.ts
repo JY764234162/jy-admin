@@ -150,7 +150,9 @@ export const findFullPathByKey = (routes: ElegantConstRoute[], targetKey: string
       // 如果这个路由有子菜单，返回第一个子菜单的路径
       if (route.children && route.children.length > 0) {
         const firstChild = route.children[0];
-        return `${currentPath}/${firstChild.path}`;
+        if (firstChild) {
+          return `${currentPath}/${firstChild.path}`;
+        }
       }
       // 否则返回当前路径
       return currentPath;

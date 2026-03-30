@@ -137,7 +137,7 @@ export const Component = () => {
               beforeUpload={handleImageUpload}
               maxCount={1}
               fileList={imageFile ? [imageFile] : []}
-              onChange={({ fileList }) => setImageFile(fileList[0])}
+              onChange={({ fileList }) => setImageFile(fileList[0] ?? null)}
             >
               <p className="ant-upload-drag-icon">
                 <UploadOutlined />

@@ -67,7 +67,7 @@ export const Component = () => {
     const shuffled = [...deck];
     for (let i = shuffled.length - 1; i > 0; i--) {
       const j = Math.floor(Math.random() * (i + 1));
-      [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
+      [shuffled[i], shuffled[j]] = [shuffled[j]!, shuffled[i]!];
     }
     return shuffled;
   };
@@ -87,7 +87,7 @@ export const Component = () => {
     // 每人发13张牌
     shuffled.forEach((card, index) => {
       const playerIndex = index % 4;
-      newPlayers[playerIndex].cards.push(card);
+      newPlayers[playerIndex]!.cards.push(card);
     });
 
     // 按点数排序：3-K、A、2
@@ -226,7 +226,7 @@ export const Component = () => {
     // 恢复上次选中的牌（如果存在），并验证有效性
     const validLastSelected: PlayerCardsMap = { 1: [], 2: [], 3: [], 4: [] };
     for (let i = 1; i <= 4; i++) {
-      validLastSelected[i] = lastPlayerSelectedCards[i].filter((savedCard) =>
+      validLastSelected[i] = lastPlayerSelectedCards[i]!.filter((savedCard) =>
         sortedDeck.find((card) => card.id === savedCard.id)
       );
     }
@@ -243,7 +243,7 @@ export const Component = () => {
 
   // 切换牌的选中状态
   const toggleCardSelection = (card: Card) => {
-    const currentPlayerCards = playerSelectedCards[selectingPlayer];
+    const currentPlayerCards = playerSelectedCards[selectingPlayer]!;
     const allSelectedCards = getAllSelectedCards();
 
     // 检查当前玩家是否已选中此牌
@@ -264,7 +264,7 @@ export const Component = () => {
     }
 
     setPlayerSelectedCards((prev) => {
-      const playerCards = prev[selectingPlayer];
+      const playerCards = prev[selectingPlayer]!;
       const exists = playerCards.find((c) => c.id === card.id);
       if (exists) {
         return {
@@ -292,10 +292,10 @@ export const Component = () => {
 
     // 创建玩家
     const newPlayers: Player[] = [
-      { id: 1, name: "玩家1", cards: [...playerSelectedCards[1]], position: "bottom" },
-      { id: 2, name: "玩家2", cards: [...playerSelectedCards[2]], position: "right" },
-      { id: 3, name: "玩家3", cards: [...playerSelectedCards[3]], position: "top" },
-      { id: 4, name: "玩家4", cards: [...playerSelectedCards[4]], position: "left" },
+      { id: 1, name: "玩家1", cards: [...playerSelectedCards[1]!], position: "bottom" },
+      { id: 2, name: "玩家2", cards: [...playerSelectedCards[2]!], position: "right" },
+      { id: 3, name: "玩家3", cards: [...playerSelectedCards[3]!], position: "top" },
+      { id: 4, name: "玩家4", cards: [...playerSelectedCards[4]!], position: "left" },
     ];
 
     // 找出需要补牌的玩家（手牌不足13张的）
@@ -306,7 +306,7 @@ export const Component = () => {
     while (cardIndex < shuffled.length) {
       for (const player of playersNeedCards) {
         if (player.cards.length < 13 && cardIndex < shuffled.length) {
-          player.cards.push(shuffled[cardIndex]);
+          player.cards.push(shuffled[cardIndex]!);
           cardIndex++;
         }
       }
@@ -369,10 +369,10 @@ export const Component = () => {
 
     // 创建玩家，使用上次选中的牌
     const newPlayers: Player[] = [
-      { id: 1, name: "玩家1", cards: [...lastPlayerSelectedCards[1]], position: "bottom" },
-      { id: 2, name: "玩家2", cards: [...lastPlayerSelectedCards[2]], position: "right" },
-      { id: 3, name: "玩家3", cards: [...lastPlayerSelectedCards[3]], position: "top" },
-      { id: 4, name: "玩家4", cards: [...lastPlayerSelectedCards[4]], position: "left" },
+      { id: 1, name: "玩家1", cards: [...lastPlayerSelectedCards[1]!], position: "bottom" },
+      { id: 2, name: "玩家2", cards: [...lastPlayerSelectedCards[2]!], position: "right" },
+      { id: 3, name: "玩家3", cards: [...lastPlayerSelectedCards[3]!], position: "top" },
+      { id: 4, name: "玩家4", cards: [...lastPlayerSelectedCards[4]!], position: "left" },
     ];
 
     // 找出需要补牌的玩家（手牌不足13张的）
@@ -383,7 +383,7 @@ export const Component = () => {
     while (cardIndex < shuffled.length) {
       for (const player of playersNeedCards) {
         if (player.cards.length < 13 && cardIndex < shuffled.length) {
-          player.cards.push(shuffled[cardIndex]);
+          player.cards.push(shuffled[cardIndex]!);
           cardIndex++;
         }
       }
@@ -618,14 +618,14 @@ const CardSelectorModal: React.FC<CardSelectorModalProps> = ({
   // 获取所有已选的牌
   const allSelectedCards = Object.values(playerSelectedCards).flat();
   // 当前玩家选中的牌
-  const currentPlayerCards = playerSelectedCards[selectingPlayer];
+  const currentPlayerCards = playerSelectedCards[selectingPlayer]!;
   // 总已选牌数
   const totalSelected = allSelectedCards.length;
 
   // 检查牌被哪个玩家选中
   const getCardOwner = (card: Card): number | null => {
     for (let i = 1; i <= 4; i++) {
-      if (playerSelectedCards[i].find((c) => c.id === card.id)) {
+      if (playerSelectedCards[i]!.find((c) => c.id === card.id)) {
         return i;
       }
     }
@@ -649,7 +649,7 @@ const CardSelectorModal: React.FC<CardSelectorModalProps> = ({
               onClick={() => onSelectingPlayerChange(playerId)}
             >
               玩家{playerId}
-              <span className="tab-count">({playerSelectedCards[playerId].length}/13)</span>
+              <span className="tab-count">({playerSelectedCards[playerId]!.length}/13)</span>
             </button>
           ))}
         </div>
@@ -658,12 +658,12 @@ const CardSelectorModal: React.FC<CardSelectorModalProps> = ({
         <div className="players-cards-preview">
           {[1, 2, 3, 4].map((playerId) => (
             <div key={playerId} className={`player-preview ${selectingPlayer === playerId ? "active" : ""}`}>
-              <div className="preview-label">玩家{playerId}: {playerSelectedCards[playerId].length}张</div>
+              <div className="preview-label">玩家{playerId}: {playerSelectedCards[playerId]!.length}张</div>
               <div className="preview-cards">
-                {playerSelectedCards[playerId].length === 0 ? (
+                {playerSelectedCards[playerId]!.length === 0 ? (
                   <span className="no-cards">未选牌</span>
                 ) : (
-                  playerSelectedCards[playerId].map((card) => {
+                  playerSelectedCards[playerId]!.map((card) => {
                     const isRed = card.suit === "♥" || card.suit === "♦";
                     return (
                       <span key={card.id} className={`preview-card ${isRed ? "red" : "black"}`}>

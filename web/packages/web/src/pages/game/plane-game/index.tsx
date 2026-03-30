@@ -207,21 +207,25 @@ export const Component = () => {
     const enemies = enemiesRef.current;
 
     for (let i = bullets.length - 1; i >= 0; i--) {
-      bullets[i].y -= bullets[i].speed;
-      
+      const bullet = bullets[i];
+      if (!bullet) continue;
+      bullet.y -= bullet.speed;
+
       // 移除超出屏幕的子弹
-      if (bullets[i].y < 0) {
+      if (bullet.y < 0) {
         bullets.splice(i, 1);
         continue;
       }
 
       // 检测子弹与敌机的碰撞
       for (let j = enemies.length - 1; j >= 0; j--) {
-        if (checkCollision(bullets[i], enemies[j])) {
+        const enemy = enemies[j];
+        if (!enemy) continue;
+        if (checkCollision(bullet, enemy)) {
           createParticles(
-            enemies[j].x + enemies[j].width / 2,
-            enemies[j].y + enemies[j].height / 2,
-            enemies[j].color
+            enemy.x + enemy.width / 2,
+            enemy.y + enemy.height / 2,
+            enemy.color
           );
           gameStateRef.current.score += 10;
           if (scoreRef.current) {
@@ -241,21 +245,23 @@ export const Component = () => {
     const player = playerRef.current;
 
     for (let i = enemies.length - 1; i >= 0; i--) {
-      enemies[i].y += enemies[i].speed;
+      const enemy = enemies[i];
+      if (!enemy) continue;
+      enemy.y += enemy.speed;
 
       // 检测敌机与玩家的碰撞
-      if (checkCollision(enemies[i], player)) {
+      if (checkCollision(enemy, player)) {
         createParticles(player.x, player.y, player.color);
         gameStateRef.current.lives--;
         if (livesRef.current) {
           livesRef.current.textContent = String(gameStateRef.current.lives);
         }
         enemies.splice(i, 1);
-        
+
         if (gameStateRef.current.lives <= 0) {
           gameStateRef.current.gameOver = true;
           if (gameOverRef.current) {
-            gameOverRef.current.classList.remove(styles.gameOverHidden);
+            gameOverRef.current.classList.remove(styles.gameOverHidden!);
           }
           if (finalScoreRef.current) {
             finalScoreRef.current.textContent = String(gameStateRef.current.score);
@@ -265,7 +271,7 @@ export const Component = () => {
       }
 
       // 移除超出屏幕的敌机
-      if (enemies[i] && enemies[i].y > CANVAS_HEIGHT) {
+      if (enemy.y > CANVAS_HEIGHT) {
         enemies.splice(i, 1);
       }
     }
@@ -276,11 +282,13 @@ export const Component = () => {
     const particles = particlesRef.current;
 
     for (let i = particles.length - 1; i >= 0; i--) {
-      particles[i].x += particles[i].vx;
-      particles[i].y += particles[i].vy;
-      particles[i].life--;
+      const particle = particles[i];
+      if (!particle) continue;
+      particle.x += particle.vx;
+      particle.y += particle.vy;
+      particle.life--;
 
-      if (particles[i].life <= 0) {
+      if (particle.life <= 0) {
         particles.splice(i, 1);
       }
     }
@@ -464,7 +472,7 @@ export const Component = () => {
       livesRef.current.textContent = '3';
     }
     if (gameOverRef.current) {
-      gameOverRef.current.classList.add(styles.gameOverHidden);
+      gameOverRef.current.classList.add(styles.gameOverHidden!);
     }
   }, []);
 
@@ -472,6 +480,7 @@ export const Component = () => {
   const handleTouchStart = useCallback((e: React.TouchEvent<HTMLCanvasElement>) => {
     e.preventDefault();
     const touch = e.touches[0];
+    if (!touch) return;
     const canvas = canvasRef.current;
     if (!canvas) return;
 
@@ -488,6 +497,7 @@ export const Component = () => {
   const handleTouchMove = useCallback((e: React.TouchEvent<HTMLCanvasElement>) => {
     e.preventDefault();
     const touch = e.touches[0];
+    if (!touch) return;
     const canvas = canvasRef.current;
     if (!canvas || !touchStartRef.current) return;
 
@@ -582,7 +592,7 @@ export const Component = () => {
           <div>分数: <span ref={scoreRef}>0</span></div>
           <div>生命: <span ref={livesRef}>3</span></div>
         </div>
-        <div ref={gameOverRef} className={`${styles.gameOver} ${styles.gameOverHidden}`}>
+        <div ref={gameOverRef} className={`${styles.gameOver} ${styles.gameOverHidden!}`}>
           <h2 className={styles.gameOverTitle}>游戏结束</h2>
           <p className={styles.finalScore}>最终分数: <span ref={finalScoreRef}>0</span></p>
           <button className={styles.restartBtn} onClick={restartGame}>重新开始</button>

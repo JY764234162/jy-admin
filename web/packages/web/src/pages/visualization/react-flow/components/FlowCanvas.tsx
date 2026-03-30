@@ -116,7 +116,7 @@ export const FlowCanvas = () => {
         type: "custom",
         position,
         data: {
-          label: nodeTypes[type as keyof typeof nodeTypes].label,
+          label: nodeTypes[type as keyof typeof nodeTypes]!.label,
           nodeType: type,
           onNodeClick: handleNodeClick,
           description: '',
@@ -252,6 +252,7 @@ export const FlowCanvas = () => {
     // 依次执行每个节点
     for (let i = 0; i < executionOrder.length; i++) {
       const node = executionOrder[i];
+      if (!node) continue;
 
       // 更新节点状态为执行中
       setNodes((nds) =>
@@ -270,7 +271,7 @@ export const FlowCanvas = () => {
       );
 
       // 执行节点（流式模拟）
-      const stream = mockExecuteNode(node);
+      const stream = mockExecuteNode(executionOrder[i]!);
       const reader = stream.getReader();
       const decoder = new TextDecoder();
 
@@ -282,7 +283,7 @@ export const FlowCanvas = () => {
               // 执行完成，更新状态
               setNodes((nds) =>
                 nds.map((n) => {
-                  if (n.id === node.id) {
+                  if (n.id === executionOrder[i]!.id) {
                     return {
                       ...n,
                       data: {
@@ -306,7 +307,7 @@ export const FlowCanvas = () => {
                 try {
                   const data = JSON.parse(line.slice(6));
                   // 可以在这里处理进度更新
-                  console.log(`Node ${node.id} progress: ${data.progress}%`);
+                  console.log(`Node ${executionOrder[i]!.id} progress: ${data.progress}%`);
                 } catch (e) {
                   // 忽略解析错误
                 }

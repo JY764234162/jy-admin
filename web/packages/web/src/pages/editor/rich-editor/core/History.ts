@@ -44,7 +44,7 @@ export class CommandHistory {
     // 如果内容与上一个快照相同，不记录
     if (this.undoStack.length > 0) {
       const lastSnapshot = this.undoStack[this.undoStack.length - 1];
-      if (lastSnapshot.content === content) {
+      if (lastSnapshot && lastSnapshot.content === content) {
         return;
       }
     }
@@ -105,7 +105,7 @@ export class CommandHistory {
     // 需要弹出当前状态，恢复到上一个状态
     if (this.undoStack.length > 0) {
       const topSnapshot = this.undoStack[this.undoStack.length - 1];
-      if (topSnapshot.content === currentContent) {
+      if (topSnapshot && topSnapshot.content === currentContent) {
         // 弹出当前状态
         const currentSnapshot = this.undoStack.pop()!;
         this.redoStack.push(currentSnapshot);
@@ -113,7 +113,9 @@ export class CommandHistory {
         // 如果还有上一个状态，恢复它
         if (this.undoStack.length > 0) {
           const prevSnapshot = this.undoStack[this.undoStack.length - 1];
-          this.restoreSnapshot(prevSnapshot);
+          if (prevSnapshot) {
+            this.restoreSnapshot(prevSnapshot);
+          }
           return true;
         } else {
           // 没有更早的状态了，恢复当前状态
@@ -125,14 +127,16 @@ export class CommandHistory {
         // 当前内容不在栈中（可能刚修改还未保存）
         // 直接恢复到栈顶状态
         const targetSnapshot = this.undoStack[this.undoStack.length - 1];
-        
+
         // 保存当前内容到 redo 栈
         this.redoStack.push({
           content: currentContent,
           timestamp: Date.now(),
         });
-        
-        this.restoreSnapshot(targetSnapshot);
+
+        if (targetSnapshot) {
+          this.restoreSnapshot(targetSnapshot);
+        }
         return true;
       }
     }
@@ -229,7 +233,7 @@ export class CommandHistory {
           currentOffset += textLength;
         } else {
           for (let i = 0; i < node.childNodes.length; i++) {
-            if (walkNodes(node.childNodes[i])) {
+            if (walkNodes(node.childNodes[i]!)) {
               return true;
             }
           }

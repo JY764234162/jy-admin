@@ -319,7 +319,7 @@ export const Component = () => {
         const sourceData = audioBuffer.getChannelData(channel);
         const targetData = newBuffer.getChannelData(channel);
         for (let i = 0; i < length; i++) {
-          targetData[i] = sourceData[startSample + i];
+          targetData[i] = sourceData[startSample + i]!;
         }
       }
 
@@ -374,7 +374,7 @@ export const Component = () => {
       const convertTo16BitPCM = (input: Float32Array): Int16Array => {
         const output = new Int16Array(input.length);
         for (let i = 0; i < input.length; i++) {
-          const s = Math.max(-1, Math.min(1, input[i]));
+          const s = Math.max(-1, Math.min(1, input[i]!));
           output[i] = s < 0 ? s * 0x8000 : s * 0x7fff;
         }
         return output;
@@ -491,7 +491,7 @@ export const Component = () => {
     let offset = 44;
     for (let i = 0; i < buffer.length; i++) {
       for (let channel = 0; channel < numberOfChannels; channel++) {
-        const sample = Math.max(-1, Math.min(1, buffer.getChannelData(channel)[i]));
+        const sample = Math.max(-1, Math.min(1, buffer.getChannelData(channel)[i]!));
         view.setInt16(offset, sample < 0 ? sample * 0x8000 : sample * 0x7fff, true);
         offset += 2;
       }

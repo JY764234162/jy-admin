@@ -27,7 +27,7 @@ const LazyImage = ({
     observerRef.current = new IntersectionObserver(
       ([entry]) => {
         // 只在未加载且变为可见时触发一次
-        if (!isLoaded && entry.isIntersecting) {
+        if (!isLoaded && entry?.isIntersecting) {
           setIsVisible(true);
           // 一旦触发加载，立即停止观察
           if (imgRef.current && observerRef.current) {

@@ -244,6 +244,7 @@ class AhoCorasick {
 
     for (let i = 0; i < processedText.length; i++) {
       const char = processedText[i];
+      if (!char) break;
       while (node && !node.children.has(char)) {
         node = node.fail!;
       }

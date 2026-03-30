@@ -149,13 +149,13 @@ const CronContent: React.FC<{
   const initData = () => {
     // 初始化数据
     const [second, minute, hour, day, month, week, year] = value!.split(" ");
-    setSecond(secondReg.test(second) ? second : "*");
-    setMinute(minuteReg.test(minute) ? minute : "*");
-    setHour(hourReg.test(hour) ? hour : "*");
-    setDay(dayReg.test(day) ? day : "*");
-    setMonth(monthReg.test(month) ? month : "*");
-    setWeek(weekReg.test(week) ? week : "?");
-    setYear(yearReg.test(year) ? year : "*");
+    setSecond(secondReg.test(second!) ? second! : "*");
+    setMinute(minuteReg.test(minute!) ? minute! : "*");
+    setHour(hourReg.test(hour!) ? hour! : "*");
+    setDay(dayReg.test(day!) ? day! : "*");
+    setMonth(monthReg.test(month!) ? month! : "*");
+    setWeek(weekReg.test(week!) ? week! : "?");
+    setYear(yearReg.test(year!) ? year! : "*");
     setCronText(
       `${second} ${minute} ${hour} ${day} ${month} ${week}${noYear ? "" : ` ${year}`}`
     );

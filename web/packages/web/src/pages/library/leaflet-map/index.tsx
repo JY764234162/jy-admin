@@ -55,7 +55,7 @@ export const Component = () => {
   const mapRef = useRef<L.Map | null>(null);
   const mapContainerRef = useRef<HTMLDivElement>(null);
   const [selectedLocation, setSelectedLocation] = useState("北京");
-  const [mapStyle, setMapStyle] = useState(mapStyles[0].url);
+  const [mapStyle, setMapStyle] = useState(mapStyles[0]!.url);
   const [zoomLevel, setZoomLevel] = useState(10);
   const [markers, setMarkers] = useState<L.Marker[]>([]);
   const [polyline, setPolyline] = useState<L.Polyline | null>(null);

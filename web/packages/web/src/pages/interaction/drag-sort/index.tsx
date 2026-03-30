@@ -45,6 +45,7 @@ export const Component = () => {
       setItems((prevItems) => {
         const newItems = [...prevItems];
         const [draggedItem] = newItems.splice(dragIndex, 1);
+        if (!draggedItem) return newItems;
         newItems.splice(targetIndex, 0, draggedItem);
         return newItems;
       });

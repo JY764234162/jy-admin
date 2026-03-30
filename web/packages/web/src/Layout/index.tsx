@@ -38,7 +38,10 @@ export const Layout: React.FC = memo(() => {
 
   //初始化路由
   useMount(() => {
-    router.navigate(router.state.matches[0].pathname);
+    const firstMatch = router.state.matches[0];
+    if (firstMatch) {
+      router.navigate(firstMatch.pathname);
+    }
   });
 
   useUpdateEffect(() => {

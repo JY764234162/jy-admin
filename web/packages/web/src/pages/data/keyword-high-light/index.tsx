@@ -41,7 +41,7 @@ const HighLight: FC<HighLightProps> = ({ words, text }) => {
   const render = useMemo(() => {
     return offWords.map((item, index) => {
       if (item.highlight) {
-        const type = KEYWORD_TYPES.find((t) => t.value === item.meta?.type) || KEYWORD_TYPES[4];
+        const type = KEYWORD_TYPES.find((t) => t.value === item.meta?.type) || KEYWORD_TYPES[4]!;
         return (
           <Tooltip key={index} title={`类型：${type.label}`} mouseEnterDelay={0.5}>
             <span
@@ -83,7 +83,7 @@ export const Component = () => {
     { keyword: "nature", keywordTag: "456", type: "organization" },
   ]);
   const [text, setText] = React.useState("www.nature.com/scientificreports");
-  const [selectedType, setSelectedType] = React.useState<string>(KEYWORD_TYPES[0].value);
+  const [selectedType, setSelectedType] = React.useState<string>(KEYWORD_TYPES[0]!.value);
 
   return (
     <div style={{ maxWidth: "800px", margin: "0 auto", padding: "20px" }}>
@@ -128,7 +128,7 @@ export const Component = () => {
               <Text strong>当前关键词：</Text>
               <div style={{ marginBottom: 16 }}>
                 {keywords.map((item, index) => {
-                  const type = KEYWORD_TYPES.find((t) => t.value === item.type) || KEYWORD_TYPES[4];
+                  const type = KEYWORD_TYPES.find((t) => t.value === item.type) || KEYWORD_TYPES[4]!;
                   return (
                     <span
                       key={item.keywordTag}

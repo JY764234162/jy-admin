@@ -100,6 +100,7 @@ export const Component = () => {
 
     for (let i = 0; i < files.length; i++) {
       const file = files[i];
+      if (!file) continue;
       await handleUpload(file);
     }
 
@@ -117,6 +118,7 @@ export const Component = () => {
     // 处理文件夹中的文件
     for (let i = 0; i < files.length; i++) {
       const file = files[i];
+      if (!file) continue;
       // 从完整路径中提取相对路径
       const path = file.webkitRelativePath.split("/").slice(0, -1).join("/");
       await handleUpload(file, path);
@@ -169,6 +171,7 @@ export const Component = () => {
 
     for (let i = 0; i < items.length; i++) {
       const item = items[i];
+      if (!item) continue;
       const entry = item.webkitGetAsEntry();
       if (entry) {
         await processDirectory(entry);

@@ -64,7 +64,7 @@ export function useAIChat(options: UseAIChatOptions = {}) {
         const sessionList = res.data.list || [];
         setSessions(sessionList);
         if (sessionList.length > 0) {
-          setActiveKey((prev) => prev || sessionList[0].ID.toString());
+          setActiveKey((prev) => prev || (sessionList[0]?.ID.toString() ?? ""));
         }
       }
     } catch (error) {
@@ -171,7 +171,7 @@ export function useAIChat(options: UseAIChatOptions = {}) {
           setActiveKey((prev) => {
             if (prev !== key) return prev;
             const remaining = (sessionsRef.current || []).filter((s) => s.ID !== conversationId);
-            return remaining.length > 0 ? remaining[0].ID.toString() : "";
+            return remaining.length > 0 ? remaining[0]?.ID.toString() ?? "" : "";
           });
           antdMessage.success("删除成功");
         } else {
@@ -313,7 +313,9 @@ export function useAIChat(options: UseAIChatOptions = {}) {
         const next = current.slice();
         const status: UiMessage["status"] =
           snap.status === "error" ? "error" : snap.status === "done" ? "success" : "loading";
-        next[idx] = { ...next[idx], content: snap.fullText, status };
+        const existingMsg = next[idx];
+        if (!existingMsg) return prev;
+        next[idx] = { ...existingMsg, content: snap.fullText, status };
         return { ...prev, [activeKey]: next };
       });
 

@@ -187,7 +187,7 @@ export class RichEditor {
         const item = items[i];
         
         // 检查是否是图片类型
-        if (item.type.indexOf("image") !== -1) {
+        if (item && item.type.indexOf("image") !== -1) {
           const file = item.getAsFile();
           if (file) {
             // 粘贴图片（历史记录由 insertImage 方法内部处理）
@@ -203,7 +203,7 @@ export class RichEditor {
     if (files && files.length > 0) {
       for (let i = 0; i < files.length; i++) {
         const file = files[i];
-        if (file.type.startsWith("image/")) {
+        if (file && file.type.startsWith("image/")) {
           // 粘贴图片（历史记录由 insertImage 方法内部处理）
           this.insertImageFromFile(file);
           return;
@@ -330,11 +330,12 @@ export class RichEditor {
       if (x >= rect.left && x <= rect.right && y >= rect.top && y <= rect.bottom) {
         for (let i = 0; i < el.childNodes.length; i++) {
           const child = el.childNodes[i];
-          const childRect = child.nodeType === Node.ELEMENT_NODE 
+          if (!child) continue;
+          const childRect = child.nodeType === Node.ELEMENT_NODE
             ? (child as HTMLElement).getBoundingClientRect()
             : this.getTextNodeRect(child as Text);
-          
-          if (x >= childRect.left && x <= childRect.right && 
+
+          if (x >= childRect.left && x <= childRect.right &&
               y >= childRect.top && y <= childRect.bottom) {
             const found = this.findNearestTextNode(child, x, y);
             if (found) return found;
@@ -383,7 +384,7 @@ export class RichEditor {
     this.handleDragOver(e);
 
     const file = files[0];
-    if (file.type.startsWith("image/")) {
+    if (file && file.type.startsWith("image/")) {
       this.insertImageFromFile(file);
     }
   }

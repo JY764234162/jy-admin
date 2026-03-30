@@ -31,8 +31,8 @@ function createPixelArray(
     const a = imgData[offset + 3];
 
     // If pixel is mostly opaque and not white
-    if (typeof a === 'undefined' || a >= 125) {
-      if (!(r > 250 && g > 250 && b > 250)) {
+    if (typeof a === 'undefined' || (a !== undefined && a >= 125)) {
+      if (r !== undefined && g !== undefined && b !== undefined && !(r > 250 && g > 250 && b > 250)) {
         pixelArray.push([r, g, b]);
       }
     }
@@ -99,7 +99,7 @@ const MMCQ = (() => {
     peek(index?: number): T {
       if (!this.sorted) this.sort();
       if (index === undefined) index = this.contents.length - 1;
-      return this.contents[index];
+      return this.contents[index]!;
     }
 
     pop(): T | undefined {
@@ -546,7 +546,7 @@ export class ColorThief {
    */
   getColor(sourceImage: HTMLImageElement, quality = 10): ColorTuple {
     const palette = this.getPalette(sourceImage, 5, quality);
-    return palette[0];
+    return palette[0] ?? [0, 0, 0];
   }
 
   /**
@@ -584,7 +584,7 @@ export class ColorThief {
 
     sourceImage.addEventListener('load', () => {
       const palette = this.getPalette(sourceImage, 5, quality);
-      callback(palette[0], imageUrl);
+      callback(palette[0] ?? [0, 0, 0], imageUrl);
     });
     sourceImage.crossOrigin = 'anonymous';
     sourceImage.src = imageUrl;
@@ -625,7 +625,7 @@ export class ColorThief {
       const sourceImage = document.createElement('img');
       sourceImage.addEventListener('load', function () {
         const palette = new ColorThief().getPalette(sourceImage, 5, quality);
-        callback(palette[0], sourceImage);
+        callback(palette[0] ?? [0, 0, 0], sourceImage);
       });
       sourceImage.src = imageData;
     });

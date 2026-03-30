@@ -59,7 +59,7 @@ const ExecutingTimePicker: React.FC<{
   const [cycleStart, setCycleStart] = useState<number>(typeInfo[type].min); // 周期开始时间
   const [cycleEnd, setCycleEnd] = useState<number>(typeInfo[type].min); // 周期结束时间
   const [selectTime, setSelectTime] = useState<number[]>([
-    typeInfo[type].options[0].value,
+    typeInfo[type].options[0]!.value,
   ]);
   const Language = useLanguage(language);
 
@@ -89,9 +89,9 @@ const ExecutingTimePicker: React.FC<{
   const handleChange = (date: any, dateString: string | string[]) => {
     const dateArr = String(dateString).split(":"); // [hour, minutes, second]
     onChange(
-      dateArr[0],
-      dateArr[1],
-      dateArr[2]
+      dateArr[0]!,
+      dateArr[1]!,
+      dateArr[2]!
       // String(Number(dateArr[0])),
       // String(Number(dateArr[1])),
       // String(Number(dateArr[2]))

@@ -81,8 +81,9 @@ export const parseParameters = (
     (acc, value) => {
       if (!value) return acc;
       const [name, data] = value.split(eq).map((s) => s.trim());
+      if (!name) return acc;
       // 不支持数组、对象
-      acc[camelCase(name)] = data;
+      acc[camelCase(name)] = data ?? "";
       return acc;
     },
     {} as Record<string, string>

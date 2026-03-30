@@ -17,15 +17,15 @@ const DayCron: React.FC<{
   const [circleTime, setCircleTime] = useState<number>(1); // 循环时间大小     5
   const [cycleStart, setCycleStart] = useState<number>(1); // 周期开始时间   6
   const [cycleEnd, setCycleEnd] = useState<number>(1); // 周期结束时间       6
-  const [startWeek, setStartWeek] = useState<number>(Language.Week[0].value); // 开始的星期   7
+  const [startWeek, setStartWeek] = useState<number>(Language.Week[0]!.value); // 开始的星期   7
   const [spaceDay, setSpaceDay] = useState<number>(1); // 开始的星期相隔天数              7
   const [selectDayList, setSelectDayList] = useState<number[]>([1]); // 具体的哪天    8
   const [selectWeekList, setSelectWeekList] = useState<string[]>([
-    Language.Week[0].name,
+    Language.Week[0]!.name,
   ]); // 具体的哪星期    9
-  const [lastWeek, setLastWeek] = useState<number>(Language.Week[0].value); // 最后一个星期几   10
+  const [lastWeek, setLastWeek] = useState<number>(Language.Week[0]!.value); // 最后一个星期几   10
   const [conunt, setConunt] = useState<number>(1); // 这个月第几周         11
-  const [conWeek, setConWeek] = useState<number>(Language.Week[0].value); // 这个月第几周星期几   11
+  const [conWeek, setConWeek] = useState<number>(Language.Week[0]!.value); // 这个月第几周星期几   11
 
   useEffect(() => {
     // 回显数据
@@ -49,13 +49,13 @@ const DayCron: React.FC<{
       } else if (day.indexOf("/") !== -1) {
         setSelectRadio(5);
         const [start, end] = day.split("/");
-        setCircleStart(parseInt(start));
-        setCircleTime(parseInt(end));
+        setCircleStart(parseInt(start!));
+        setCircleTime(parseInt(end!));
       } else if (day.indexOf("-") !== -1) {
         setSelectRadio(6);
         const [start, end] = day.split("-");
-        setCycleStart(parseInt(start));
-        setCycleEnd(parseInt(end));
+        setCycleStart(parseInt(start!));
+        setCycleEnd(parseInt(end!));
       } else {
         setSelectRadio(8);
         setSelectDayList(day.split(",").map((item) => parseInt(item)));
@@ -64,8 +64,8 @@ const DayCron: React.FC<{
       if (week.indexOf("/") !== -1) {
         setSelectRadio(7);
         const [start, end] = week.split("/");
-        setStartWeek(parseInt(start));
-        setSpaceDay(parseInt(end));
+        setStartWeek(parseInt(start!));
+        setSpaceDay(parseInt(end!));
       } else if (week.indexOf("L") !== -1) {
         // 只会是 ?L的情况了 所有可以直接截取
         setSelectRadio(10);
@@ -73,8 +73,8 @@ const DayCron: React.FC<{
       } else if (week.indexOf("#") !== -1) {
         setSelectRadio(11);
         const [start, end] = week.split("#");
-        setConWeek(parseInt(start));
-        setConunt(parseInt(end));
+        setConWeek(parseInt(start!));
+        setConunt(parseInt(end!));
       } else {
         setSelectRadio(9);
         setSelectWeekList(week.split(",").map((item) => item));

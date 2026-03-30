@@ -54,7 +54,7 @@ const TimeSelect: React.FC<{
   const [cycleStart, setCycleStart] = useState<number>(typeInfo[type].min); // 周期开始时间
   const [cycleEnd, setCycleEnd] = useState<number>(typeInfo[type].min); // 周期结束时间
   const [selectTime, setSelectTime] = useState<number[]>([
-    typeInfo[type].options[0].value,
+    typeInfo[type].options[0]!.value,
   ]);
   const Language = useLanguage(language);
 
@@ -65,13 +65,13 @@ const TimeSelect: React.FC<{
     } else if (value.indexOf("/") > -1) {
       setSelectRadio(1);
       const [start, end] = value.split("/");
-      setCircleStart(parseInt(start));
-      setCircleTime(parseInt(end));
+      setCircleStart(parseInt(start!));
+      setCircleTime(parseInt(end!));
     } else if (value.indexOf("-") > -1) {
       setSelectRadio(2);
       const [start, end] = value.split("-");
-      setCycleStart(parseInt(start));
-      setCycleEnd(parseInt(end));
+      setCycleStart(parseInt(start!));
+      setCycleEnd(parseInt(end!));
     } else {
       setSelectRadio(3);
       setSelectTime(value.split(",").map((item) => parseInt(item)));

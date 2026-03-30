@@ -77,7 +77,7 @@ export const Component = () => {
     for (let i = 0; i < data.length; i += 4 * step) {
       const rgb = `${data[i]},${data[i + 1]},${data[i + 2]}`;
       colorCount[rgb] = (colorCount[rgb] || 0) + 1;
-      if (!dominantColor || colorCount[rgb] > colorCount[dominantColor]) {
+      if (!dominantColor || (colorCount[rgb] ?? 0) > (colorCount[dominantColor] ?? 0)) {
         dominantColor = rgb;
       }
     }
@@ -139,7 +139,7 @@ export const Component = () => {
 
   const getHighContrastColor = (dominantColor: string): string => {
     const rgb = dominantColor.split(",").map(Number);
-    const brightness = rgb[0] * 0.299 + rgb[1] * 0.587 + rgb[2] * 0.114;
+    const brightness = (rgb[0] ?? 0) * 0.299 + (rgb[1] ?? 0) * 0.587 + (rgb[2] ?? 0) * 0.114;
     return brightness > 186 ? "rgba(0, 0, 0, 0.3)" : "rgba(255, 255, 255, 0.3)";
   };
 
@@ -213,7 +213,7 @@ export const Component = () => {
               beforeUpload={handleImageUpload}
               maxCount={1}
               fileList={imageFile ? [imageFile] : []}
-              onChange={({ fileList }) => setImageFile(fileList[0])}
+              onChange={({ fileList }) => setImageFile(fileList[0] ?? null)}
             >
               <p className="ant-upload-drag-icon">
                 <UploadOutlined />

@@ -158,9 +158,9 @@ export const Component = () => {
     for (let y = startY; y < endY; y++) {
       for (let x = startX; x < endX; x++) {
         const index = (y * width + x) * 4;
-        r += imageData.data[index];
-        g += imageData.data[index + 1];
-        b += imageData.data[index + 2];
+        r += imageData.data[index]!;
+        g += imageData.data[index + 1]!;
+        b += imageData.data[index + 2]!;
         count++;
       }
     }
@@ -233,7 +233,7 @@ export const Component = () => {
               beforeUpload={handleImageUpload}
               maxCount={1}
               fileList={imageFile ? [imageFile] : []}
-              onChange={({ fileList }) => setImageFile(fileList[0])}
+              onChange={({ fileList }) => setImageFile(fileList[0] ?? null)}
             >
               <p className="ant-upload-drag-icon">
                 <UploadOutlined />

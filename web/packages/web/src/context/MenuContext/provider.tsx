@@ -18,7 +18,8 @@ export const MenuContextProvider = memo(({ children }: { children: ReactNode }) 
   const allRoutes = useSelector(routesSlice.selectors.getAllRoute);
 
   const selectedKeys = useMemo(() => {
-    return router.state.matches[router.state.matches.length - 1].pathname.split("/").filter(Boolean);
+    const lastMatch = router.state.matches[router.state.matches.length - 1];
+    return lastMatch?.pathname.split("/").filter(Boolean) ?? [];
   }, [router.state.matches]);
 
   const items = useMemo(() => {
@@ -51,7 +52,7 @@ export const MenuContextProvider = memo(({ children }: { children: ReactNode }) 
   const onMenuOpenChange = useCallback(
     (openKeys: string[]) => {
       if (isOnlyExpandCurrentParentMenu && settings.layout.mode === "vertical") {
-        setOpenKeys([openKeys[openKeys.length - 1]]);
+        setOpenKeys([openKeys[openKeys.length - 1] ?? ""]);
       } else {
         setOpenKeys(openKeys);
       }
