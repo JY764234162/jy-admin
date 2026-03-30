@@ -44,8 +44,9 @@ jobs:
           script: |
             set -euo pipefail
 
-            printenv
-            
+            echo "Deploying to ${{ secrets.SERVER_USER }}@${{ secrets.SERVER_HOST }}:${{ secrets.SERVER_PORT }}"
+            echo "Server path: ${{ secrets.SERVER_PATH }}"
+
             cd "${{ secrets.SERVER_PATH }}"
 
             # 拉取最新代码（已设置 upstream 时可直接 git pull）
