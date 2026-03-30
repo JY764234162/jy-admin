@@ -3,6 +3,7 @@ package core
 import (
 	"fmt"
 	"os"
+	"time"
 
 	"gorm.io/driver/mysql"
 	"gorm.io/driver/sqlite"
@@ -58,6 +59,7 @@ func InitGorm() *gorm.DB {
 			SingularTable: singular,
 		},
 		DisableForeignKeyConstraintWhenMigrating: true,
+		PrepareStmt: true,
 	}
 
 	// 连接数据库
@@ -84,6 +86,8 @@ func InitGorm() *gorm.DB {
 	sqlDB, _ := db.DB()
 	sqlDB.SetMaxIdleConns(maxIdleConns)
 	sqlDB.SetMaxOpenConns(maxOpenConns)
+	sqlDB.SetConnMaxLifetime(time.Hour)
+	sqlDB.SetConnMaxIdleTime(10 * time.Minute)
 
 	fmt.Printf("连接数据库成功: %s\n", dsn)
 	return db

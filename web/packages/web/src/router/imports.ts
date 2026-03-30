@@ -69,6 +69,7 @@ export const dynamicLazyMap: Record<string, () => Promise<any>> = {
   // ========== 游戏 ==========
   poke: () => import("@/pages/game/poke"),
   "plane-game": () => import("@/pages/game/plane-game"),
+  "slot-machine": () => import("@/pages/game/slot-machine"),
 
   // ========== 其他 ==========
   resume: () => import("@/pages/other/resume"),
