@@ -1,0 +1,11 @@
+fastapi>=0.115.0
+uvicorn>=0.30.0
+python-multipart>=0.0.9
+openai>=1.50.0
+# faiss-cpu removed — using pure numpy cosine similarity instead
+PyMuPDF>=1.24.0
+openpyxl>=3.1.0
+python-dotenv>=1.0.0
+langchain-text-splitters>=0.3.0
+numpy>=2.0.0
+sse-starlette>=2.1.0

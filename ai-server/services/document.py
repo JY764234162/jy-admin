@@ -1,0 +1,76 @@
+import io
+from pathlib import Path
+
+import fitz  # PyMuPDF
+from openpyxl import load_workbook
+from langchain_text_splitters import RecursiveCharacterTextSplitter
+
+import config
+
+
+def parse_pdf(file_bytes: bytes) -> str:
+    doc = fitz.open(stream=file_bytes, filetype="pdf")
+    texts = []
+    for page_num, page in enumerate(doc):
+        text = page.get_text()
+        if text.strip():
+            texts.append(f"[第{page_num + 1}页]\n{text}")
+    doc.close()
+    return "\n\n".join(texts)
+
+
+def parse_excel(file_bytes: bytes) -> str:
+    wb = load_workbook(io.BytesIO(file_bytes), read_only=True)
+    texts = []
+    for sheet_name in wb.sheetnames:
+        ws = wb[sheet_name]
+        rows = list(ws.iter_rows(values_only=True))
+        if not rows:
+            continue
+        headers = [str(h) if h else "" for h in rows[0]]
+        texts.append(f"[工作表: {sheet_name}]")
+        texts.append(f"字段: {'、'.join(headers)}")
+        for row in rows[1:]:
+            parts = []
+            for header, val in zip(headers, row):
+                if val is not None:
+                    parts.append(f"{header}为{val}")
+            if parts:
+                texts.append("，".join(parts))
+    wb.close()
+    return "\n".join(texts)
+
+
+def parse_txt(file_bytes: bytes) -> str:
+    return file_bytes.decode("utf-8", errors="ignore")
+
+
+def parse_markdown(file_bytes: bytes) -> str:
+    return file_bytes.decode("utf-8", errors="ignore")
+
+
+PARSERS = {
+    ".pdf": parse_pdf,
+    ".xlsx": parse_excel,
+    ".xls": parse_excel,
+    ".txt": parse_txt,
+    ".md": parse_markdown,
+}
+
+
+def parse_file(filename: str, file_bytes: bytes) -> str:
+    ext = Path(filename).suffix.lower()
+    parser = PARSERS.get(ext)
+    if not parser:
+        raise ValueError(f"不支持的文件格式: {ext}，支持: {list(PARSERS.keys())}")
+    return parser(file_bytes)
+
+
+def split_text(text: str) -> list[str]:
+    splitter = RecursiveCharacterTextSplitter(
+        chunk_size=config.CHUNK_SIZE,
+        chunk_overlap=config.CHUNK_OVERLAP,
+        separators=["\n\n", "\n", "。", "！", "？", "；", "，", " ", ""],
+    )
+    chunks = splitter.split_text(text)
+    return [c.strip() for c in chunks if c.strip()]
