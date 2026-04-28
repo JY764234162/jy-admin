@@ -7,7 +7,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 import config
-from routers import knowledge
+from routers import knowledge, chat
 
 app = FastAPI(title="AI Server", description="RAG 知识库问答服务", version="1.0.0")
 
@@ -20,6 +20,7 @@ app.add_middleware(
 )
 
 app.include_router(knowledge.router)
+app.include_router(chat.router)
 
 
 @app.get("/api/health")

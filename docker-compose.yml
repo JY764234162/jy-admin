@@ -110,6 +110,24 @@ services:
     memswap_limit: 512m # 内存+Swap 限制：512MB（允许使用 256MB Swap）
     cpus: 0.5 # CPU 限制：0.5 核
 
+  # 向量数据库（PostgreSQL + pgvector）
+  postgres-vector:
+    image: pgvector/pgvector:pg16
+    container_name: jy-admin-pgvector
+    restart: always
+    environment:
+      POSTGRES_DB: ai_vectors
+      POSTGRES_USER: ai_admin
+      POSTGRES_PASSWORD: ${PG_PASSWORD:-ai123456}
+    ports:
+      - "5433:5432"
+    volumes:
+      - pgvector_data:/var/lib/postgresql/data
+    networks:
+      - jy-admin-network
+    mem_limit: 512m
+    cpus: 0.5
+
   msfz:
     build:
       context: ./web
@@ -142,6 +160,8 @@ volumes:
   backend_uploads:
     driver: local
   backend_logs:
+    driver: local
+  pgvector_data:
     driver: local
 
 networks:

@@ -1,14 +1,16 @@
 import io
 from pathlib import Path
+from typing import List
 
-import fitz  # PyMuPDF
-from openpyxl import load_workbook
+from langchain_community.document_loaders import PyMuPDFLoader, TextLoader
 from langchain_text_splitters import RecursiveCharacterTextSplitter
+from langchain_core.documents import Document
 
 import config
 
 
 def parse_pdf(file_bytes: bytes) -> str:
+    from pymupdf import fitz
     doc = fitz.open(stream=file_bytes, filetype="pdf")
     texts = []
     for page_num, page in enumerate(doc):
@@ -20,6 +22,7 @@ def parse_pdf(file_bytes: bytes) -> str:
 
 
 def parse_excel(file_bytes: bytes) -> str:
+    from openpyxl import load_workbook
     wb = load_workbook(io.BytesIO(file_bytes), read_only=True)
     texts = []
     for sheet_name in wb.sheetnames:
@@ -66,7 +69,7 @@ def parse_file(filename: str, file_bytes: bytes) -> str:
     return parser(file_bytes)
 
 
-def split_text(text: str) -> list[str]:
+def split_text(text: str) -> List[str]:
     splitter = RecursiveCharacterTextSplitter(
         chunk_size=config.CHUNK_SIZE,
         chunk_overlap=config.CHUNK_OVERLAP,

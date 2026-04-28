@@ -1,5 +1,6 @@
 import json
 from pathlib import Path
+from typing import List, Dict
 
 import numpy as np
 
@@ -30,7 +31,7 @@ def _cosine_similarity(a: np.ndarray, b: np.ndarray) -> float:
     return float(np.dot(a, b) / (norm_a * norm_b))
 
 
-def add_documents(doc_id: str, filename: str, chunks: list[str], embeddings: list[list[float]]):
+def add_documents(doc_id: str, filename: str, chunks: List[str], embeddings: List[List[float]]):
     vectors = np.array(embeddings, dtype=np.float32)
     np.save(str(_vec_path(doc_id)), vectors)
 
@@ -43,7 +44,7 @@ def add_documents(doc_id: str, filename: str, chunks: list[str], embeddings: lis
     _save_meta(meta)
 
 
-def search(query_embedding: list[float], top_k: int = 3) -> list[dict]:
+def search(query_embedding: List[float], top_k: int = 3) -> List[Dict]:
     query_vec = np.array(query_embedding, dtype=np.float32)
 
     results = []
@@ -66,7 +67,7 @@ def search(query_embedding: list[float], top_k: int = 3) -> list[dict]:
     return results[:top_k]
 
 
-def list_documents() -> list[dict]:
+def list_documents() -> List[Dict]:
     meta = _load_meta()
     return [
         {"doc_id": doc_id, **info}

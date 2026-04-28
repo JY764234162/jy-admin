@@ -1,14 +1,15 @@
 import uuid
-import shutil
 from pathlib import Path
+from typing import List, Dict
 
 from fastapi import APIRouter, UploadFile, File, HTTPException
 from pydantic import BaseModel
 from sse_starlette.sse import EventSourceResponse
+from langchain_core.prompts import PromptTemplate
 
 import config
-from services import embedding, vector_store, document
-from services.llm import chat_stream
+from services import document, embedding, vector_store
+from services.llm import llm
 
 router = APIRouter(prefix="/api/knowledge", tags=["knowledge"])
 
@@ -16,6 +17,23 @@ router = APIRouter(prefix="/api/knowledge", tags=["knowledge"])
 class QueryRequest(BaseModel):
     question: str
     top_k: int = 3
+    structured: bool = False
+
+
+# RAG Prompt 模板
+RAG_PROMPT = PromptTemplate.from_template(
+    """你是一个文档问答助手。请严格根据以下参考资料回答用户的问题。
+如果资料中没有相关内容，请明确说"文档中没有找到相关信息"。
+
+参考资料：
+{context}
+
+来源文件：{sources}
+
+用户问题：{question}
+
+请给出准确、简洁的回答："""
+)
 
 
 @router.post("/upload")
@@ -37,7 +55,8 @@ async def upload_document(file: UploadFile = File(...)):
     if not chunks:
         raise HTTPException(400, "文档拆分结果为空")
 
-    embeddings = embedding.embed_texts(chunks)
+    # 用本地 TF-IDF 向量化
+    embeddings = embedding.embed_documents(chunks)
 
     doc_id = uuid.uuid4().hex[:12]
     vector_store.add_documents(doc_id, file.filename, chunks, embeddings)
@@ -57,40 +76,51 @@ async def query_knowledge(req: QueryRequest):
     if not docs:
         raise HTTPException(400, "知识库为空，请先上传文档")
 
-    query_emb = embedding.embed_query(req.question)
-    results = vector_store.search(query_emb, top_k=req.top_k)
+    if req.structured:
+        # 结构化输出
+        query_emb = embedding.embed_query(req.question)
+        results = vector_store.search(query_emb, top_k=req.top_k)
+        context_parts = [r["content"] for r in results]
+        sources = list(set(r["source"] for r in results))
 
-    if not results:
-        raise HTTPException(404, "未找到相关内容")
+        context = "\n\n---\n\n".join(context_parts)
+        sources_text = "、".join(sources)
 
-    context_parts = []
-    sources = set()
-    for r in results:
-        context_parts.append(r["content"])
-        sources.add(r["source"])
+        messages = [
+            {"role": "system", "content": "你是一个文档问答助手。请严格根据参考资料回答，输出 JSON 格式。"},
+            {"role": "user", "content": RAG_PROMPT.format(context=context, sources=sources_text, question=req.question) + "\n\n请以 JSON 格式输出：{\"answer\": \"...\", \"sources\": [...], \"confidence\": 0.0~1.0}"}
+        ]
+        response = llm.invoke(messages)
+        content = response.content
 
-    context = "\n\n---\n\n".join(context_parts)
-    sources_text = "、".join(sources)
+        # 尝试解析 JSON
+        import json
+        try:
+            start = content.index("{")
+            end = content.rindex("}") + 1
+            parsed = json.loads(content[start:end])
+            return parsed
+        except (ValueError, json.JSONDecodeError):
+            return {"answer": content, "sources": sources, "confidence": 0.5}
+    else:
+        # 流式输出
+        async def event_generator():
+            query_emb = embedding.embed_query(req.question)
+            results = vector_store.search(query_emb, top_k=req.top_k)
+            context_parts = [r["content"] for r in results]
+            sources = list(set(r["source"] for r in results))
 
-    system_prompt = (
-        "你是一个文档问答助手。请严格根据以下参考资料回答用户的问题。"
-        "如果资料中没有相关内容，请明确说'文档中没有找到相关信息'。"
-        "回答时请说明信息来自哪个文件。"
-    )
-    user_prompt = f"参考资料：\n{context}\n\n来源文件：{sources_text}\n\n用户问题：{req.question}"
+            context = "\n\n---\n\n".join(context_parts)
+            sources_text = "、".join(sources)
 
-    async def event_generator():
-        stream = chat_stream([
-            {"role": "system", "content": system_prompt},
-            {"role": "user", "content": user_prompt},
-        ])
-        for chunk in stream:
-            delta = chunk.choices[0].delta
-            if delta.content:
-                yield {"data": delta.content}
-        yield {"data": "[DONE]"}
+            prompt = RAG_PROMPT.format(context=context, sources=sources_text, question=req.question)
 
-    return EventSourceResponse(event_generator())
+            for chunk in llm.stream(prompt):
+                if chunk.content:
+                    yield {"data": chunk.content}
+            yield {"data": "[DONE]"}
+
+        return EventSourceResponse(event_generator())
 
 
 @router.get("/list")
