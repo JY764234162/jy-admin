@@ -52,7 +52,7 @@ service.interceptors.response.use(
         // 清除 token 和用户信息（只清除 localStorage，避免循环依赖）
         // store 会在重新加载时从 localStorage 读取，如果 token 不存在会自动重置
         localStg.remove("token");
-        router.navigate("/login", { replace: true });
+        router?.navigate("/login", { replace: true });
       }
 
       return Promise.reject(new Error(res.msg || "请求失败"));
@@ -72,7 +72,7 @@ service.interceptors.response.use(
           // 清除 token 和用户信息（只清除 localStorage，避免循环依赖）
           // store 会在重新加载时从 localStorage 读取，如果 token 不存在会自动重置
           localStg.remove("token");
-          router.navigate("/login", { replace: true });
+          router?.navigate("/login", { replace: true });
           break;
         }
         case 403:

@@ -1,4 +1,5 @@
-import React, { useCallback, useState, DragEvent, useMemo, useEffect } from "react";
+import { useCallback, useRef, useState, DragEvent, useMemo, useEffect } from "react";
+import { flushSync } from "react-dom";
 import {
   ReactFlow,
   MiniMap,
@@ -16,16 +17,17 @@ import {
   NodeTypes,
   Panel,
 } from "@xyflow/react";
-import { Button, Space, Tooltip, Dropdown } from "antd";
-import { 
-  AlignLeftOutlined, 
-  AlignCenterOutlined, 
+import { Button, Space, Tooltip, Dropdown, Badge } from "antd";
+import {
+  AlignLeftOutlined,
+  AlignCenterOutlined,
   AppstoreOutlined,
   BgColorsOutlined,
   DownOutlined,
   PlayCircleOutlined,
 } from "@ant-design/icons";
 import dagre from "dagre";
+import { useYjsCollaboration } from "@/hooks/useYjsCollaboration";
 import { nodeTypes } from "./nodeTypes";
 import { CustomNode } from "./CustomNode";
 import { NodeEditorDrawer } from "./NodeEditorDrawer";
@@ -38,21 +40,140 @@ const initialEdges: Edge[] = [];
 export const FlowCanvas = () => {
   const reactFlowInstance = useReactFlow();
 
-  const [nodes, setNodes] = useState<Node[]>(initialNodes);
-  const [edges, setEdges] = useState<Edge[]>(initialEdges);
-  
+  const [nodes, _setNodes] = useState<Node[]>(initialNodes);
+  const [edges, _setEdges] = useState<Edge[]>(initialEdges);
+
   // 编辑抽屉状态
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [editingNode, setEditingNode] = useState<Node | null>(null);
-  
+
   // 执行状态
   const [isExecuting, setIsExecuting] = useState(false);
 
+  // Yjs 协同编辑 — 默认房间，组件挂载自动连接，卸载自动断开
+  const DEFAULT_ROOM = "flow-default";
+  const suppressYjsSync = useRef(false);
+  const { ydocRef, connected, connect, disconnect } = useYjsCollaboration(DEFAULT_ROOM, localStg.get("token") || "");
+
+  // 包装 setNodes，自动同步到 Yjs
+  const setNodes = useCallback(
+    (value: Node[] | ((prev: Node[]) => Node[])) => {
+      _setNodes((prev) => {
+        const next = typeof value === "function" ? (value as (prev: Node[]) => Node[])(prev) : value;
+        if (ydocRef.current && !suppressYjsSync.current) {
+          const yNodes = ydocRef.current.getMap("nodes");
+          ydocRef.current.transact(() => {
+            const newIds = new Set(next.map((n: Node) => n.id));
+            for (const [id] of yNodes) {
+              if (!newIds.has(id)) yNodes.delete(id);
+            }
+            for (const node of next) {
+              yNodes.set(node.id, node);
+            }
+          }, "local");
+        }
+        suppressYjsSync.current = false;
+        return next;
+      });
+    },
+    [ydocRef]
+  );
+
+  // 包装 setEdges，自动同步到 Yjs
+  const setEdges = useCallback(
+    (value: Edge[] | ((prev: Edge[]) => Edge[])) => {
+      _setEdges((prev) => {
+        const next = typeof value === "function" ? (value as (prev: Edge[]) => Edge[])(prev) : value;
+        if (ydocRef.current && !suppressYjsSync.current) {
+          const yEdges = ydocRef.current.getMap("edges");
+          ydocRef.current.transact(() => {
+            const newIds = new Set(next.map((e: Edge) => e.id));
+            for (const [id] of yEdges) {
+              if (!newIds.has(id)) yEdges.delete(id);
+            }
+            for (const edge of next) {
+              yEdges.set(edge.id, edge);
+            }
+          }, "local");
+        }
+        suppressYjsSync.current = false;
+        return next;
+      });
+    },
+    [ydocRef]
+  );
+
+  // Yjs observer：远程变更同步到本地 state
+  useEffect(() => {
+    if (!ydocRef.current || !connected) return;
+    const yNodes = ydocRef.current.getMap("nodes");
+    const yEdges = ydocRef.current.getMap("edges");
+
+    const nodesObserver = () => {
+      suppressYjsSync.current = true;
+      requestAnimationFrame(() => {
+        _setNodes(Array.from(yNodes.values()) as Node[]);
+      });
+    };
+    const edgesObserver = () => {
+      suppressYjsSync.current = true;
+      requestAnimationFrame(() => {
+        _setEdges(Array.from(yEdges.values()) as Edge[]);
+      });
+    };
+
+    yNodes.observe(nodesObserver);
+    yEdges.observe(edgesObserver);
+
+    return () => {
+      yNodes.unobserve(nodesObserver);
+      yEdges.unobserve(edgesObserver);
+    };
+  }, [ydocRef, connected]);
+
+  // 用 ref 跟踪最新 nodes/edges，避免连接时闭包陈旧
+  const nodesRef = useRef<Node[]>(nodes);
+  const edgesRef = useRef<Edge[]>(edges);
+  useEffect(() => {
+    nodesRef.current = nodes;
+  }, [nodes]);
+  useEffect(() => {
+    edgesRef.current = edges;
+  }, [edges]);
+
+  // 自动连接协同编辑（组件挂载时连接，卸载时断开）
+  useEffect(() => {
+    connect();
+    // 等待服务器状态快照到达后，只增量同步本地独有的数据
+    setTimeout(() => {
+      if (ydocRef.current) {
+        const yNodes = ydocRef.current.getMap<Node>("nodes");
+        const yEdges = ydocRef.current.getMap<Edge>("edges");
+        ydocRef.current.transact(() => {
+          // 只添加 Yjs 中不存在的节点，不覆盖服务器已有的
+          for (const node of nodesRef.current) {
+            if (!yNodes.has(node.id)) {
+              yNodes.set(node.id, node);
+            }
+          }
+          for (const edge of edgesRef.current) {
+            if (!yEdges.has(edge.id)) {
+              yEdges.set(edge.id, edge);
+            }
+          }
+        }, "local");
+      }
+    }, 500);
+    return () => {
+      disconnect();
+    };
+  }, [connect, disconnect, ydocRef]);
+
   // 从 localStorage 加载数据
   useEffect(() => {
-    const savedNodes = localStg.get('reactFlowNodes' as keyof StorageType.Local);
-    const savedEdges = localStg.get('reactFlowEdges' as keyof StorageType.Local);
-    
+    const savedNodes = localStg.get("reactFlowNodes" as keyof StorageType.Local);
+    const savedEdges = localStg.get("reactFlowEdges" as keyof StorageType.Local);
+
     if (savedNodes && Array.isArray(savedNodes)) {
       setNodes(savedNodes as Node[]);
     }
@@ -60,12 +181,12 @@ export const FlowCanvas = () => {
       setEdges(savedEdges as Edge[]);
     }
   }, []);
-  
+
   // 保存数据到 localStorage（节点或边变化时）
   useEffect(() => {
     if (nodes.length > 0 || edges.length > 0) {
-      localStg.set('reactFlowNodes' as keyof StorageType.Local, nodes as any);
-      localStg.set('reactFlowEdges' as keyof StorageType.Local, edges as any);
+      localStg.set("reactFlowNodes" as keyof StorageType.Local, nodes as any);
+      localStg.set("reactFlowEdges" as keyof StorageType.Local, edges as any);
     }
   }, [nodes, edges]);
 
@@ -77,9 +198,17 @@ export const FlowCanvas = () => {
     []
   );
 
-  const onNodesChange = useCallback((changes: NodeChange[]) => setNodes((nds) => applyNodeChanges(changes, nds)), []);
+  const onNodesChange = useCallback((changes: NodeChange[]) => {
+    flushSync(() => {
+      setNodes((nds) => applyNodeChanges(changes, nds));
+    });
+  }, []);
 
-  const onEdgesChange = useCallback((changes: EdgeChange[]) => setEdges((eds) => applyEdgeChanges(changes, eds)), []);
+  const onEdgesChange = useCallback((changes: EdgeChange[]) => {
+    flushSync(() => {
+      setEdges((eds) => applyEdgeChanges(changes, eds));
+    });
+  }, []);
 
   const onConnect = useCallback((params: Connection) => setEdges((eds) => addEdge(params, eds)), []);
 
@@ -88,14 +217,14 @@ export const FlowCanvas = () => {
     event.dataTransfer.dropEffect = "move";
   }, []);
 
-  // 节点点击处理
-  const handleNodeClick = useCallback((nodeId: string, nodeData: any) => {
-    const node = nodes.find((n) => n.id === nodeId);
+  // 节点点击处理（用 ref 避免依赖 nodes，防止频繁触发 useEffect）
+  const handleNodeClick = useCallback((nodeId: string, _nodeData: any) => {
+    const node = nodesRef.current.find((n) => n.id === nodeId);
     if (node) {
       setEditingNode(node);
       setDrawerOpen(true);
     }
-  }, [nodes]);
+  }, []);
 
   const onDrop = useCallback(
     (event: DragEvent) => {
@@ -119,9 +248,9 @@ export const FlowCanvas = () => {
           label: nodeTypes[type as keyof typeof nodeTypes]!.label,
           nodeType: type,
           onNodeClick: handleNodeClick,
-          description: '',
-          status: 'pending',
-          notes: '',
+          description: "",
+          status: "pending",
+          notes: "",
         },
       };
 
@@ -132,7 +261,7 @@ export const FlowCanvas = () => {
 
   // Dagre 层次布局
   const onDagreLayout = useCallback(
-    (direction: 'TB' | 'BT' | 'LR' | 'RL') => {
+    (direction: "TB" | "BT" | "LR" | "RL") => {
       const dagreGraph = new dagre.graphlib.Graph();
       dagreGraph.setDefaultEdgeLabel(() => ({}));
 
@@ -241,7 +370,7 @@ export const FlowCanvas = () => {
         ...node,
         data: {
           ...node.data,
-          status: 'pending',
+          status: "pending",
         },
       }))
     );
@@ -262,7 +391,7 @@ export const FlowCanvas = () => {
               ...n,
               data: {
                 ...n.data,
-                status: 'processing',
+                status: "processing",
               },
             };
           }
@@ -288,7 +417,7 @@ export const FlowCanvas = () => {
                       ...n,
                       data: {
                         ...n.data,
-                        status: 'completed',
+                        status: "completed",
                       },
                     };
                   }
@@ -300,10 +429,10 @@ export const FlowCanvas = () => {
             }
 
             const chunk = decoder.decode(value);
-            const lines = chunk.split('\n\n');
+            const lines = chunk.split("\n\n");
 
             for (const line of lines) {
-              if (line.startsWith('data: ')) {
+              if (line.startsWith("data: ")) {
                 try {
                   const data = JSON.parse(line.slice(6));
                   // 可以在这里处理进度更新
@@ -373,50 +502,52 @@ export const FlowCanvas = () => {
         <Controls />
         <MiniMap />
         <Background gap={12} size={1} />
-        
+
         {/* 自动布局控制面板 */}
         <Panel position="top-right">
           <Space>
+            {/* 协同编辑状态 */}
+            <Space>
+              <Badge status={connected ? "success" : "error"} />
+              <span style={{ fontSize: 12 }}>{connected ? "协同中" : "连接中..."}</span>
+            </Space>
+
+            <div style={{ width: "1px", height: "20px", background: "#d9d9d9", margin: "0 8px" }} />
+
             <Tooltip title="执行流程">
-              <Button
-                type="primary"
-                icon={<PlayCircleOutlined />}
-                onClick={handleExecute}
-                loading={isExecuting}
-                size="small"
-              >
+              <Button type="primary" icon={<PlayCircleOutlined />} onClick={handleExecute} loading={isExecuting} size="small">
                 执行流程
               </Button>
             </Tooltip>
-            
-            <div style={{ width: '1px', height: '20px', background: '#d9d9d9', margin: '0 8px' }} />
-            
+
+            <div style={{ width: "1px", height: "20px", background: "#d9d9d9", margin: "0 8px" }} />
+
             <Dropdown
               menu={{
                 items: [
                   {
-                    key: 'TB',
-                    label: '从上到下',
+                    key: "TB",
+                    label: "从上到下",
                     icon: <AlignCenterOutlined rotate={90} />,
-                    onClick: () => onDagreLayout('TB'),
+                    onClick: () => onDagreLayout("TB"),
                   },
                   {
-                    key: 'BT',
-                    label: '从下到上',
+                    key: "BT",
+                    label: "从下到上",
                     icon: <AlignCenterOutlined rotate={-90} />,
-                    onClick: () => onDagreLayout('BT'),
+                    onClick: () => onDagreLayout("BT"),
                   },
                   {
-                    key: 'LR',
-                    label: '从左到右',
+                    key: "LR",
+                    label: "从左到右",
                     icon: <AlignLeftOutlined />,
-                    onClick: () => onDagreLayout('LR'),
+                    onClick: () => onDagreLayout("LR"),
                   },
                   {
-                    key: 'RL',
-                    label: '从右到左',
+                    key: "RL",
+                    label: "从右到左",
                     icon: <AlignLeftOutlined rotate={180} />,
-                    onClick: () => onDagreLayout('RL'),
+                    onClick: () => onDagreLayout("RL"),
                   },
                 ],
               }}
@@ -427,21 +558,13 @@ export const FlowCanvas = () => {
             </Dropdown>
 
             <Tooltip title="网格排列">
-              <Button
-                icon={<AppstoreOutlined />}
-                onClick={onGridLayout}
-                size="small"
-              >
+              <Button icon={<AppstoreOutlined />} onClick={onGridLayout} size="small">
                 网格布局
               </Button>
             </Tooltip>
 
             <Tooltip title="圆形排列">
-              <Button
-                icon={<BgColorsOutlined />}
-                onClick={onCircleLayout}
-                size="small"
-              >
+              <Button icon={<BgColorsOutlined />} onClick={onCircleLayout} size="small">
                 圆形布局
               </Button>
             </Tooltip>
@@ -450,12 +573,7 @@ export const FlowCanvas = () => {
       </ReactFlow>
 
       {/* 节点编辑抽屉 */}
-      <NodeEditorDrawer
-        open={drawerOpen}
-        node={editingNode}
-        onClose={() => setDrawerOpen(false)}
-        onSave={handleSaveNode}
-      />
+      <NodeEditorDrawer open={drawerOpen} node={editingNode} onClose={() => setDrawerOpen(false)} onSave={handleSaveNode} />
     </div>
   );
 };

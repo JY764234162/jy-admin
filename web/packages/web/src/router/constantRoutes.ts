@@ -45,7 +45,10 @@ export const constantRoutes: RouteObject[] = [
     path: "*",
     lazy: () => import("@/components/NotFound").then((m) => ({ Component: m.NotFound })),
     loader: () => {
-      return redirect("/login");
+      if (!localStg.get("token")) {
+        return redirect("/login");
+      }
+      return true;
     },
   },
 ];

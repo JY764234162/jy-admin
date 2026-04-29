@@ -1,0 +1,40 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(curl -s -X POST https://api.minimax.chat/v1/embeddings -H 'Authorization: Bearer sk-cp-1poj1VNBlxHWRLjQDx8NGN1GBjyygEtoccfuyMkrPj8tAuxcOKnDbPrrEmcQtZ9R2bcvb9Q1zOTREQejc-GfCer0G90ksStZLWIC7RYGDrVSp9WycfTHi-4' -H 'Content-Type: application/json' -d '{\"model\":\"embo-01\",\"texts\":[\"测试文本\"],\"type\":\"db\"}')",
+      "Bash(../venv/bin/python -c ' *)",
+      "Bash(curl -s -X POST http://localhost:8000/api/knowledge/query -H 'Content-Type: application/json' -d '{\"question\":\"面试题有哪些？\"}')",
+      "Bash(curl -s -X POST http://localhost:8000/api/chat -H 'Content-Type: application/json' -d '{\"message\":\"你好\"}')",
+      "Bash(curl -s -X POST http://localhost:8000/api/chat -H 'Content-Type: application/json' -d '{\"message\":\"我叫张三，是前端开发\"}')",
+      "Bash(curl -s http://localhost:8000/api/chat/list)",
+      "Bash(grep -v '\\\\.pyc$')",
+      "Bash(grep -v '.npy$')",
+      "Bash(grep -v '.json$')",
+      "Bash(go get *)",
+      "Bash(go mod *)",
+      "Bash(pnpm add *)",
+      "Bash(docker exec *)",
+      "Bash(netstat -tlnp)",
+      "Bash(docker stop *)",
+      "Bash(docker rm *)",
+      "Bash(curl -s http://localhost:7777/api/health)",
+      "Bash(curl -s -o /dev/null -w \"%{http_code}\" http://localhost:3000/)",
+      "Bash(docker-compose up *)",
+      "Bash(kill 476)",
+      "Bash(kill 858)",
+      "Bash(docker run *)",
+      "Bash(docker cp *)",
+      "Bash(docker start *)",
+      "Bash(curl -i -N -H \"Connection: Upgrade\" -H \"Upgrade: websocket\" -H \"Sec-WebSocket-Key: dGhlIHNhbXBsZSBub25jZQ==\" -H \"Sec-WebSocket-Version: 13\" \"http://localhost:7777/api/ws/collab/test?token=test\")",
+      "Bash(python3 -c \"import sys,json; d=json.load\\(sys.stdin\\); [print\\(k+':',v\\) for k,v in d.get\\('scripts',{}\\).items\\(\\)]\")",
+      "Bash(xargs ls *)",
+      "Bash(timeout 15 pnpm dev)",
+      "Bash(timeout 15 pnpm --filter @packages/web dev)",
+      "Bash(xxd)",
+      "Bash(curl -s 'http://localhost:7777/api/user/list?page=1&pageSize=10' -H 'x-token: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJJRCI6MSwiVXNlcm5hbWUiOiJhZG1pbiIsIk5pY2tOYW1lIjoi6LaF57qn566h55CG5ZGYIiwiQXV0aG9yaXR5SWQiOiI4ODgiLCJCdWZmZXJUaW1lIjo4NjQwMCwiaXNzIjoiSlktQWRtaW4tUHJvZHVjdGlvbiIsImF1ZCI6WyJHVkEiXSwiZXhwIjoxNzc4MDQ2NTEwLCJuYmYiOjE3Nzc0NDE3MTB9.7ekCkF21FEjUDFuf5JDzpEk8PnjNMJ3r1f4MBXuTB-M')",
+      "Bash(curl -s 'http://localhost:7777/api/user/list?page=1&pageSize=10' -H 'Authorization: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJJRCI6MSwiVXNlcm5hbWUiOiJhZG1pbiIsIk5pY2tOYW1lIjoi6LaF57qn566h55CG5ZGYIiwiQXV0aG9yaXR5SWQiOiI4ODgiLCJCdWZmZXJUaW1lIjo4NjQwMCwiaXNzIjoiSlktQWRtaW4tUHJvZHVjdGlvbiIsImF1ZCI6WyJHVkEiXSwiZXhwIjoxNzc4MDQ2NTEwLCJuYmYiOjE3Nzc0NDE3MTB9.7ekCkF21FEjUDFuf5JDzpEk8PnjNMJ3r1f4MBXuTB-M')",
+      "Bash(sed -i '' 's/id, username, nick_name, authority_id, email, phone, avatar, status, created_at/id, username, nick_name, header_img, authority_id, enable, created_at/' /Users/jiangyi/Desktop/study/jy-admin/server/api/user/list.go)",
+      "Bash(sed -n '42p' /Users/jiangyi/Desktop/study/jy-admin/server/api/user/list.go)"
+    ]
+  }
+}

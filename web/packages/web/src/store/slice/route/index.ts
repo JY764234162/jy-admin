@@ -3,7 +3,6 @@ import { createSlice, PayloadAction } from "@reduxjs/toolkit";
 import { router } from "@/router/routers";
 import { convertMenusToRoutes } from "@/utils/menuToRoute";
 import { AppThunk } from "@/store";
-import { constantRoutes } from "@/router/constantRoutes";
 
 const initialState: { allRoutes: ElegantConstRoute[]; constantRoutes: ElegantConstRoute[]; authRoutes: ElegantConstRoute[] } = {
   constantRoutes: [],
@@ -41,12 +40,13 @@ export const initConstantRoute = (): AppThunk => async (dispatch) => {
       const routes = convertMenusToRoutes(res.data);
       const reactRoutes = transformToReactRoutes(routes);
 
-      // 更新路由
-      await router.patchRoutes("layout", reactRoutes);
+      // 登录后的场景：router 已创建，patch 新路由
+      if (router?.patchRoutes) {
+        await router.patchRoutes("layout", reactRoutes);
+      }
       await dispatch(routesSlice.actions.setAllRoute(routes));
     }
   } catch (error: any) {
     console.error("初始化路由失败:", error);
   }
 };
-

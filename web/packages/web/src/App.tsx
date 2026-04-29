@@ -11,6 +11,7 @@ import { localStg } from "./utils/storage";
 import "@/styles/index.css";
 import "@/styles/scrollbar.scss";
 import { ReactNode, useMemo } from "react";
+
 const watermarkProps: WatermarkProps = {
   font: {
     fontSize: 16,
@@ -22,7 +23,7 @@ const watermarkProps: WatermarkProps = {
   zIndex: 9999,
 };
 
-export default function App() {
+export default function App({ router }: { router: any }) {
   const settings = useSelector(settingSlice.selectors.getSettings);
   //持久化设置
   useUpdateEffect(() => {
@@ -33,15 +34,15 @@ export default function App() {
     return settings.watermark.visible ? (
       <Watermark className="h-full" content={settings.watermark?.text} {...watermarkProps}>
         <AliveScope>
-          <Router />
+          <Router router={router} />
         </AliveScope>
       </Watermark>
     ) : (
       <AliveScope>
-        <Router />
+        <Router router={router} />
       </AliveScope>
     );
-  }, [settings.watermark.visible]);
+  }, [settings.watermark.visible, router]);
 
   return (
     <AntdProvider>

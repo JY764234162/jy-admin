@@ -18,9 +18,10 @@ export const MenuContextProvider = memo(({ children }: { children: ReactNode }) 
   const allRoutes = useSelector(routesSlice.selectors.getAllRoute);
 
   const selectedKeys = useMemo(() => {
-    const lastMatch = router.state.matches[router.state.matches.length - 1];
+    const matches = router?.state.matches ?? [];
+    const lastMatch = matches[matches.length - 1];
     return lastMatch?.pathname.split("/").filter(Boolean) ?? [];
-  }, [router.state.matches]);
+  }, [router?.state.matches]);
 
   const items = useMemo(() => {
     console.log(allRoutes, transformToMenuItems(allRoutes));

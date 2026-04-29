@@ -11,6 +11,7 @@ import (
 	_ "jiangyi.com/docs"
 	"jiangyi.com/global"
 	"jiangyi.com/middleware"
+	"jiangyi.com/websocket"
 )
 
 type justFilesFilesystem struct {
@@ -68,6 +69,9 @@ func registerRouter(Router *gin.Engine) *gin.Engine {
 	privateGroup := Router.Group(global.JY_Config.System.RouterPrefix, middleware.JWTAuth())
 	//api分组
 	apiGroup := api.ApiGroup
+
+	// WebSocket 协同编辑 Hub
+	hub := websocket.NewHub()
 
 	//登录相关（开放路由，不需要认证）
 	{
@@ -135,6 +139,9 @@ func registerRouter(Router *gin.Engine) *gin.Engine {
 	if global.JY_Config.System.OSSType == "local" {
 		publicGroup.StaticFS(global.JY_Config.Local.StorePath, justFilesFilesystem{http.Dir(global.JY_Config.Local.StorePath)}) // Router.Use(middleware.LoadTls())  // 如果需要使用https 请打开此中间件 然后前往 core/server.go 将启动模式 更变为 Router.RunTLS("端口","你的cre/pem文件","你的key文件")
 	}
+
+	// WebSocket 协同编辑（通过 query token 认证）
+	publicGroup.GET("/ws/collab/:roomId", websocket.ServeWS(hub))
 
 	//开放健康检查
 	publicGroup.GET("/health", func(c *gin.Context) {

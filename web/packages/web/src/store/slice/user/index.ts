@@ -44,12 +44,18 @@ export const userSlice = createSlice({
 
 //获取用户信息
 export const getCurrentUserInfo = (): AppThunk => async (dispatch) => {
-  const res = await userApi.getCurrentUser();
-  if (res.code === 0 && res.data) {
-    dispatch(userSlice.actions.setUserInfo(res.data));
-  } else {
+  try {
+    const res = await userApi.getCurrentUser();
+    if (res.code === 0 && res.data) {
+      dispatch(userSlice.actions.setUserInfo(res.data));
+    } else {
+      localStg.remove("token");
+      dispatch(userSlice.actions.clearUserInfo());
+      router?.navigate("/login", { replace: true });
+    }
+  } catch (error) {
+    console.error("获取用户信息失败:", error);
     localStg.remove("token");
     dispatch(userSlice.actions.clearUserInfo());
-    router.navigate("/login", { replace: true });
   }
 };

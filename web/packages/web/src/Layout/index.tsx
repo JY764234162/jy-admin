@@ -2,9 +2,8 @@ import React, { memo, useEffect, useRef } from "react";
 import { useDispatch, useSelector } from "react-redux";
 import { settingSlice } from "@/store/slice/setting";
 import { SettingDrawer } from "@/components/SettingDrawerButton";
-import { router } from "@/router/routers";
 import { MenuContextProvider } from "@/context/MenuContext/provider";
-import { useMount, useUpdateEffect } from "ahooks";
+import { useUpdateEffect } from "ahooks";
 import { Layout as AntdLayout, theme } from "antd";
 import { Outlet, useLocation } from "react-router-dom";
 import { GlobalHeader } from "./global-header";
@@ -36,13 +35,7 @@ export const Layout: React.FC = memo(() => {
     }
   }, [isMobile]);
 
-  //初始化路由
-  useMount(() => {
-    const firstMatch = router.state.matches[0];
-    if (firstMatch) {
-      router.navigate(firstMatch.pathname);
-    }
-  });
+  // 路由表已在 main.tsx 初始化时完整创建，不需要在 Layout 挂载时额外导航
 
   useUpdateEffect(() => {
     const scrollElement = scrollRef.current;
