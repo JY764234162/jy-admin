@@ -34,7 +34,13 @@
       "Bash(curl -s 'http://localhost:7777/api/user/list?page=1&pageSize=10' -H 'x-token: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJJRCI6MSwiVXNlcm5hbWUiOiJhZG1pbiIsIk5pY2tOYW1lIjoi6LaF57qn566h55CG5ZGYIiwiQXV0aG9yaXR5SWQiOiI4ODgiLCJCdWZmZXJUaW1lIjo4NjQwMCwiaXNzIjoiSlktQWRtaW4tUHJvZHVjdGlvbiIsImF1ZCI6WyJHVkEiXSwiZXhwIjoxNzc4MDQ2NTEwLCJuYmYiOjE3Nzc0NDE3MTB9.7ekCkF21FEjUDFuf5JDzpEk8PnjNMJ3r1f4MBXuTB-M')",
       "Bash(curl -s 'http://localhost:7777/api/user/list?page=1&pageSize=10' -H 'Authorization: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJJRCI6MSwiVXNlcm5hbWUiOiJhZG1pbiIsIk5pY2tOYW1lIjoi6LaF57qn566h55CG5ZGYIiwiQXV0aG9yaXR5SWQiOiI4ODgiLCJCdWZmZXJUaW1lIjo4NjQwMCwiaXNzIjoiSlktQWRtaW4tUHJvZHVjdGlvbiIsImF1ZCI6WyJHVkEiXSwiZXhwIjoxNzc4MDQ2NTEwLCJuYmYiOjE3Nzc0NDE3MTB9.7ekCkF21FEjUDFuf5JDzpEk8PnjNMJ3r1f4MBXuTB-M')",
       "Bash(sed -i '' 's/id, username, nick_name, authority_id, email, phone, avatar, status, created_at/id, username, nick_name, header_img, authority_id, enable, created_at/' /Users/jiangyi/Desktop/study/jy-admin/server/api/user/list.go)",
-      "Bash(sed -n '42p' /Users/jiangyi/Desktop/study/jy-admin/server/api/user/list.go)"
+      "Bash(sed -n '42p' /Users/jiangyi/Desktop/study/jy-admin/server/api/user/list.go)",
+      "Bash(chmod +x /Users/jiangyi/Desktop/study/jy-admin/deploy-local.sh)",
+      "Bash(./deploy-local.sh)",
+      "Bash(ssh ubuntu@101.42.138.198 \"ls -la /home/ubuntu/jy-admin/docker-compose.yml /home/ubuntu/jy-admin/docker-compose.yaml 2>&1; which docker-compose; docker compose version 2>&1 | head -1\")",
+      "Bash(ssh ubuntu@101.42.138.198 \"ls -la /home/ubuntu/jy-admin/ 2>&1; ls -la /home/ubuntu/ | grep jy\")",
+      "Bash(ssh ubuntu@101.42.138.198 \"find /home/ubuntu -name 'docker-compose.yml' 2>/dev/null | head -5; ls -la /home/ubuntu/jy_admin/ 2>&1 | head -20\")",
+      "Bash(ssh ubuntu@101.42.138.198 \"cat ~/.ssh/authorized_keys | wc -l; echo '---'; head -1 ~/.ssh/authorized_keys | cut -c1-80\")"
     ]
   }
 }

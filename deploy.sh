@@ -1,6 +1,11 @@
 #!/bin/bash
-
-# Docker 部署脚本
+#
+# 服务器端部署脚本（在服务器上运行）
+# 功能：检查前端产物 → 构建并启动后端/数据库 → 启动前端 Nginx
+#
+# 前置条件：前端产物已由本地通过 scp/rsync 传到 web/packages/web/dist/
+# 如需一键本地构建+部署，使用: ./deploy-local.sh
+#
 # 使用方法: ./deploy.sh
 
 set -e
@@ -89,6 +94,17 @@ fi
 export DOCKER_BUILDKIT=1
 export COMPOSE_DOCKER_CLI_BUILD=1
 
+# 检查前端构建产物是否存在（本地构建后通过 scp/rsync 传过来的）
+echo -e "\n${BLUE}检查前端构建产物...${NC}"
+if [ ! -f "web/packages/web/dist/index.html" ]; then
+    echo -e "${RED}错误: 未找到前端构建产物 web/packages/web/dist/index.html${NC}"
+    echo -e "${YELLOW}请先在本地执行 pnpm build，然后通过 scp/rsync 把 dist 传到服务器${NC}"
+    echo -e "${YELLOW}或者使用本地部署脚本: ./deploy-local.sh${NC}"
+    exit 1
+else
+    echo -e "${GREEN}✓ 前端构建产物已就绪${NC}"
+fi
+
 # 清理虚悬镜像（dangling images）
 echo -e "\n${BLUE}清理虚悬镜像...${NC}"
 DANGLING_IMAGES=$(docker images -f "dangling=true" -q)
@@ -101,13 +117,17 @@ else
     echo -e "${GREEN}✓ 虚悬镜像清理完成${NC}"
 fi
 
-# 构建和启动
+# 构建和启动（后端 build，前端不 build）
 echo -e "\n${BLUE}开始构建和启动服务...${NC}\n"
 
 if docker compose version &> /dev/null; then
-    docker compose up -d --build
+    # 先构建并启动后端和数据库
+    docker compose up -d --build backend mysql
+    # 前端直接用已有产物，不需要 --build（避免服务器内存不足）
+    docker compose up -d frontend
 else
-    docker-compose up -d --build
+    docker-compose up -d --build backend mysql
+    docker-compose up -d frontend
 fi
 
 echo -e "\n${GREEN}✓ 部署完成！${NC}\n"

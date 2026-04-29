@@ -86,13 +86,12 @@ services:
       retries: 3
 
   # 前端服务（Nginx）
+  # 注意：使用本地构建产物，需在本地先执行 pnpm build
+  # 如需在服务器构建，恢复为 packages/web/Dockerfile
   frontend:
     build:
       context: ./web
       dockerfile: packages/web/Dockerfile
-      # 启用构建缓存
-      args:
-        BUILDKIT_INLINE_CACHE: 1
     container_name: jy-admin-frontend
     restart: always
     ports:
@@ -159,8 +158,8 @@ volumes:
     driver: local
   backend_logs:
     driver: local
-  pgvector_data:
-    driver: local
+  # pgvector_data:
+  #   driver: local
 
 networks:
   jy-admin-network:

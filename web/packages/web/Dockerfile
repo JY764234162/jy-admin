@@ -1,86 +1,25 @@
-# 如果需要用 CI/CD，请设置环境变量：
-# variables:
-#   DOCKER_BUILDKIT: 1
+# ============================================================
+# 纯部署版 Dockerfile（本地构建产物 → Nginx）
+# 用法：
+#   1. 本地执行：cd web/packages/web && pnpm build
+#   2. Docker 构建：docker-compose up --build frontend
+# ============================================================
 
-# 基础层：设置环境
-FROM node:20-slim AS base
-
-ENV PNPM_HOME="/pnpm"
-ENV PATH="$PNPM_HOME:$PATH"
-
-# 启用 corepack（内置 pnpm 支持）
-RUN corepack enable
-
-WORKDIR /app
-
-# 依赖层：只复制依赖文件，最大化缓存利用
-FROM base AS deps
-
-# 先复制根目录的 package 文件
-COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
-
-# 只复制 packages 下的 package.json 文件（用于依赖解析）
-# 这样可以避免源代码变更导致依赖层失效
-COPY packages/web/package.json ./packages/web/
-# 复制 utils 的 package.json（如果存在）
-# 注意：如果 packages/utils/package.json 不存在，构建会失败
-# 可以通过创建 .dockerignore 或使用多阶段构建来处理可选文件
-RUN mkdir -p ./packages/utils
-COPY packages/utils/package.json ./packages/utils/
-
-# 安装依赖（使用缓存挂载加速）
-# 配置国内代理
-RUN pnpm config set registry https://registry.npmmirror.com
-RUN --mount=type=cache,id=pnpm,target=/pnpm/store \
-    pnpm install --frozen-lockfile
-
-# 构建层：构建前端项目
-FROM base AS build
-
-# 复制所有配置文件
-COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
-
-# 复制所有源代码（.dockerignore 会排除 node_modules）
-COPY packages ./packages
-
-# 配置 pnpm 使用国内镜像
-RUN pnpm config set registry https://registry.npmmirror.com
-
-# 安装依赖（使用缓存挂载加速，会利用 deps 层已下载的包）
-# 这样可以确保所有 workspace 依赖和链接都正确
-RUN --mount=type=cache,id=pnpm,target=/pnpm/store \
-    pnpm install --frozen-lockfile
-
-# 设置 Node.js 内存限制（4GB服务器使用2.5GB，留出1.5GB给系统）
-# 注意：如果仍然失败，考虑增加交换空间（Swap）
-ENV NODE_OPTIONS="--max-old-space-size=2560"
-ENV NODE_ENV=production
-
-# 构建前端（分离 TypeScript 编译和 Vite 构建，确保内存释放）
-# 先编译 TypeScript，然后单独运行 Vite 构建
-RUN cd packages/web && \
-    echo "Step 1: TypeScript compilation..." && \
-    pnpm exec tsc -b && \
-    echo "Step 2: Vite build (memory limit: 2.5GB)..." && \
-    pnpm exec vite build
-
-# 运行层：Nginx 服务
 FROM nginx:alpine
 
 LABEL MAINTAINER="jy-admin"
 
-# 复制 Nginx 配置（此 Dockerfile 位于 packages/web，下方路径基于构建上下文：web 根目录）
+# 复制 Nginx 配置（构建上下文为 web 根目录）
 COPY packages/web/nginx.conf /etc/nginx/conf.d/default.conf
 
-# 从构建层复制构建产物（构建产物在 web/packages/web/dist，对应构建阶段的 /app/packages/web/dist）
-COPY --from=build /app/packages/web/dist /usr/share/nginx/html
+# 复制本地构建产物（需先在本地执行 pnpm build）
+COPY packages/web/dist /usr/share/nginx/html
 
-# 验证构建产物
-RUN ls -al /usr/share/nginx/html
+# 验证构建产物存在
+RUN ls -al /usr/share/nginx/html/index.html || (echo "错误：未找到构建产物，请先执行 pnpm build" && exit 1)
 
 # 暴露端口
 EXPOSE 80
 
 # 启动 Nginx
 CMD ["nginx", "-g", "daemon off;"]
-
