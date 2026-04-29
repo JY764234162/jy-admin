@@ -17,8 +17,7 @@ services:
       - mysql_data:/var/lib/mysql
       - ./init.sql:/docker-entrypoint-initdb.d/init.sql:ro
       - ./server/mysql/conf.d:/etc/mysql/conf.d:ro
-    command: --character-set-server=utf8mb4
-      --collation-server=utf8mb4_unicode_ci
+    command: --character-set-server=utf8mb4 --collation-server=utf8mb4_unicode_ci
       --default-authentication-plugin=mysql_native_password
     networks:
       - jy-admin-network
@@ -109,51 +108,50 @@ services:
     mem_limit: 256m # 内存限制：256MB（Nginx 占用很少）
     memswap_limit: 512m # 内存+Swap 限制：512MB（允许使用 256MB Swap）
     cpus: 0.5 # CPU 限制：0.5 核
+  # # 向量数据库（PostgreSQL + pgvector）
+  # postgres-vector:
+  #   image: pgvector/pgvector:pg16
+  #   container_name: jy-admin-pgvector
+  #   restart: always
+  #   environment:
+  #     POSTGRES_DB: ai_vectors
+  #     POSTGRES_USER: ai_admin
+  #     POSTGRES_PASSWORD: ${PG_PASSWORD:-ai123456}
+  #   ports:
+  #     - "5433:5432"
+  #   volumes:
+  #     - pgvector_data:/var/lib/postgresql/data
+  #   networks:
+  #     - jy-admin-network
+  #   mem_limit: 512m
+  #   cpus: 0.5
 
-  # 向量数据库（PostgreSQL + pgvector）
-  postgres-vector:
-    image: pgvector/pgvector:pg16
-    container_name: jy-admin-pgvector
-    restart: always
-    environment:
-      POSTGRES_DB: ai_vectors
-      POSTGRES_USER: ai_admin
-      POSTGRES_PASSWORD: ${PG_PASSWORD:-ai123456}
-    ports:
-      - "5433:5432"
-    volumes:
-      - pgvector_data:/var/lib/postgresql/data
-    networks:
-      - jy-admin-network
-    mem_limit: 512m
-    cpus: 0.5
+  # msfz:
+  #   build:
+  #     context: ./web
+  #     dockerfile: packages/msfz/Dockerfile
+  #     # 启用构建缓存
+  #     args:
+  #       BUILDKIT_INLINE_CACHE: 1
+  #   container_name: jy-admin-msfz
+  #   restart: always
+  #   ports:
+  #     - "8080:80"
+  #   volumes:
+  #     # 证书目录：宿主机 ./certs 挂载到容器 /etc/nginx/certs（勿提交 certs/ 到仓库）
+  #     - ./web/packages/msfz/certs:/etc/nginx/certs:ro
+  #   networks:
+  #     - jy-admin-network
+  #   mem_limit: 256m
+  #   cpus: 0.5
+  #   healthcheck:
+  #     test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:80/"]
+  #     interval: 30s
+  #     timeout: 3s
+  #     retries: 3
+  #     start_period: 10s
 
-  msfz:
-    build:
-      context: ./web
-      dockerfile: packages/msfz/Dockerfile
-      # 启用构建缓存
-      args:
-        BUILDKIT_INLINE_CACHE: 1
-    container_name: jy-admin-msfz
-    restart: always
-    ports:
-      - "8080:80"
-    volumes:
-      # 证书目录：宿主机 ./certs 挂载到容器 /etc/nginx/certs（勿提交 certs/ 到仓库）
-      - ./web/packages/msfz/certs:/etc/nginx/certs:ro
-    networks:
-      - jy-admin-network
-    mem_limit: 256m
-    cpus: 0.5
-    healthcheck:
-      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:80/"]
-      interval: 30s
-      timeout: 3s
-      retries: 3
-      start_period: 10s
 
-      
 volumes:
   mysql_data:
     driver: local
