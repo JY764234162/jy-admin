@@ -57,7 +57,7 @@ if [ -d "web/packages/web/dist" ] && [ -f "web/packages/web/dist/index.html" ]; 
     echo -e "${GREEN}✓ 构建产物已存在${NC}"
     # 非交互环境默认不重新构建
     if [ -t 0 ]; then
-        read -r -p "是否重新构建? [y/N] " confirm
+        read -r -p "是否重新构建? [Y/N] " confirm
         if [[ ! "$confirm" =~ ^[Yy]$ ]]; then
             echo -e "${YELLOW}跳过构建，使用已有产物${NC}"
             SKIP_BUILD=1

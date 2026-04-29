@@ -5,7 +5,7 @@
 #   2. Docker 构建：docker-compose up --build frontend
 # ============================================================
 
-FROM nginx:alpine
+FROM nginx
 
 LABEL MAINTAINER="jy-admin"
 

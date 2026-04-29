@@ -4,13 +4,25 @@ import * as Y from "yjs";
 const MSG_UPDATE = 0x00;
 const MSG_STATE = 0x01;
 
+export type ConnectionStatus = "idle" | "connecting" | "connected" | "error";
+
 export function useYjsCollaboration(roomId: string, token: string) {
-  const [connected, setConnected] = useState(false);
+  const [connectionStatus, setConnectionStatus] = useState<ConnectionStatus>("idle");
   const ydocRef = useRef<Y.Doc | null>(null);
   const wsRef = useRef<WebSocket | null>(null);
 
   const connect = useCallback(() => {
-    if (!roomId || !token || wsRef.current) return;
+    if (!roomId || !token) {
+      setConnectionStatus("error");
+      return;
+    }
+    if (wsRef.current) {
+      // 已有连接，先断开
+      wsRef.current.close();
+      wsRef.current = null;
+    }
+
+    setConnectionStatus("connecting");
 
     const protocol = window.location.protocol === "https:" ? "wss:" : "ws:";
     const wsUrl = `${protocol}//${window.location.host}/api/ws/collab/${roomId}?token=${token}`;
@@ -20,15 +32,15 @@ export function useYjsCollaboration(roomId: string, token: string) {
 
     ws.onopen = () => {
       console.log("[Yjs] WebSocket 已连接");
-      setConnected(true);
+      setConnectionStatus("connected");
     };
     ws.onclose = () => {
       console.log("[Yjs] WebSocket 已断开");
-      setConnected(false);
+      setConnectionStatus("error");
     };
     ws.onerror = (err) => {
       console.error("[Yjs] WebSocket 错误:", err);
-      setConnected(false);
+      setConnectionStatus("error");
     };
 
     ws.onmessage = (event) => {
@@ -66,12 +78,12 @@ export function useYjsCollaboration(roomId: string, token: string) {
     wsRef.current = null;
     ydocRef.current?.destroy();
     ydocRef.current = null;
-    setConnected(false);
+    setConnectionStatus("idle");
   }, []);
 
   // 定期发送完整状态
   useEffect(() => {
-    if (!connected) return;
+    if (connectionStatus !== "connected") return;
     const interval = setInterval(() => {
       if (ydocRef.current && wsRef.current?.readyState === WebSocket.OPEN) {
         const state = Y.encodeStateAsUpdate(ydocRef.current);
@@ -79,7 +91,7 @@ export function useYjsCollaboration(roomId: string, token: string) {
       }
     }, 10000);
     return () => clearInterval(interval);
-  }, [connected]);
+  }, [connectionStatus]);
 
   // 组件卸载时清理
   useEffect(() => {
@@ -89,5 +101,5 @@ export function useYjsCollaboration(roomId: string, token: string) {
     };
   }, []);
 
-  return { ydocRef, wsRef, connected, connect, disconnect };
+  return { ydocRef, wsRef, connectionStatus, connect, disconnect };
 }

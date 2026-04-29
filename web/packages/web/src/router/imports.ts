@@ -75,7 +75,7 @@ export const dynamicLazyMap: Record<string, () => Promise<any>> = {
   resume: () => import("@/pages/other/resume"),
 
   // ========== 基金分析 ==========
-  "fund-analysis": () => import("@/pages/fund-analysis"),
+  // "fund-analysis": () => import("@/pages/fund-analysis"),
 
   // ========== 系统管理 ==========
   user: () => import("@/pages/user"),
