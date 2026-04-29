@@ -134,23 +134,8 @@ if [ -t 0 ]; then
             web/packages/web/dist/ \
             "${SERVER_USER}@${SERVER_HOST}:${SERVER_PATH}/web/packages/web/dist/"
 
-        rsync -avz \
-            web/packages/web/nginx.conf \
-            "${SERVER_USER}@${SERVER_HOST}:${SERVER_PATH}/web/packages/web/nginx.conf"
-
-        echo -e "\n${BLUE}远程服务器重新部署...${NC}"
-        ssh "${SERVER_USER}@${SERVER_HOST}" << EOF
-            set -e
-            cd "${SERVER_PATH}"
-            docker compose up -d --build --force-recreate frontend
-            echo ""
-            docker compose ps
-EOF
-
-        echo -e "\n${GREEN}✓ 远程服务器部署完成！${NC}"
-        echo -e "${GREEN}远程访问地址：${NC}"
-        echo "  前端: http://${SERVER_HOST}"
-        echo "  API:  http://${SERVER_HOST}/api/health"
+        echo -e "${GREEN}✓ 前端产物已推送到远程服务器${NC}"
+        echo -e "${YELLOW}提示: 请在服务器上执行 ./deploy.sh 完成部署${NC}"
     else
         echo -e "${YELLOW}跳过远程推送${NC}"
     fi
