@@ -158,7 +158,8 @@ func registerRouter(Router *gin.Engine) *gin.Engine {
 		// SPA 路由支持：所有非 API 路由都返回 index.html
 		Router.NoRoute(func(c *gin.Context) {
 			// 如果是 API 路由，返回 404
-			if c.Request.URL.Path[:4] == "/api" {
+			path := c.Request.URL.Path
+			if len(path) >= 4 && path[:4] == "/api" {
 				c.JSON(http.StatusNotFound, gin.H{"code": 404, "msg": "接口不存在"})
 				return
 			}

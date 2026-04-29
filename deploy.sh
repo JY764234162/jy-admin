@@ -3,8 +3,8 @@
 # 服务器端部署脚本（在服务器上运行）
 # 功能：检查前端产物 → 构建并启动后端/数据库 → 启动前端 Nginx
 #
-# 前置条件：前端产物已由本地通过 scp/rsync 传到 web/packages/web/dist/
-# 如需一键本地构建+部署，使用: ./deploy-local.sh
+# 前置条件：前端产物已由本地构建后推送到仓库/传到服务器
+# 如需本地构建+部署，使用: ./deploy-local.sh
 #
 # 使用方法: ./deploy.sh
 
@@ -77,7 +77,7 @@ done
 
 
 
-if [ ${#MISSING_VARS[@]} -gt 0 ]; then 
+if [ ${#MISSING_VARS[@]} -gt 0 ]; then
     echo -e "${RED}错误: 以下环境变量未设置：${NC}"
     for var in "${MISSING_VARS[@]}"; do
         echo -e "${RED}  - $var${NC}"
@@ -94,12 +94,12 @@ fi
 export DOCKER_BUILDKIT=1
 export COMPOSE_DOCKER_CLI_BUILD=1
 
-# 检查前端构建产物是否存在（本地构建后通过 scp/rsync 传过来的）
+# 检查前端构建产物是否存在（本地构建后通过 git 或 scp/rsync 传到服务器）
 echo -e "\n${BLUE}检查前端构建产物...${NC}"
 if [ ! -f "web/packages/web/dist/index.html" ]; then
     echo -e "${RED}错误: 未找到前端构建产物 web/packages/web/dist/index.html${NC}"
-    echo -e "${YELLOW}请先在本地执行 pnpm build，然后通过 scp/rsync 把 dist 传到服务器${NC}"
-    echo -e "${YELLOW}或者使用本地部署脚本: ./deploy-local.sh${NC}"
+    echo -e "${YELLOW}请先在本地执行 pnpm build，然后将 dist 提交到仓库或传到服务器${NC}"
+    echo -e "${YELLOW}本地开发请使用: ./deploy-local.sh${NC}"
     exit 1
 else
     echo -e "${GREEN}✓ 前端构建产物已就绪${NC}"
@@ -132,7 +132,7 @@ echo -e "\n${GREEN}✓ 部署完成！${NC}\n"
 # 显示服务状态
 echo -e "${BLUE}服务状态：${NC}"
 if docker compose version &> /dev/null; then
-    docker compose ps   
+    docker compose ps
 else
     docker-compose ps
 fi
@@ -146,4 +146,5 @@ echo -e "${BLUE}常用命令：${NC}"
 echo "  查看日志: docker-compose logs -f"
 echo "  停止服务: docker-compose down"
 echo "  重启服务: docker-compose restart"
+
 

@@ -40,7 +40,18 @@
       "Bash(ssh ubuntu@101.42.138.198 \"ls -la /home/ubuntu/jy-admin/docker-compose.yml /home/ubuntu/jy-admin/docker-compose.yaml 2>&1; which docker-compose; docker compose version 2>&1 | head -1\")",
       "Bash(ssh ubuntu@101.42.138.198 \"ls -la /home/ubuntu/jy-admin/ 2>&1; ls -la /home/ubuntu/ | grep jy\")",
       "Bash(ssh ubuntu@101.42.138.198 \"find /home/ubuntu -name 'docker-compose.yml' 2>/dev/null | head -5; ls -la /home/ubuntu/jy_admin/ 2>&1 | head -20\")",
-      "Bash(ssh ubuntu@101.42.138.198 \"cat ~/.ssh/authorized_keys | wc -l; echo '---'; head -1 ~/.ssh/authorized_keys | cut -c1-80\")"
+      "Bash(ssh ubuntu@101.42.138.198 \"cat ~/.ssh/authorized_keys | wc -l; echo '---'; head -1 ~/.ssh/authorized_keys | cut -c1-80\")",
+      "Bash(docker-compose ps *)",
+      "Bash(docker-compose logs *)",
+      "Bash(curl -s -o /dev/null -w \"%{http_code}\" https://registry-1.docker.io/v2/library/alpine/manifests/latest)",
+      "Bash(curl -s http://localhost:7777/)",
+      "Bash(curl -s -o /dev/null -w \"%{http_code}\" http://localhost/)",
+      "Bash(curl -s http://localhost/)",
+      "Bash(curl -s -o /dev/null -w \"%{http_code}\" http://localhost/api/health)",
+      "Bash(curl -s http://localhost/assets/)",
+      "Bash(openssl x509 *)",
+      "Bash(curl -s -o /dev/null -w \"%{http_code}\" --insecure https://localhost/)",
+      "Bash(curl -s --insecure https://localhost/)"
     ]
   }
 }
