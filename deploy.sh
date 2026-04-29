@@ -121,13 +121,10 @@ fi
 echo -e "\n${BLUE}开始构建和启动服务...${NC}\n"
 
 if docker compose version &> /dev/null; then
-    # 先构建并启动后端和数据库
-    docker compose up -d --build backend mysql
-    # 前端直接用已有产物，不需要 --build（避免服务器内存不足）
-    docker compose up -d frontend
+    # 构建并启动所有服务（前端 build 很轻量，只是 COPY 文件到 nginx）
+    docker compose up -d --build
 else
-    docker-compose up -d --build backend mysql
-    docker-compose up -d frontend
+    docker-compose up -d --build
 fi
 
 echo -e "\n${GREEN}✓ 部署完成！${NC}\n"
