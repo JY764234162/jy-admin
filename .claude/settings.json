@@ -51,7 +51,10 @@
       "Bash(curl -s http://localhost/assets/)",
       "Bash(openssl x509 *)",
       "Bash(curl -s -o /dev/null -w \"%{http_code}\" --insecure https://localhost/)",
-      "Bash(curl -s --insecure https://localhost/)"
+      "Bash(curl -s --insecure https://localhost/)",
+      "Bash(time bash *)",
+      "Bash(docker version *)",
+      "Bash(docker info *)"
     ]
   }
 }

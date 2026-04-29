@@ -87,10 +87,38 @@ fi
 # 启动本地 Docker 服务
 echo -e "\n${BLUE}启动本地 Docker 服务...${NC}"
 
-if docker compose version &> /dev/null; then
-    docker compose up -d --build
+COMPOSE_CMD="docker compose"
+if ! docker compose version &> /dev/null; then
+    COMPOSE_CMD="docker-compose"
+fi
+
+# 询问是否需要重新构建后端镜像（后端 Go 代码变更时需要）
+REBUILD_BACKEND=""
+FRONTEND_RUNNING=$(docker ps --format '{{.Names}}' | grep -c '^jy-admin-frontend$' || true)
+if [ "$FRONTEND_RUNNING" -eq 0 ]; then
+    # 服务未运行，必须构建所有
+    echo -e "${YELLOW}服务未运行，构建并启动所有服务...${NC}"
+    $COMPOSE_CMD up -d --build
+elif [ -z "$SKIP_BUILD" ]; then
+    # 前端刚重新构建了，只重建前端镜像
+    echo -e "${YELLOW}重建前端镜像...${NC}"
+    $COMPOSE_CMD up -d --build --force-recreate frontend
 else
-    docker-compose up -d --build
+    # 前端没有重新构建，询问是否重建后端
+    if [ -t 0 ]; then
+        read -r -p "是否重新构建后端镜像? [y/N] " confirm_backend
+        if [[ "$confirm_backend" =~ ^[Yy]$ ]]; then
+            REBUILD_BACKEND=1
+        fi
+    fi
+
+    if [ -n "$REBUILD_BACKEND" ]; then
+        echo -e "${YELLOW}重建后端镜像...${NC}"
+        $COMPOSE_CMD up -d --build backend
+    else
+        echo -e "${GREEN}跳过构建，重启已有服务...${NC}"
+        $COMPOSE_CMD up -d
+    fi
 fi
 
 echo -e "\n${GREEN}✓ 本地部署完成！${NC}\n"

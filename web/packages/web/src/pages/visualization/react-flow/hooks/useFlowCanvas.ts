@@ -123,7 +123,13 @@ export function useFlowCanvas(): FlowCanvasState {
     const nodesObserver = () => {
       suppressYjsSync.current = true;
       requestAnimationFrame(() => {
-        _setNodes(Array.from(yNodes.values()) as Node[]);
+        // 从 Yjs 读取节点后重新注入 onNodeClick（函数不可序列化，Yjs 同步后会丢失）
+        _setNodes(
+          (Array.from(yNodes.values()) as Node[]).map((node) => ({
+            ...node,
+            data: { ...node.data, onNodeClick: handleNodeClick },
+          }))
+        );
       });
     };
     const edgesObserver = () => {
