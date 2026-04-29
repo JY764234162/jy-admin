@@ -1,7 +1,7 @@
 #!/bin/bash
 #
 # 本地部署脚本（在 Mac/开发机运行）
-# 功能：本地 build 前端 → 本地 docker compose 启动所有服务
+# 功能：本地 build 前端 → 本地 docker compose → 可选推送到远程服务器
 #
 # 用法：
 #   chmod +x deploy-local.sh
@@ -9,6 +9,12 @@
 #
 
 set -e
+
+# ==================== 远程服务器配置 ====================
+SERVER_HOST="101.42.138.198"
+SERVER_USER="ubuntu"
+SERVER_PATH="/home/ubuntu/jy_admin"
+# ============================================================
 
 # 颜色输出
 GREEN='\033[0;32m'
@@ -55,7 +61,6 @@ echo -e "\n${BLUE}检查前端构建产物...${NC}"
 
 if [ -d "web/packages/web/dist" ] && [ -f "web/packages/web/dist/index.html" ]; then
     echo -e "${GREEN}✓ 构建产物已存在${NC}"
-    # 非交互环境默认不重新构建
     if [ -t 0 ]; then
         read -r -p "是否重新构建? [Y/N] " confirm
         if [[ ! "$confirm" =~ ^[Yy]$ ]]; then
@@ -92,49 +97,65 @@ if ! docker compose version &> /dev/null; then
     COMPOSE_CMD="docker-compose"
 fi
 
-# 询问是否需要重新构建后端镜像（后端 Go 代码变更时需要）
-REBUILD_BACKEND=""
 FRONTEND_RUNNING=$(docker ps --format '{{.Names}}' | grep -c '^jy-admin-frontend$' || true)
 if [ "$FRONTEND_RUNNING" -eq 0 ]; then
-    # 服务未运行，必须构建所有
     echo -e "${YELLOW}服务未运行，构建并启动所有服务...${NC}"
     $COMPOSE_CMD up -d --build
 elif [ -z "$SKIP_BUILD" ]; then
-    # 前端刚重新构建了，只重建前端镜像
-    echo -e "${YELLOW}重建前端镜像...${NC}"
+    echo -e "${YELLOW}前端已重新构建，重建前端镜像...${NC}"
     $COMPOSE_CMD up -d --build --force-recreate frontend
 else
-    # 前端没有重新构建，询问是否重建后端
-    if [ -t 0 ]; then
-        read -r -p "是否重新构建后端镜像? [y/N] " confirm_backend
-        if [[ "$confirm_backend" =~ ^[Yy]$ ]]; then
-            REBUILD_BACKEND=1
-        fi
-    fi
-
-    if [ -n "$REBUILD_BACKEND" ]; then
-        echo -e "${YELLOW}重建后端镜像...${NC}"
-        $COMPOSE_CMD up -d --build backend
-    else
-        echo -e "${GREEN}跳过构建，重启已有服务...${NC}"
-        $COMPOSE_CMD up -d
-    fi
+    # 前端未重新构建，默认重建后端
+    echo -e "${YELLOW}重建后端镜像并启动所有服务...${NC}"
+    $COMPOSE_CMD up -d --build
 fi
 
 echo -e "\n${GREEN}✓ 本地部署完成！${NC}\n"
 
 # 显示服务状态
 echo -e "${BLUE}服务状态：${NC}"
-if docker compose version &> /dev/null; then
-    docker compose ps
-else
-    docker-compose ps
-fi
+$COMPOSE_CMD ps
 
 echo ""
-echo -e "${GREEN}访问地址：${NC}"
+echo -e "${GREEN}本地访问地址：${NC}"
 echo "  前端: http://localhost"
 echo "  API:  http://localhost/api/health"
+
+# 询问是否推送到远程服务器
+if [ -t 0 ]; then
+    echo ""
+    read -r -p "是否推送前端产物到远程服务器 (${SERVER_USER}@${SERVER_HOST})? [y/N] " push_confirm
+    if [[ "$push_confirm" =~ ^[Yy]$ ]]; then
+        echo -e "\n${BLUE}推送前端产物到远程服务器...${NC}"
+
+        ssh "${SERVER_USER}@${SERVER_HOST}" "mkdir -p ${SERVER_PATH}/web/packages/web/dist"
+
+        rsync -avz --delete \
+            web/packages/web/dist/ \
+            "${SERVER_USER}@${SERVER_HOST}:${SERVER_PATH}/web/packages/web/dist/"
+
+        rsync -avz \
+            web/packages/web/nginx.conf \
+            "${SERVER_USER}@${SERVER_HOST}:${SERVER_PATH}/web/packages/web/nginx.conf"
+
+        echo -e "\n${BLUE}远程服务器重新部署...${NC}"
+        ssh "${SERVER_USER}@${SERVER_HOST}" << EOF
+            set -e
+            cd "${SERVER_PATH}"
+            docker compose up -d --build --force-recreate frontend
+            echo ""
+            docker compose ps
+EOF
+
+        echo -e "\n${GREEN}✓ 远程服务器部署完成！${NC}"
+        echo -e "${GREEN}远程访问地址：${NC}"
+        echo "  前端: http://${SERVER_HOST}"
+        echo "  API:  http://${SERVER_HOST}/api/health"
+    else
+        echo -e "${YELLOW}跳过远程推送${NC}"
+    fi
+fi
+
 echo ""
 echo -e "${BLUE}常用命令：${NC}"
 echo "  查看日志: docker compose logs -f"

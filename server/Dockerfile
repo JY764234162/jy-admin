@@ -16,7 +16,8 @@ COPY . .
 ENV CGO_ENABLED=0
 ENV GOOS=linux
 ENV GOARCH=amd64
-RUN go build -ldflags="-w -s" -o jy-admin main.go
+RUN --mount=type=cache,target=/root/.cache/go-build \
+    go build -ldflags="-w -s" -o jy-admin main.go
 
 # 运行阶段
 FROM alpine:latest
