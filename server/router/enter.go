@@ -12,6 +12,7 @@ import (
 	"jiangyi.com/global"
 	"jiangyi.com/middleware"
 	"jiangyi.com/websocket"
+	game "jiangyi.com/websocket/game"
 )
 
 type justFilesFilesystem struct {
@@ -72,6 +73,9 @@ func registerRouter(Router *gin.Engine) *gin.Engine {
 
 	// WebSocket 协同编辑 Hub
 	hub := websocket.NewHub()
+
+	// WebSocket 五子棋游戏 Hub
+	gameHub := game.NewGameHub()
 
 	//登录相关（开放路由，不需要认证）
 	{
@@ -142,6 +146,9 @@ func registerRouter(Router *gin.Engine) *gin.Engine {
 
 	// WebSocket 协同编辑（通过 query token 认证）
 	publicGroup.GET("/ws/collab/:roomId", websocket.ServeWS(hub))
+
+	// WebSocket 五子棋游戏
+	publicGroup.GET("/ws/game/:roomId", game.ServeGameWS(gameHub))
 
 	//开放健康检查
 	publicGroup.GET("/health", func(c *gin.Context) {

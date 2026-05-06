@@ -70,6 +70,7 @@ export const dynamicLazyMap: Record<string, () => Promise<any>> = {
   poke: () => import("@/pages/game/poke"),
   "plane-game": () => import("@/pages/game/plane-game"),
   "slot-machine": () => import("@/pages/game/slot-machine"),
+  gomoku: () => import("@/pages/game/gomoku"),
 
   // ========== 其他 ==========
   resume: () => import("@/pages/other/resume"),

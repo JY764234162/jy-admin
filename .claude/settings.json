@@ -54,7 +54,11 @@
       "Bash(curl -s --insecure https://localhost/)",
       "Bash(time bash *)",
       "Bash(docker version *)",
-      "Bash(docker info *)"
+      "Bash(docker info *)",
+      "Bash(pnpm --filter web build)"
+    ],
+    "additionalDirectories": [
+      "/Users/jiangyi/Desktop/study/jy-admin/server/websocket"
     ]
   }
 }

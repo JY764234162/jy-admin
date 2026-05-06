@@ -1,0 +1,171 @@
+.gomoku-board-wrapper {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+}
+
+.gomoku-board {
+  display: grid;
+  grid-template-columns: repeat(15, 32px);
+  grid-template-rows: repeat(15, 32px);
+  background: #dcb35c;
+  border: 3px solid #8b6914;
+  border-radius: 4px;
+  padding: 4px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+}
+
+.gomoku-cell {
+  width: 32px;
+  height: 32px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  position: relative;
+  cursor: default;
+}
+
+.gomoku-cell.clickable {
+  cursor: pointer;
+}
+
+.gomoku-cell.clickable:hover .gomoku-preview {
+  opacity: 0.4;
+}
+
+/* 棋盘网格线 */
+.gomoku-cell::before {
+  content: "";
+  position: absolute;
+  background: #8b6914;
+}
+
+.gomoku-cell::after {
+  content: "";
+  position: absolute;
+  background: #8b6914;
+}
+
+/* 水平线 */
+.gomoku-cell::before {
+  top: 50%;
+  left: 0;
+  right: 0;
+  height: 1px;
+}
+
+/* 垂直线 */
+.gomoku-cell::after {
+  left: 50%;
+  top: 0;
+  bottom: 0;
+  width: 1px;
+}
+
+/* 边缘裁剪 */
+.gomoku-cell:nth-child(15n + 1)::before { left: 50%; }
+.gomoku-cell:nth-child(15n)::before { right: 50%; }
+.gomoku-cell:nth-child(-n + 15)::after { top: 50%; }
+.gomoku-cell:nth-child(n + 211)::after { bottom: 50%; }
+
+/* 星位 */
+.gomoku-cell:nth-child(57)::before,
+.gomoku-cell:nth-child(57)::after,
+.gomoku-cell:nth-child(63)::before,
+.gomoku-cell:nth-child(63)::after,
+.gomoku-cell:nth-child(113)::before,
+.gomoku-cell:nth-child(113)::after,
+.gomoku-cell:nth-child(119)::before,
+.gomoku-cell:nth-child(119)::after,
+.gomoku-cell:nth-child(193)::before,
+.gomoku-cell:nth-child(193)::after,
+.gomoku-cell:nth-child(199)::before,
+.gomoku-cell:nth-child(199)::after {
+  /* Star points handled via background dot */
+}
+
+/* 棋子 */
+.gomoku-stone {
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  position: relative;
+  z-index: 2;
+  box-shadow: 1px 1px 3px rgba(0, 0, 0, 0.4);
+}
+
+.gomoku-stone.black {
+  background: radial-gradient(circle at 35% 35%, #555, #111);
+}
+
+.gomoku-stone.white {
+  background: radial-gradient(circle at 35% 35%, #fff, #ccc);
+  border: 1px solid #aaa;
+}
+
+.gomoku-stone.winning {
+  box-shadow: 0 0 8px 2px #ff4d4f;
+}
+
+.gomoku-last-mark {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: #ff4d4f;
+}
+
+.gomoku-preview {
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  opacity: 0;
+  position: relative;
+  z-index: 1;
+  transition: opacity 0.15s;
+}
+
+.gomoku-preview.black {
+  background: radial-gradient(circle at 35% 35%, #555, #111);
+}
+
+.gomoku-preview.white {
+  background: radial-gradient(circle at 35% 35%, #fff, #ccc);
+}
+
+/* 游戏布局 */
+.gomoku-container {
+  display: flex;
+  gap: 24px;
+  justify-content: center;
+  align-items: flex-start;
+  padding: 24px;
+  height: calc(100vh - 100px);
+  overflow: auto;
+}
+
+.gomoku-sidebar {
+  width: 240px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.gomoku-lobby {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  height: calc(100vh - 100px);
+  gap: 24px;
+}
+
+.gomoku-status-bar {
+  text-align: center;
+  padding: 8px 0;
+  font-size: 16px;
+  font-weight: 500;
+}
