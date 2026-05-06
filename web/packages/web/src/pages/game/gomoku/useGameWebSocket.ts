@@ -21,7 +21,7 @@ export interface OpponentDisconnectInfo {
   graceEndsAt: number;
 }
 
-export function useGameWebSocket(roomId: string, token: string) {
+export function useGameWebSocket(roomId: string, token: string, nickname: string) {
   const [roomState, setRoomState] = useState<RoomState | null>(null);
   const [role, setRole] = useState<UserRole>("spectator");
   const [connectionStatus, setConnectionStatus] = useState<ConnectionStatus>("idle");
@@ -135,7 +135,7 @@ export function useGameWebSocket(roomId: string, token: string) {
     setConnectionStatus("connecting");
     const protocol = window.location.protocol === "https:" ? "wss:" : "ws:";
     const clientId = getClientId();
-    const wsUrl = `${protocol}//${window.location.host}/api/ws/game/${roomId}?token=${token}&clientId=${encodeURIComponent(clientId)}`;
+    const wsUrl = `${protocol}//${window.location.host}/api/ws/game/${roomId}?token=${token}&clientId=${encodeURIComponent(clientId)}&nickname=${encodeURIComponent(nickname)}`;
     const ws = new WebSocket(wsUrl);
     wsRef.current = ws;
 
@@ -170,7 +170,7 @@ export function useGameWebSocket(roomId: string, token: string) {
         // ignore
       }
     };
-  }, [roomId, token, handleMessage]);
+  }, [roomId, token, nickname, handleMessage]);
 
   const disconnect = useCallback(() => {
     intentionalCloseRef.current = true;

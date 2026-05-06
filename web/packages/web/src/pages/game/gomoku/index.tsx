@@ -1,8 +1,9 @@
 import { useEffect, useMemo, useState } from "react";
 import { useSelector } from "react-redux";
-import { Alert, Button, Card, Spin } from "antd";
+import { Alert, Button, Card, Input, Spin } from "antd";
 import { localStg } from "@/utils/storage";
 import { layoutSlice } from "@/store/slice/layout";
+import { userSlice } from "@/store/slice/user";
 import { useGameWebSocket } from "./useGameWebSocket";
 import { Board } from "./Board";
 import { GameInfo } from "./GameInfo";
@@ -32,6 +33,16 @@ function DisconnectBanner({ userId, color, graceEndsAt }: { userId: string; colo
 export const Component = () => {
   const token = localStg.get("token") || "";
   const isMobile = useSelector(layoutSlice.selectors.getIsMobile);
+  const userInfo = useSelector(userSlice.selectors.getUserInfo);
+
+  const savedNickname = localStorage.getItem("gomoku_nickname") || "";
+  const [gameNickname, setGameNickname] = useState(() => {
+    if (savedNickname) return savedNickname;
+    return userInfo?.nickName || userInfo?.username || `玩家-${Math.floor(1000 + Math.random() * 9000)}`;
+  });
+  const [nicknameSet, setNicknameSet] = useState(() => !!savedNickname);
+
+  const displayNickname = gameNickname;
 
   const {
     roomState,
@@ -50,14 +61,16 @@ export const Component = () => {
     requestRestart,
     respondRestart,
     move,
-  } = useGameWebSocket(DEFAULT_ROOM, token);
+  } = useGameWebSocket(DEFAULT_ROOM, token, displayNickname);
 
   useEffect(() => {
-    connect();
+    if (nicknameSet) {
+      connect();
+    }
     return () => {
       disconnect();
     };
-  }, [connect, disconnect]);
+  }, [connect, disconnect, nicknameSet]);
 
   // 根据屏幕尺寸动态计算棋盘格子大小
   const cellSize = useMemo(() => {
@@ -65,6 +78,37 @@ export const Component = () => {
     const available = Math.min(window.innerWidth - 20, 500);
     return Math.floor(available / 15);
   }, [isMobile]);
+
+  if (!nicknameSet) {
+    return (
+      <div className="gomoku-lobby">
+        <Card title="设置游戏昵称" style={{ width: isMobile ? "90%" : 320, maxWidth: 400 }}>
+          <p style={{ color: "#666", fontSize: 14, marginBottom: 16 }}>
+            请输入你在游戏中的显示名称
+          </p>
+          <Input
+            value={gameNickname}
+            onChange={(e) => setGameNickname(e.target.value)}
+            placeholder="例如：小明"
+            maxLength={12}
+            style={{ marginBottom: 16 }}
+          />
+          <Button
+            type="primary"
+            block
+            onClick={() => {
+              const trimmed = gameNickname.trim();
+              if (!trimmed) return;
+              localStorage.setItem("gomoku_nickname", trimmed);
+              setNicknameSet(true);
+            }}
+          >
+            开始游戏
+          </Button>
+        </Card>
+      </div>
+    );
+  }
 
   if (connectionStatus === "connecting" || connectionStatus === "idle") {
     return (

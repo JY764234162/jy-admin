@@ -2,7 +2,6 @@ package game
 
 import (
 	"encoding/json"
-	"fmt"
 	"log"
 	"sync"
 	"time"
@@ -46,9 +45,6 @@ type GameRoom struct {
 	BlackPlayer *GameClient
 	WhitePlayer *GameClient
 	Spectators  map[*GameClient]bool
-
-	// 顺序分配的显示编号
-	NextUserNum int
 
 	// 断线玩家快照（按 clientId 索引）
 	DisconnectedPlayers map[string]*DisconnectInfo
@@ -139,9 +135,6 @@ func (r *GameRoom) AssignRole(client *GameClient) string {
 			}
 		}
 	}
-
-	r.NextUserNum++
-	client.UserID = fmt.Sprintf("用户%d", r.NextUserNum)
 
 	if r.BlackPlayer == nil && !blackReserved {
 		r.BlackPlayer = client
@@ -239,7 +232,6 @@ func (r *GameRoom) RemoveClient(client *GameClient) {
 		r.MoveHistory = nil
 		r.PendingUndoRequestFrom = nil
 		r.PendingRestartRequestFrom = nil
-		r.NextUserNum = 0
 		// 房间重置时清空所有断线快照，避免身份串号
 		r.DisconnectedPlayers = make(map[string]*DisconnectInfo)
 		// 观战者也清空准备状态

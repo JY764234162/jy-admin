@@ -3,11 +3,11 @@ package game
 import (
 	"log"
 	"net/http"
-	"strings"
 	"time"
 
 	"github.com/gin-gonic/gin"
 	"github.com/gorilla/websocket"
+	"jiangyi.com/utils"
 )
 
 var gameUpgrader = websocket.Upgrader{
@@ -34,20 +34,22 @@ func ServeGameWS(hub *GameHub) gin.HandlerFunc {
 			return
 		}
 
-		// 认证：从 query 参数获取用户信息
-		userID := c.Query("userId")
+		// 优先使用前端传入的昵称，其次从 JWT 解析
+		userID := c.Query("nickname")
 		if userID == "" {
 			token := c.Query("token")
 			if token != "" {
-				// 尝试从 token 解析用户 ID（简化处理，取 token 前缀）
-				parts := strings.SplitN(token, ".", 2)
-				if len(parts) > 0 && parts[0] != "" {
-					userID = parts[0]
+				j := utils.NewJWT()
+				if claims, err := j.ParseToken(token); err == nil {
+					userID = claims.NickName
+					if userID == "" {
+						userID = claims.Username
+					}
 				}
 			}
 		}
 		if userID == "" {
-			userID = "anonymous"
+			userID = "匿名玩家"
 		}
 
 		// clientId 用于刷新重连时恢复身份（前端 sessionStorage 生成）
