@@ -13,13 +13,12 @@ import { MenuFoldOutlined, MenuUnfoldOutlined } from "@ant-design/icons";
 import { layoutSlice } from "@/store/slice/layout";
 import { GlobalBreadcrumb } from "../global-breadcrumb";
 import { UserAvatar } from "@/components/UserAvatar";
-import { userSlice } from "@/store/slice/user";
 // console.log(Object.entries(modules));
 
 export const GlobalHeader = memo(() => {
   const settings = useSelector(settingSlice.selectors.getSettings);
   const layoutSetting = useSelector(layoutSlice.selectors.getLayoutSetting);
-  const userInfo = useSelector(userSlice.selectors.getUserInfo);
+  const isMobile = useSelector(layoutSlice.selectors.getIsMobile);
   const dispatch = useDispatch();
 
   const toggleCollapsed = () => {
@@ -47,6 +46,7 @@ export const GlobalHeader = memo(() => {
         alignItems: "center",
         boxShadow: "0 1px 2px rgb(0, 21, 41, 0.08)",
         zIndex: 10,
+        height: isMobile ? "50px" : "unset",
       }}
     >
       <Button type="text" icon={layoutSetting.isCollapsed ? <MenuUnfoldOutlined /> : <MenuFoldOutlined />} onClick={toggleCollapsed} />
@@ -54,7 +54,16 @@ export const GlobalHeader = memo(() => {
       {ButtonListRender}
     </Header>
   ) : (
-    <Header style={{ display: "flex", alignItems: "center", gap: 8, boxShadow: "0 1px 2px rgb(0, 21, 41, 0.08)", padding: "0 16px" }}>
+    <Header
+      style={{
+        display: "flex",
+        alignItems: "center",
+        gap: 8,
+        boxShadow: "0 1px 2px rgb(0, 21, 41, 0.08)",
+        padding: "0 16px",
+        height: isMobile ? "50px" : "unset",
+      }}
+    >
       <GlobalLogo />
       <GlobalMenu style={{ flex: 1, overflow: "hidden", border: "none" }} />
       {ButtonListRender}

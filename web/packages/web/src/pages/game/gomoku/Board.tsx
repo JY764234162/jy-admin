@@ -8,10 +8,11 @@ interface BoardProps {
   isPlaying: boolean;
   lastMove: { row: number; col: number } | null;
   winningLine: number[][] | null;
+  cellSize?: number;
   onMove: (row: number, col: number) => void;
 }
 
-export function Board({ board, role, currentTurn, isPlaying, lastMove, winningLine, onMove }: BoardProps) {
+export function Board({ board, role, currentTurn, isPlaying, lastMove, winningLine, cellSize = 32, onMove }: BoardProps) {
   const canPlace = role !== "spectator" && isPlaying;
   const myColor: PlayerColor | null = role === "black" ? 1 : role === "white" ? 2 : null;
   const isMyTurn = myColor === currentTurn;
@@ -29,7 +30,10 @@ export function Board({ board, role, currentTurn, isPlaying, lastMove, winningLi
 
   return (
     <div className="gomoku-board-wrapper">
-      <div className="gomoku-board">
+      <div
+        className="gomoku-board"
+        style={{ "--cell": `${cellSize}px`, "--stone": `${Math.floor(cellSize * 0.8)}px`, "--mark": `${Math.max(Math.floor(cellSize * 0.2), 3)}px` } as React.CSSProperties}
+      >
         {Array.from({ length: 15 }, (_, row) =>
           Array.from({ length: 15 }, (_, col) => {
             const cell = board[row]?.[col] ?? 0 as 0 | 1 | 2;

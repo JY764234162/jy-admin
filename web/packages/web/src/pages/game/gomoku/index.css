@@ -6,8 +6,8 @@
 
 .gomoku-board {
   display: grid;
-  grid-template-columns: repeat(15, 32px);
-  grid-template-rows: repeat(15, 32px);
+  grid-template-columns: repeat(15, var(--cell, 32px));
+  grid-template-rows: repeat(15, var(--cell, 32px));
   background: #dcb35c;
   border: 3px solid #8b6914;
   border-radius: 4px;
@@ -16,8 +16,8 @@
 }
 
 .gomoku-cell {
-  width: 32px;
-  height: 32px;
+  width: var(--cell, 32px);
+  height: var(--cell, 32px);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -86,8 +86,8 @@
 
 /* 棋子 */
 .gomoku-stone {
-  width: 26px;
-  height: 26px;
+  width: var(--stone, 26px);
+  height: var(--stone, 26px);
   border-radius: 50%;
   position: relative;
   z-index: 2;
@@ -112,15 +112,15 @@
   top: 50%;
   left: 50%;
   transform: translate(-50%, -50%);
-  width: 6px;
-  height: 6px;
+  width: var(--mark, 6px);
+  height: var(--mark, 6px);
   border-radius: 50%;
   background: #ff4d4f;
 }
 
 .gomoku-preview {
-  width: 26px;
-  height: 26px;
+  width: var(--stone, 26px);
+  height: var(--stone, 26px);
   border-radius: 50%;
   opacity: 0;
   position: relative;
@@ -145,13 +145,6 @@
   padding: 24px;
   height: calc(100vh - 100px);
   overflow: auto;
-}
-
-.gomoku-sidebar {
-  width: 240px;
-  display: flex;
-  flex-direction: column;
-  gap: 16px;
 }
 
 .gomoku-lobby {

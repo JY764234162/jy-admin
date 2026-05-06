@@ -1,6 +1,8 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
+import { useSelector } from "react-redux";
 import { Alert, Button, Card, Spin } from "antd";
 import { localStg } from "@/utils/storage";
+import { layoutSlice } from "@/store/slice/layout";
 import { useGameWebSocket } from "./useGameWebSocket";
 import { Board } from "./Board";
 import { GameInfo } from "./GameInfo";
@@ -29,6 +31,7 @@ function DisconnectBanner({ userId, color, graceEndsAt }: { userId: string; colo
 
 export const Component = () => {
   const token = localStg.get("token") || "";
+  const isMobile = useSelector(layoutSlice.selectors.getIsMobile);
 
   const {
     roomState,
@@ -55,6 +58,13 @@ export const Component = () => {
       disconnect();
     };
   }, [connect, disconnect]);
+
+  // 根据屏幕尺寸动态计算棋盘格子大小
+  const cellSize = useMemo(() => {
+    if (!isMobile) return 32;
+    const available = Math.min(window.innerWidth - 20, 500);
+    return Math.floor(available / 15);
+  }, [isMobile]);
 
   if (connectionStatus === "connecting" || connectionStatus === "idle") {
     return (
@@ -95,7 +105,6 @@ export const Component = () => {
       if (!bothPresent) {
         return <span style={{ color: "#999" }}>⏳ 等待对手加入房间...</span>;
       }
-      // 两人都在,根据准备状态提示
       if (myPlayer?.ready && opponent?.ready) {
         return <span style={{ color: "#52c41a" }}>双方已准备,开始游戏!</span>;
       }
@@ -120,35 +129,56 @@ export const Component = () => {
     );
   };
 
-  return (
-    <div className="gomoku-container">
-      <div className="gomoku-sidebar">
-        <Card size="small">
-          <div style={{ textAlign: "center", fontSize: 16, fontWeight: 600 }}>
-            {role === "black" && <span style={{ color: "#000" }}>⚫ 你是黑方</span>}
-            {role === "white" && <span style={{ color: "#666" }}>⚪ 你是白方</span>}
-            {role === "spectator" && <span style={{ color: "#fa8c16" }}>👀 观战者</span>}
-          </div>
+  const sidebar = (
+    <div
+      style={{
+        width: isMobile ? "100%" : 240,
+        maxWidth: isMobile ? 500 : undefined,
+        display: "flex",
+        flexDirection: "column",
+        gap: isMobile ? 8 : 16,
+        order: isMobile ? 2 : -1,
+      }}
+    >
+      <Card size="small">
+        <div style={{ textAlign: "center", fontSize: isMobile ? 14 : 15, fontWeight: 600 }}>
+          {role === "black" && <span style={{ color: "#000" }}>⚫ 你是黑方</span>}
+          {role === "white" && <span style={{ color: "#666" }}>⚪ 你是白方</span>}
+          {role === "spectator" && <span style={{ color: "#fa8c16" }}>👀 观战者</span>}
+        </div>
+      </Card>
+      <GameInfo roomState={roomState} role={role} onReady={ready} onUnready={unready} />
+      {roomState.status !== "waiting" && (
+        <Card size="small" title="操作">
+          <GameControls
+            role={role}
+            status={roomState.status}
+            pendingUndoFrom={pendingUndoFrom}
+            pendingRestartFrom={pendingRestartFrom}
+            onUndo={requestUndo}
+            onRespondUndo={respondUndo}
+            onSurrender={surrender}
+            onRestart={requestRestart}
+            onRespondRestart={respondRestart}
+          />
         </Card>
-        <GameInfo roomState={roomState} role={role} onReady={ready} onUnready={unready} />
-        {roomState.status !== "waiting" && (
-          <Card size="small" title="操作">
-            <GameControls
-              role={role}
-              status={roomState.status}
-              pendingUndoFrom={pendingUndoFrom}
-              pendingRestartFrom={pendingRestartFrom}
-              onUndo={requestUndo}
-              onRespondUndo={respondUndo}
-              onSurrender={surrender}
-              onRestart={requestRestart}
-              onRespondRestart={respondRestart}
-            />
-          </Card>
-        )}
-      </div>
+      )}
+    </div>
+  );
 
-      <div>
+  return (
+    <div
+      className="gomoku-container"
+      style={{
+        flexDirection: isMobile ? "column" : "row",
+        alignItems: "center",
+        padding: isMobile ? "12px 8px" : 24,
+        gap: isMobile ? 12 : 24,
+        height: isMobile ? "auto" : undefined,
+        minHeight: isMobile ? "calc(100vh - 100px)" : undefined,
+      }}
+    >
+      <div style={{ display: "flex", flexDirection: "column", alignItems: "center", order: isMobile ? 1 : 0 }}>
         {opponentDisconnected && (
           <DisconnectBanner
             userId={opponentDisconnected.userId}
@@ -163,12 +193,15 @@ export const Component = () => {
           isPlaying={roomState.status === "playing"}
           lastMove={lastMove ? { row: lastMove.row, col: lastMove.col } : null}
           winningLine={null}
+          cellSize={cellSize}
           onMove={move}
         />
-        <div className="gomoku-status-bar">
+        <div className="gomoku-status-bar" style={{ fontSize: isMobile ? 14 : 16, padding: isMobile ? "4px 0" : "8px 0" }}>
           {renderStatusBar()}
         </div>
       </div>
+
+      {sidebar}
     </div>
   );
 };
