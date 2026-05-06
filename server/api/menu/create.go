@@ -7,6 +7,8 @@ import (
 	"jiangyi.com/model/system"
 )
 
+const adminAuthorityId = "888"
+
 // CreateMenu 创建菜单
 // @Summary      创建菜单
 // @Description  创建菜单
@@ -35,5 +37,12 @@ func (a *Api) CreateMenu(c *gin.Context) {
 		common.FailWithMsg(c, "创建菜单失败")
 		return
 	}
+
+	// 自动将新菜单追加到超级管理员角色
+	var admin system.SysAuthority
+	if err := global.JY_DB.Where("authority_id = ?", adminAuthorityId).First(&admin).Error; err == nil {
+		global.JY_DB.Model(&admin).Association("SysBaseMenus").Append(&menu)
+	}
+
 	common.OkWithDetailed(c, menu, "创建成功")
 }
