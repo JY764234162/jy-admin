@@ -33,6 +33,16 @@
   opacity: 0.4;
 }
 
+.gomoku-cell.touch-active .gomoku-preview {
+  opacity: 0.5;
+}
+
+.gomoku-board {
+  touch-action: none;
+  user-select: none;
+  -webkit-user-select: none;
+}
+
 /* 棋盘网格线 */
 .gomoku-cell::before {
   content: "";
