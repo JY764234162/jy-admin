@@ -8,6 +8,10 @@ export interface PlayerInfo {
   ready: boolean;
 }
 
+export interface SpectatorInfo {
+  userId: string;
+}
+
 export interface RoomState {
   roomId: string;
   board: Board;
@@ -15,6 +19,7 @@ export interface RoomState {
     black: PlayerInfo | null;
     white: PlayerInfo | null;
   };
+  spectators: SpectatorInfo[];
   currentTurn: PlayerColor;
   status: GameStatus;
   moveHistory: Array<{ row: number; col: number; player: PlayerColor }>;

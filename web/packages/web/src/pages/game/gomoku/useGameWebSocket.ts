@@ -48,7 +48,7 @@ export function useGameWebSocket(roomId: string, token: string) {
         setRole(msg.data.color);
         break;
       case "game_start":
-        setRoomState((prev) => prev ? { ...prev, status: "playing", currentTurn: msg.data.currentTurn } : prev);
+        setRoomState((prev) => (prev ? { ...prev, status: "playing", currentTurn: msg.data.currentTurn } : prev));
         break;
       case "move_made":
         setRoomState((prev) => {
@@ -64,7 +64,7 @@ export function useGameWebSocket(roomId: string, token: string) {
         });
         break;
       case "game_over":
-        setRoomState((prev) => prev ? { ...prev, status: "ended", winner: (msg.data.winner || null) as 1 | 2 | null } : prev);
+        setRoomState((prev) => (prev ? { ...prev, status: "ended", winner: (msg.data.winner || null) as 1 | 2 | null } : prev));
         setOpponentDisconnected(null);
         break;
       case "undo_requested":
@@ -73,11 +73,13 @@ export function useGameWebSocket(roomId: string, token: string) {
       case "undo_result":
         setPendingUndoFrom(null);
         if (msg.data.accepted) {
-          setRoomState((prev) => prev ? { ...prev, board: msg.data.board, moveHistory: msg.data.moveHistory, currentTurn: msg.data.currentTurn } : prev);
+          setRoomState((prev) =>
+            prev ? { ...prev, board: msg.data.board, moveHistory: msg.data.moveHistory, currentTurn: msg.data.currentTurn } : prev
+          );
         }
         break;
       case "player_surrendered":
-        setRoomState((prev) => prev ? { ...prev, status: "ended" } : prev);
+        setRoomState((prev) => (prev ? { ...prev, status: "ended" } : prev));
         break;
       case "restart_requested":
         setPendingRestartFrom(msg.data.from);
@@ -168,7 +170,6 @@ export function useGameWebSocket(roomId: string, token: string) {
         // ignore
       }
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [roomId, token, handleMessage]);
 
   const disconnect = useCallback(() => {

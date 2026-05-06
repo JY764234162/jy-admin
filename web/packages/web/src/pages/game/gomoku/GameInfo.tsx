@@ -9,8 +9,9 @@ interface GameInfoProps {
 }
 
 export function GameInfo({ roomState, role, onReady, onUnready }: GameInfoProps) {
-  const { players, currentTurn, status, moveHistory, winner } = roomState;
+  const { players, spectators, currentTurn, status, moveHistory, winner } = roomState;
   const history = moveHistory ?? [];
+  const specList = spectators ?? [];
 
   const statusText = () => {
     if (status === "waiting") return "等待开始";
@@ -85,6 +86,24 @@ export function GameInfo({ roomState, role, onReady, onUnready }: GameInfoProps)
       <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
         {renderPlayer("black", players.black)}
         {renderPlayer("white", players.white)}
+      </div>
+
+      <div style={{ marginTop: 12, paddingTop: 12, borderTop: "1px dashed #eee" }}>
+        <div style={{ fontSize: 12, color: "#666", marginBottom: 6, display: "flex", alignItems: "center" }}>
+          <span>👀 观战者</span>
+          <Tag style={{ marginLeft: "auto", marginRight: 0 }}>{specList.length}</Tag>
+        </div>
+        {specList.length === 0 ? (
+          <div style={{ fontSize: 12, color: "#bbb", textAlign: "center", padding: "4px 0" }}>暂无观战者</div>
+        ) : (
+          <div style={{ display: "flex", flexWrap: "wrap", gap: 4 }}>
+            {specList.map((s) => (
+              <Tag key={s.userId} style={{ margin: 0 }}>
+                {s.userId}
+              </Tag>
+            ))}
+          </div>
+        )}
       </div>
 
       <div style={{ marginTop: 12, fontSize: 12, color: "#999", textAlign: "center" }}>

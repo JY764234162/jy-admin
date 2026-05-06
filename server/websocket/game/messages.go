@@ -31,18 +31,23 @@ type PlayerInfo struct {
 }
 
 type RoomStateData struct {
-	RoomID      string       `json:"roomId"`
-	Board       [15][15]int  `json:"board"`
-	Players     PlayersData  `json:"players"`
-	CurrentTurn int          `json:"currentTurn"`
-	Status      string       `json:"status"`
-	MoveHistory []MoveEntry  `json:"moveHistory"`
-	Winner      int          `json:"winner"`
+	RoomID      string          `json:"roomId"`
+	Board       [15][15]int     `json:"board"`
+	Players     PlayersData     `json:"players"`
+	Spectators  []SpectatorInfo `json:"spectators"`
+	CurrentTurn int             `json:"currentTurn"`
+	Status      string          `json:"status"`
+	MoveHistory []MoveEntry     `json:"moveHistory"`
+	Winner      int             `json:"winner"`
 }
 
 type PlayersData struct {
 	Black *PlayerInfo `json:"black"`
 	White *PlayerInfo `json:"white"`
+}
+
+type SpectatorInfo struct {
+	UserID string `json:"userId"`
 }
 
 type MoveEntry struct {
@@ -110,11 +115,12 @@ type RestartRequestedData struct {
 }
 
 type GameRestartData struct {
-	RoomID      string      `json:"roomId"`
-	Board       [15][15]int `json:"board"`
-	Players     PlayersData `json:"players"`
-	CurrentTurn int         `json:"currentTurn"`
-	Status      string      `json:"status"`
+	RoomID      string          `json:"roomId"`
+	Board       [15][15]int     `json:"board"`
+	Players     PlayersData     `json:"players"`
+	Spectators  []SpectatorInfo `json:"spectators"`
+	CurrentTurn int             `json:"currentTurn"`
+	Status      string          `json:"status"`
 }
 
 type OpponentDisconnectedData struct {

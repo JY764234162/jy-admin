@@ -579,6 +579,7 @@ func (r *GameRoom) HandleRestartResponse(client *GameClient, accept bool) {
 		CurrentTurn: 1,
 		Status:      StatusWaiting,
 		Players:     r.buildPlayersData(),
+		Spectators:  r.buildSpectatorsData(),
 	})
 	r.broadcastAll(msg)
 }
@@ -596,6 +597,7 @@ func (r *GameRoom) BuildRoomState() []byte {
 		MoveHistory: r.MoveHistory,
 		Winner:      r.Winner,
 		Players:     r.buildPlayersData(),
+		Spectators:  r.buildSpectatorsData(),
 	}
 	msg, err := buildMessage("room_state", data)
 	if err != nil {
@@ -613,6 +615,14 @@ func (r *GameRoom) buildPlayersData() PlayersData {
 		white = &PlayerInfo{UserID: r.WhitePlayer.UserID, Ready: r.WhitePlayer.Ready}
 	}
 	return PlayersData{Black: black, White: white}
+}
+
+func (r *GameRoom) buildSpectatorsData() []SpectatorInfo {
+	list := make([]SpectatorInfo, 0, len(r.Spectators))
+	for spec := range r.Spectators {
+		list = append(list, SpectatorInfo{UserID: spec.UserID})
+	}
+	return list
 }
 
 func (r *GameRoom) getOpponent(client *GameClient) *GameClient {
