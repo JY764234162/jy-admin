@@ -1,19 +1,8 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { ConnectionStatus } from "@/hooks/useYjsCollaboration";
 import type { RoomState, ServerMessage, UserRole } from "./types";
-
-const RECONNECT_DELAY = 2000;
-const MAX_RECONNECT_ATTEMPTS = 10;
-const CLIENT_ID_KEY = "gomoku_client_id";
-
-function getClientId(): string {
-  let id = sessionStorage.getItem(CLIENT_ID_KEY);
-  if (!id) {
-    id = `${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
-    sessionStorage.setItem(CLIENT_ID_KEY, id);
-  }
-  return id;
-}
+import { RECONNECT_DELAY, MAX_RECONNECT_ATTEMPTS } from "./constants";
+import { getClientId } from "./utils";
 
 export interface OpponentDisconnectInfo {
   userId: string;
