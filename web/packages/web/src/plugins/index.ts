@@ -5,4 +5,5 @@ export * from "./setupHotModule";
 export * from "./setupLoading";
 export * from "./setupNprogress";
 export * from "./setupRouter";
+export * from "./setupSentry";
 

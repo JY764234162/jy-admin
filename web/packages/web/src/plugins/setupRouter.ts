@@ -9,4 +9,8 @@ export const setupRouter = async () => {
     await store.dispatch(getCurrentUserInfo());
     await store.dispatch(initConstantRoute());
   }
+
+  const authRoutes = store.getState().routes.allRoutes;
+  const { createAppRouter } = await import("@/router/createAppRouter");
+  return createAppRouter(authRoutes);
 };
