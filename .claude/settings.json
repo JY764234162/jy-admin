@@ -55,7 +55,13 @@
       "Bash(time bash *)",
       "Bash(docker version *)",
       "Bash(docker info *)",
-      "Bash(pnpm --filter web build)"
+      "Bash(pnpm --filter web build)",
+      "Bash(curl -s -X POST http://localhost:7777/api/base/login -H 'Content-Type: application/json' -d '{\"username\":\"admin\",\"password\":\"123456\",\"captcha\":\"1234\",\"captchaId\":\"test\"}')",
+      "Bash(curl -s -X POST http://localhost:7777/api/login -H 'Content-Type: application/json' -d '{\"username\":\"admin\",\"password\":\"123456\",\"captcha\":\"1234\",\"captchaId\":\"test\"}')",
+      "Bash(git clone *)",
+      "Bash(grep -n \"= nil$\" server/websocket/mahjong/room.go)",
+      "Bash(git config *)",
+      "Bash(gpg --list-keys --keyid-format LONG)"
     ],
     "additionalDirectories": [
       "/Users/jiangyi/Desktop/study/jy-admin/server/websocket"
