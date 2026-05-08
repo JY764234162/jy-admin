@@ -18,6 +18,7 @@ const (
 // MahjongPlayer 表示房间内的玩家
 type MahjongPlayer struct {
 	Client      *MahjongClient
+	ClientID    string // 独立保存，断线后仍能识别重连
 	UserID      string
 	Hand        []Tile
 	DiscardPile []Tile
@@ -95,13 +96,16 @@ func (r *MahjongRoom) AssignSeat(client *MahjongClient) int {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 
-	// 检查是否断线重连
+	// 检查是否断线重连（不依赖 p.Client，因为 RemoveClient 会将其置为 nil）
 	for i, p := range r.Players {
-		if p != nil && p.Client != nil && p.Client.ClientID == client.ClientID {
+		if p != nil && p.ClientID == client.ClientID {
 			p.Client = client
 			p.IsBot = false
 			client.Seat = i
 			r.Clients[client] = true
+
+			msg, _ := buildMessage("player_reconnected", PlayerReconnectedData{Player: i})
+			r.broadcastAll(msg)
 			return i
 		}
 	}
@@ -110,6 +114,7 @@ func (r *MahjongRoom) AssignSeat(client *MahjongClient) int {
 		if r.Players[i] == nil {
 			r.Players[i] = &MahjongPlayer{
 				Client:      client,
+				ClientID:    client.ClientID,
 				UserID:      client.UserID,
 				Hand:        []Tile{},
 				DiscardPile: []Tile{},
