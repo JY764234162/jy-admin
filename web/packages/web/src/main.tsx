@@ -1,4 +1,4 @@
-import { createRoot } from "react-dom/client";
+import { createRoot, type Root } from "react-dom/client";
 import {
   setupConsole,
   setupDayjs,
@@ -12,6 +12,8 @@ import {
 import App from "./App";
 import { Provider } from "react-redux";
 import { store } from "./store";
+
+let root: Root | null = null;
 
 async function setupApp() {
   //初始状态loading
@@ -40,7 +42,13 @@ async function setupApp() {
 
   const container = document.getElementById("root");
   if (!container) return;
-  createRoot(container).render(
+
+  // 避免 HMR 时重复创建 root，防止 React 模块竞态条件导致 context 丢失
+  if (!root) {
+    root = createRoot(container);
+  }
+
+  root.render(
     <Provider store={store}>
       <App router={router} />
     </Provider>
