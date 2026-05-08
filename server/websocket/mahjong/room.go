@@ -46,11 +46,12 @@ type MahjongRoom struct {
 
 func NewMahjongRoom(id string) *MahjongRoom {
 	return &MahjongRoom{
-		ID:      id,
-		Clients: make(map[*MahjongClient]bool),
-		Status:  StatusWaiting,
-		Wind:    "东",
-		Round:   1,
+		ID:          id,
+		Clients:     make(map[*MahjongClient]bool),
+		Status:      StatusWaiting,
+		Wind:        "东",
+		Round:       1,
+		DiscardPile: []Tile{},
 	}
 }
 
@@ -183,6 +184,18 @@ func (r *MahjongRoom) StartGame() {
 	}
 
 	r.broadcastState()
+
+	// 庄家是 bot，直接打牌（庄家已有14张，不需要摸牌）
+	if r.Players[r.Dealer] != nil && r.Players[r.Dealer].IsBot {
+		go func() {
+			time.Sleep(1 * time.Second)
+			r.mu.Lock()
+			defer r.mu.Unlock()
+			if r.Players[r.Dealer] != nil && r.Players[r.Dealer].IsBot {
+				r.botDiscard(r.Dealer)
+			}
+		}()
+	}
 }
 
 func (r *MahjongRoom) DrawTile(player int) {
@@ -210,19 +223,6 @@ func (r *MahjongRoom) DrawTile(player int) {
 	msg, _ := buildMessage("tile_drawn", TileDrawnData{Player: player})
 	r.broadcastAll(msg)
 	r.broadcastState()
-
-	// 托管：自动打牌
-	if r.Players[player] != nil && r.Players[player].IsBot {
-		go func() {
-			time.Sleep(1 * time.Second)
-			r.mu.Lock()
-			defer r.mu.Unlock()
-			if r.Players[player] != nil && len(r.Players[player].Hand) > 0 {
-				discard := r.Players[player].Hand[len(r.Players[player].Hand)-1]
-				r.doDiscard(player, discard)
-			}
-		}()
-	}
 }
 
 func (r *MahjongRoom) doDiscard(player int, tile Tile) {
@@ -261,11 +261,113 @@ func (r *MahjongRoom) doDiscard(player int, tile Tile) {
 		if next >= 0 {
 			r.CurrentPlayer = next
 			r.broadcastState()
-			if r.Players[r.CurrentPlayer] != nil && r.Players[r.CurrentPlayer].IsBot {
-				go r.DrawTile(r.CurrentPlayer)
+			if r.Players[next] != nil && r.Players[next].IsBot {
+				go r.botPlay(next)
 			}
 		}
+	} else {
+		// 有人能响应，延迟后让 bot 自动按优先级响应（胡>杠>碰），否则自动 pass
+		go func(discardedTile Tile) {
+			time.Sleep(2 * time.Second)
+			r.mu.Lock()
+			defer r.mu.Unlock()
+
+			if r.LastDiscarded == nil || r.LastDiscarded.ID != discardedTile.ID {
+				return // 已经有人手动响应了
+			}
+
+			// 胡优先级最高
+			for i := 0; i < 4; i++ {
+				if i == player || r.Players[i] == nil || !r.Players[i].IsBot {
+					continue
+				}
+				if r.canHu(i, nil, r.LastDiscarded) {
+					r.doHu(i, r.LastDiscarded)
+					return
+				}
+			}
+			// 杠
+			for i := 0; i < 4; i++ {
+				if i == player || r.Players[i] == nil || !r.Players[i].IsBot {
+					continue
+				}
+				if r.canGang(i, *r.LastDiscarded) {
+					r.doGang(i, *r.LastDiscarded)
+					return
+				}
+			}
+			// 碰
+			for i := 0; i < 4; i++ {
+				if i == player || r.Players[i] == nil || !r.Players[i].IsBot {
+					continue
+				}
+				if r.canPeng(i, *r.LastDiscarded) {
+					r.doPeng(i, *r.LastDiscarded)
+					return
+				}
+			}
+
+			// 没有 bot 能响应，所有人自动 pass
+			r.LastDiscarded = nil
+			next := r.nextActivePlayer(r.CurrentPlayer)
+			if next >= 0 {
+				r.CurrentPlayer = next
+				r.broadcastState()
+				if r.Players[next] != nil && r.Players[next].IsBot {
+					go r.botPlay(next)
+				}
+			}
+		}(*r.LastDiscarded)
 	}
+}
+
+// ========== Bot 自动打牌 ==========
+
+// botPlay 处理 bot 的完整回合：摸牌 → 检查自摸 → 打牌
+func (r *MahjongRoom) botPlay(seat int) {
+	time.Sleep(1 * time.Second)
+	r.mu.Lock()
+	defer r.mu.Unlock()
+
+	if r.Players[seat] == nil || !r.Players[seat].IsBot || r.Status != StatusPlaying || r.CurrentPlayer != seat {
+		return
+	}
+
+	// 摸牌
+	if len(r.Wall) == 0 {
+		r.Status = StatusEnded
+		r.broadcastState()
+		return
+	}
+
+	drawn := r.Wall[0]
+	r.Wall = r.Wall[1:]
+	r.Players[seat].Hand = append(r.Players[seat].Hand, drawn)
+
+	yourDrawMsg, _ := buildMessage("your_draw", YourDrawData{Tile: drawn, Player: seat})
+	r.sendToSeat(seat, yourDrawMsg)
+
+	tileDrawnMsg, _ := buildMessage("tile_drawn", TileDrawnData{Player: seat})
+	r.broadcastAll(tileDrawnMsg)
+	r.broadcastState()
+
+	// 检查自摸胡
+	if r.canHu(seat, &drawn, nil) {
+		r.doHu(seat, nil)
+		return
+	}
+
+	// 自动打牌
+	r.botDiscard(seat)
+}
+
+// botDiscard bot 自动打出手牌最后一张
+func (r *MahjongRoom) botDiscard(seat int) {
+	if r.Players[seat] == nil || len(r.Players[seat].Hand) == 0 {
+		return
+	}
+	discard := r.Players[seat].Hand[len(r.Players[seat].Hand)-1]
+	r.doDiscard(seat, discard)
 }
 
 // ========== 碰/杠/胡判断 ==========
@@ -490,8 +592,8 @@ func (r *MahjongRoom) HandleMessage(client *MahjongClient, raw []byte) {
 			if next >= 0 {
 				r.CurrentPlayer = next
 				r.broadcastState()
-				if r.Players[r.CurrentPlayer] != nil && r.Players[r.CurrentPlayer].IsBot {
-					go r.DrawTile(r.CurrentPlayer)
+				if r.Players[next] != nil && r.Players[next].IsBot {
+					go r.botPlay(next)
 				}
 			}
 		}
@@ -521,6 +623,17 @@ func (r *MahjongRoom) doPeng(player int, tile Tile) {
 	r.LastDiscarded = nil
 	r.CurrentPlayer = player
 	r.broadcastState()
+
+	if r.Players[player] != nil && r.Players[player].IsBot {
+		go func() {
+			time.Sleep(1 * time.Second)
+			r.mu.Lock()
+			defer r.mu.Unlock()
+			if r.Players[player] != nil && r.Players[player].IsBot {
+				r.botDiscard(player)
+			}
+		}()
+	}
 }
 
 func (r *MahjongRoom) doGang(player int, tile Tile) {
@@ -555,6 +668,17 @@ func (r *MahjongRoom) doGang(player int, tile Tile) {
 	r.LastDiscarded = nil
 	r.CurrentPlayer = player
 	r.broadcastState()
+
+	if r.Players[player] != nil && r.Players[player].IsBot {
+		go func() {
+			time.Sleep(1 * time.Second)
+			r.mu.Lock()
+			defer r.mu.Unlock()
+			if r.Players[player] != nil && r.Players[player].IsBot {
+				r.botDiscard(player)
+			}
+		}()
+	}
 }
 
 func (r *MahjongRoom) doHu(player int, discarded *Tile) {
