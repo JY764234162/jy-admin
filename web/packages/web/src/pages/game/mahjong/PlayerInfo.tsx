@@ -63,7 +63,7 @@ export function PlayerInfo({ player, isCurrent, isMe, isDealer, isMobile }: Play
       <div style={{ fontSize: isMobile ? 11 : 12, color: "#666" }}>
         {player.handCount}张
       </div>
-      {player.melds.length > 0 && (
+      {(player.melds ?? []).length > 0 && (
         <div style={{ display: "flex", gap: 2, flexWrap: "wrap", justifyContent: "center" }}>
           {player.melds.map((meld, idx) => (
             <span

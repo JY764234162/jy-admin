@@ -7,6 +7,7 @@ interface DiscardAreaProps {
 }
 
 export function DiscardArea({ discardPile, isMobile }: DiscardAreaProps) {
+  const pile = discardPile ?? [];
   return (
     <div
       className="mahjong-discard-area"
@@ -18,10 +19,10 @@ export function DiscardArea({ discardPile, isMobile }: DiscardAreaProps) {
       }}
     >
       <div style={{ fontSize: isMobile ? 12 : 14, color: "#666", marginBottom: 8 }}>
-        弃牌堆 ({discardPile.length})
+        弃牌堆 ({pile.length})
       </div>
       <div style={{ display: "flex", flexWrap: "wrap", gap: isMobile ? 3 : 6 }}>
-        {discardPile.map((tile, idx) => (
+        {pile.map((tile, idx) => (
           <div
             key={tile.id + idx}
             className={`mahjong-tile discard ${tile.suit}`}

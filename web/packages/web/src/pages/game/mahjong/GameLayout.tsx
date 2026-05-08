@@ -50,7 +50,8 @@ export function GameLayout({
     return seats;
   }, [mySeat]);
 
-  const lastDiscarded = roomState.discardPile[roomState.discardPile.length - 1];
+  const discardPile = roomState.discardPile ?? [];
+  const lastDiscarded = discardPile[discardPile.length - 1];
   const isMyTurn = roomState.currentPlayer === mySeat && roomState.status === "playing";
   const canRespond = lastDiscarded !== undefined && roomState.currentPlayer !== mySeat && roomState.status === "playing";
 
@@ -136,7 +137,7 @@ export function GameLayout({
             {roomState.status === "ended" && <span style={{ color: "#cf1322" }}>游戏结束</span>}
           </div>
         </Card>
-        <DiscardArea discardPile={roomState.discardPile} isMobile={isMobile} />
+        <DiscardArea discardPile={discardPile} isMobile={isMobile} />
       </div>
 
       {/* 底部：自己 */}
