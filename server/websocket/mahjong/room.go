@@ -42,17 +42,19 @@ type MahjongRoom struct {
 	Wind          string
 	LastDiscarded *Tile             // 最后打出的牌
 	PendingAction string            // 等待的动作: peng/gang/hu/none
+	forfeitTimers map[string]*time.Timer // 掉线弃权计时器: clientID -> timer
 	mu            sync.RWMutex
 }
 
 func NewMahjongRoom(id string) *MahjongRoom {
 	return &MahjongRoom{
-		ID:          id,
-		Clients:     make(map[*MahjongClient]bool),
-		Status:      StatusWaiting,
-		Wind:        "东",
-		Round:       1,
-		DiscardPile: []Tile{},
+		ID:            id,
+		Clients:       make(map[*MahjongClient]bool),
+		forfeitTimers: make(map[string]*time.Timer),
+		Status:        StatusWaiting,
+		Wind:          "东",
+		Round:         1,
+		DiscardPile:   []Tile{},
 	}
 }
 
@@ -104,6 +106,12 @@ func (r *MahjongRoom) AssignSeat(client *MahjongClient) int {
 			client.Seat = i
 			r.Clients[client] = true
 
+			// 取消弃权计时器
+			if timer, ok := r.forfeitTimers[client.ClientID]; ok {
+				timer.Stop()
+				delete(r.forfeitTimers, client.ClientID)
+			}
+
 			msg, _ := buildMessage("player_reconnected", PlayerReconnectedData{Player: i})
 			r.broadcastAll(msg)
 			return i
@@ -139,11 +147,35 @@ func (r *MahjongRoom) RemoveClient(client *MahjongClient) {
 
 	if client.Seat >= 0 && client.Seat < 4 && r.Players[client.Seat] != nil {
 		if r.Status == StatusPlaying {
-			// 游戏中断线 → 托管
-			r.Players[client.Seat].IsBot = true
+			// 游戏中断线 → 先置 Client 为 nil，启动 10s 弃权计时器
 			r.Players[client.Seat].Client = nil
-			msg, _ := buildMessage("player_left", PlayerLeftData{Player: client.Seat, IsBot: true})
-			r.broadcastAll(msg)
+
+			cid := client.ClientID
+			seat := client.Seat
+			if oldTimer, ok := r.forfeitTimers[cid]; ok {
+				oldTimer.Stop()
+			}
+
+			r.forfeitTimers[cid] = time.AfterFunc(10*time.Second, func() {
+				r.mu.Lock()
+				defer r.mu.Unlock()
+
+				delete(r.forfeitTimers, cid)
+
+				if r.Players[seat] == nil || r.Players[seat].Client != nil {
+					// 已经重连或已离开
+					return
+				}
+
+				r.Players[seat].IsBot = true
+				msg, _ := buildMessage("player_left", PlayerLeftData{Player: seat, IsBot: true})
+				r.broadcastAll(msg)
+
+				// 如果当前轮到该玩家，触发自动打牌
+				if r.CurrentPlayer == seat && r.Status == StatusPlaying {
+					go r.botPlay(seat)
+				}
+			})
 		} else {
 			r.Players[client.Seat] = nil
 		}
