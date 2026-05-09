@@ -274,6 +274,7 @@ func (r *MahjongRoom) doDiscard(player int, tile Tile) {
 		}
 	}
 	r.Players[player].DiscardPile = append(r.Players[player].DiscardPile, tile)
+	r.DiscardPile = append(r.DiscardPile, tile)
 	r.LastDiscarded = &tile
 
 	msg, _ := buildMessage("tile_discarded", TileDiscardedData{Tile: tile, Player: player})
