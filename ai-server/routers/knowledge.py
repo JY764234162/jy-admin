@@ -88,17 +88,40 @@ async def query_knowledge(req: QueryRequest):
     retriever = store.as_retriever(search_kwargs={"k": req.top_k})
 
     if req.structured:
-        # 结构化输出：使用 LangChain with_structured_output
+        # 结构化输出：Prompt 中要求返回 JSON，手动解析（兼容不支持 response_format 的模型）
+        structured_prompt = PromptTemplate.from_template(
+            """你是一个文档问答助手。请严格根据以下参考资料回答用户的问题。
+如果资料中没有找到相关信息，请明确说"文档中没有找到相关信息"。
+
+参考资料：
+{context}
+
+用户问题：{question}
+
+请用 JSON 格式返回结果，必须包含以下字段：
+- answer: 根据参考资料生成的回答（字符串）
+- sources: 引用的来源文件列表（字符串数组）
+- confidence: 回答置信度，范围 0.0~1.0（数字）
+
+只返回 JSON，不要有任何其他文字。"""
+        )
         rag_chain = (
             {
                 "context": retriever | _format_docs,
                 "question": RunnablePassthrough(),
             }
-            | RAG_PROMPT
-            | get_structured_llm()
+            | structured_prompt
+            | llm
+            | StrOutputParser()
         )
-        result = rag_chain.invoke(req.question)
-        return result.dict() if hasattr(result, "dict") else dict(result)
+        raw = rag_chain.invoke(req.question)
+        import json as _json
+        try:
+            data = _json.loads(raw.strip().removeprefix("```json").removesuffix("```").strip())
+            return {"answer": data.get("answer", ""), "sources": data.get("sources", []), "confidence": data.get("confidence", 0.5)}
+        except Exception:
+            # 解析失败时回退到普通文本
+            return {"answer": raw, "sources": [], "confidence": 0.5}
     else:
         # 流式输出：使用 LCEL 链 + StrOutputParser
         async def event_generator():
