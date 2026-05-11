@@ -1,56 +1,67 @@
-import re
-from collections import Counter
-from typing import List
-
-import numpy as np
+import requests
 from langchain_core.embeddings import Embeddings
 
-EMBEDDING_DIM = 256
+import config
 
 
-class TFIDFEmbeddings(Embeddings):
-    """本地 TF-IDF 向量化，不需要外部 API"""
+class MiniMaxEmbeddings(Embeddings):
+    """MiniMax 云 Embedding API，遵循 LangChain Embeddings 接口"""
 
-    def _tokenize(self, text: str) -> List[str]:
-        text = text.lower()
-        tokens = re.findall(r"[a-zA-Z]+|[一-鿿]|[0-9]+", text)
-        bigrams = [tokens[i] + tokens[i + 1] for i in range(len(tokens) - 1)]
-        return tokens + bigrams
+    def __init__(self, api_key: str = None, base_url: str = None, model: str = None):
+        self.api_key = api_key or config.MINIMAX_API_KEY
+        self.base_url = (base_url or config.MINIMAX_BASE_URL).rstrip("/")
+        self.model = model or config.EMBEDDING_MODEL
 
-    def _vectorize(self, text: str) -> np.ndarray:
-        tokens = self._tokenize(text)
-        if not tokens:
-            return np.zeros(EMBEDDING_DIM, dtype=np.float32)
+    def _call_api(self, texts: list[str]) -> list[list[float]]:
+        url = f"{self.base_url}/embeddings"
+        headers = {
+            "Authorization": f"Bearer {self.api_key}",
+            "Content-Type": "application/json",
+        }
+        body = {
+            "model": self.model,
+            "texts": texts,
+            "type": "db",
+        }
+        resp = requests.post(url, headers=headers, json=body, timeout=60)
+        resp.raise_for_status()
+        data = resp.json()
 
-        token_counts = Counter(tokens)
-        vec = np.zeros(EMBEDDING_DIM, dtype=np.float32)
+        # 兼容多种响应格式
+        if "vectors" in data:
+            return data["vectors"]
+        if "data" in data:
+            return [item["embedding"] for item in data["data"]]
+        if "embeddings" in data:
+            return data["embeddings"]
+        raise ValueError(f"Unknown MiniMax response format: {list(data.keys())}")
 
-        for token, count in token_counts.most_common(EMBEDDING_DIM):
-            tf = count / len(tokens)
-            idx = hash(token) % EMBEDDING_DIM
-            vec[idx] += tf
-
-        norm = np.linalg.norm(vec)
-        if norm > 0:
-            vec /= norm
-        return vec
-
-    def embed_documents(self, texts: List[str]) -> List[List[float]]:
+    def embed_documents(self, texts: list[str]) -> list[list[float]]:
         if not texts:
             return []
-        return [self._vectorize(t).tolist() for t in texts]
+        return self._call_api(texts)
 
-    def embed_query(self, text: str) -> List[float]:
-        return self._vectorize(text).tolist()
-
-
-# 模块级便捷函数
-_embedder = TFIDFEmbeddings()
+    def embed_query(self, text: str) -> list[float]:
+        result = self._call_api([text])
+        return result[0] if result else []
 
 
-def embed_documents(texts: List[str]) -> List[List[float]]:
-    return _embedder.embed_documents(texts)
+# 全局实例（懒加载）
+_minimax_embeddings: MiniMaxEmbeddings | None = None
 
 
-def embed_query(text: str) -> List[float]:
-    return _embedder.embed_query(text)
+def get_embeddings() -> MiniMaxEmbeddings:
+    """获取全局 MiniMax Embeddings 实例"""
+    global _minimax_embeddings
+    if _minimax_embeddings is None:
+        _minimax_embeddings = MiniMaxEmbeddings()
+    return _minimax_embeddings
+
+
+# 向后兼容的便捷函数
+def embed_documents(texts: list[str]) -> list[list[float]]:
+    return get_embeddings().embed_documents(texts)
+
+
+def embed_query(text: str) -> list[float]:
+    return get_embeddings().embed_query(text)

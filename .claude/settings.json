@@ -61,7 +61,9 @@
       "Bash(git clone *)",
       "Bash(grep -n \"= nil$\" server/websocket/mahjong/room.go)",
       "Bash(git config *)",
-      "Bash(gpg --list-keys --keyid-format LONG)"
+      "Bash(gpg --list-keys --keyid-format LONG)",
+      "Bash(./venv/bin/python -c ' *)",
+      "Bash(./venv/bin/pip list *)"
     ],
     "additionalDirectories": [
       "/Users/jiangyi/Desktop/study/jy-admin/server/websocket"

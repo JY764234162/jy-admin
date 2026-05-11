@@ -1,87 +1,95 @@
-import json
-from pathlib import Path
 from typing import List, Dict
 
-import numpy as np
+from langchain_community.vectorstores import PGVector
+from langchain_core.documents import Document
+from sqlalchemy import create_engine, text
 
 import config
+from services import embedding
 
-META_FILE = config.VECTOR_DIR / "metadata.json"
-
-
-def _load_meta() -> dict:
-    if META_FILE.exists():
-        return json.loads(META_FILE.read_text("utf-8"))
-    return {"documents": {}}
+_connection_string = config.PG_CONNECTION_STRING
+_collection_name = "jy_admin_knowledge"
 
 
-def _save_meta(meta: dict):
-    META_FILE.write_text(json.dumps(meta, ensure_ascii=False, indent=2), "utf-8")
+def get_store() -> PGVector:
+    """获取 PGVector 实例（懒加载）"""
+    return PGVector(
+        connection_string=_connection_string,
+        collection_name=_collection_name,
+        embedding_function=embedding.get_embeddings(),
+    )
 
 
-def _vec_path(doc_id: str) -> Path:
-    return config.VECTOR_DIR / f"{doc_id}.npy"
+def _get_engine():
+    return create_engine(_connection_string)
 
 
-def _cosine_similarity(a: np.ndarray, b: np.ndarray) -> float:
-    norm_a = np.linalg.norm(a)
-    norm_b = np.linalg.norm(b)
-    if norm_a == 0 or norm_b == 0:
-        return 0.0
-    return float(np.dot(a, b) / (norm_a * norm_b))
+def add_documents(documents: List[Document]) -> int:
+    """向知识库添加文档（LangChain Document 列表）"""
+    store = get_store()
+    store.add_documents(documents)
+    return len(documents)
 
 
-def add_documents(doc_id: str, filename: str, chunks: List[str], embeddings: List[List[float]]):
-    vectors = np.array(embeddings, dtype=np.float32)
-    np.save(str(_vec_path(doc_id)), vectors)
-
-    meta = _load_meta()
-    meta["documents"][doc_id] = {
-        "filename": filename,
-        "chunks": chunks,
-        "chunk_count": len(chunks),
-    }
-    _save_meta(meta)
-
-
-def search(query_embedding: List[float], top_k: int = 3) -> List[Dict]:
-    query_vec = np.array(query_embedding, dtype=np.float32)
-
-    results = []
-    meta = _load_meta()
-    for doc_id, doc_meta in meta["documents"].items():
-        vec_path = _vec_path(doc_id)
-        if not vec_path.exists():
-            continue
-        vectors = np.load(str(vec_path))
-        for idx in range(len(vectors)):
-            score = _cosine_similarity(query_vec, vectors[idx])
-            results.append({
-                "content": doc_meta["chunks"][idx],
-                "score": score,
-                "source": doc_meta["filename"],
-                "doc_id": doc_id,
-            })
-
-    results.sort(key=lambda x: x["score"], reverse=True)
-    return results[:top_k]
-
-
-def list_documents() -> List[Dict]:
-    meta = _load_meta()
+def search(query: str, top_k: int = 3) -> List[Dict]:
+    """语义检索，返回最相关的文档片段"""
+    store = get_store()
+    docs_with_scores = store.similarity_search_with_score(query, k=top_k)
     return [
-        {"doc_id": doc_id, **info}
-        for doc_id, info in meta["documents"].items()
+        {
+            "content": doc.page_content,
+            "score": float(score),
+            "source": doc.metadata.get("source", ""),
+            "doc_id": doc.metadata.get("doc_id", ""),
+        }
+        for doc, score in docs_with_scores
     ]
 
 
+def list_documents() -> List[Dict]:
+    """列出所有已上传的文档（按 doc_id 去重）"""
+    engine = _get_engine()
+    with engine.connect() as conn:
+        result = conn.execute(
+            text("""
+                SELECT DISTINCT
+                    cmetadata->>'doc_id' as doc_id,
+                    cmetadata->>'source' as source,
+                    COUNT(*) OVER (PARTITION BY cmetadata->>'doc_id') as chunk_count
+                FROM langchain_pg_embedding
+                WHERE collection_id = (
+                    SELECT uuid FROM langchain_pg_collection WHERE name = :name
+                )
+            """),
+            {"name": _collection_name},
+        )
+        rows = result.fetchall()
+        seen = set()
+        docs = []
+        for row in rows:
+            if row.doc_id and row.doc_id not in seen:
+                seen.add(row.doc_id)
+                docs.append({
+                    "doc_id": row.doc_id,
+                    "source": row.source,
+                    "chunk_count": row.chunk_count,
+                })
+        return docs
+
+
 def delete_document(doc_id: str) -> bool:
-    meta = _load_meta()
-    if doc_id not in meta["documents"]:
-        return False
-    del meta["documents"][doc_id]
-    _save_meta(meta)
-    vec_path = _vec_path(doc_id)
-    if vec_path.exists():
-        vec_path.unlink()
-    return True
+    """删除指定文档的所有片段"""
+    engine = _get_engine()
+    with engine.connect() as conn:
+        result = conn.execute(
+            text("""
+                DELETE FROM langchain_pg_embedding
+                WHERE collection_id = (
+                    SELECT uuid FROM langchain_pg_collection WHERE name = :name
+                )
+                AND cmetadata->>'doc_id' = :doc_id
+            """),
+            {"name": _collection_name, "doc_id": doc_id},
+        )
+        conn.commit()
+        return result.rowcount > 0
