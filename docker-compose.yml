@@ -107,23 +107,59 @@ services:
     mem_limit: 256m # 内存限制：256MB（Nginx 占用很少）
     memswap_limit: 512m # 内存+Swap 限制：512MB（允许使用 256MB Swap）
     cpus: 0.5 # CPU 限制：0.5 核
-  # # 向量数据库（PostgreSQL + pgvector）
-  # postgres-vector:
-  #   image: pgvector/pgvector:pg16
-  #   container_name: jy-admin-pgvector
-  #   restart: always
-  #   environment:
-  #     POSTGRES_DB: ai_vectors
-  #     POSTGRES_USER: ai_admin
-  #     POSTGRES_PASSWORD: ${PG_PASSWORD:-ai123456}
-  #   ports:
-  #     - "5433:5432"
-  #   volumes:
-  #     - pgvector_data:/var/lib/postgresql/data
-  #   networks:
-  #     - jy-admin-network
-  #   mem_limit: 512m
-  #   cpus: 0.5
+  # 向量数据库（PostgreSQL + pgvector）
+  postgres-vector:
+    image: pgvector/pgvector:pg16
+    container_name: jy-admin-pgvector
+    restart: always
+    environment:
+      POSTGRES_DB: ai_vectors
+      POSTGRES_USER: ai_admin
+      POSTGRES_PASSWORD: ${PG_PASSWORD:-ai123456}
+    ports:
+      - "5433:5432"
+    volumes:
+      - pgvector_data:/var/lib/postgresql/data
+    networks:
+      - jy-admin-network
+    mem_limit: 512m
+    cpus: 0.5
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ai_admin -d ai_vectors"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # AI 服务（FastAPI + LangChain + PGVector）
+  ai-server:
+    build:
+      context: ./ai-server
+      dockerfile: Dockerfile
+    container_name: jy-admin-ai-server
+    restart: always
+    environment:
+      AI_API_KEY: ${AI_API_KEY}
+      AI_BASE_URL: ${AI_BASE_URL}
+      AI_MODEL: ${AI_MODEL}
+      EMBEDDING_MODEL: ${EMBEDDING_MODEL:-BAAI/bge-small-zh}
+      HF_ENDPOINT: https://hf-mirror.com
+      PG_HOST: postgres-vector
+      PG_PORT: 5432
+      PG_DB: ai_vectors
+      PG_USER: ai_admin
+      PG_PASSWORD: ${PG_PASSWORD:-ai123456}
+    ports:
+      - "8000:8000"
+    volumes:
+      - ai_uploads:/app/uploads
+    depends_on:
+      postgres-vector:
+        condition: service_healthy
+    networks:
+      - jy-admin-network
+    mem_limit: 512m
+    memswap_limit: 1g
+    cpus: 1.0
 
   # msfz:
   #   build:
@@ -158,8 +194,10 @@ volumes:
     driver: local
   backend_logs:
     driver: local
-  # pgvector_data:
-  #   driver: local
+  pgvector_data:
+    driver: local
+  ai_uploads:
+    driver: local
 
 networks:
   jy-admin-network:
