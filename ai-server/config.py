@@ -11,10 +11,8 @@ AI_API_KEY = os.getenv("AI_API_KEY", "")
 AI_BASE_URL = os.getenv("AI_BASE_URL", "https://api.openai.com/v1")
 AI_MODEL = os.getenv("AI_MODEL", "gpt-4o")
 
-# Embedding 配置（MiniMax 云 API）
-MINIMAX_API_KEY = os.getenv("MINIMAX_API_KEY", "")
-MINIMAX_BASE_URL = os.getenv("MINIMAX_BASE_URL", "https://api.minimax.chat/v1")
-EMBEDDING_MODEL = os.getenv("EMBEDDING_MODEL", "embo-01")
+# Embedding 配置（本地 HuggingFace 模型）
+EMBEDDING_MODEL = os.getenv("EMBEDDING_MODEL", "BAAI/bge-small-zh")
 
 # PostgreSQL + pgvector 配置（优先）
 PG_HOST = os.getenv("PG_HOST", "localhost")
