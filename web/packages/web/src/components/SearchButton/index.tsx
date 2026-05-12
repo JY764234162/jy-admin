@@ -5,6 +5,7 @@ import { AutoComplete, Input, Modal, Button, Tooltip, Empty, List } from "antd";
 import { useMemo, useState, useRef, useEffect } from "react";
 import { useSelector } from "react-redux";
 import { useNavigate } from "react-router-dom";
+import { useGlobalShortcut } from "@/hooks/useGlobalShortcut";
 
 interface SearchOption {
   value: string;
@@ -112,20 +113,27 @@ export function SearchButton() {
     }
   }, [open]);
 
+  // Cmd+F (Mac) / Ctrl+F (Win&Linux) 切换搜索菜单,劫持浏览器原生 Find
+  useGlobalShortcut({ key: "f", mod: true }, () => {
+    if (open) {
+      handleClose();
+    } else {
+      handleOpen();
+    }
+  });
+
   // ESC 关闭
-  useEffect(() => {
-    const handleEsc = (e: KeyboardEvent) => {
-      if (e.key === "Escape" && open) {
-        handleClose();
-      }
-    };
-    window.addEventListener("keydown", handleEsc);
-    return () => window.removeEventListener("keydown", handleEsc);
-  }, [open]);
+  useGlobalShortcut({ key: "Escape", enabled: open, preventDefault: false }, () => {
+    handleClose();
+  });
+
+  // Mac 显示 ⌘,其它平台显示 Ctrl
+  const isMac = typeof navigator !== "undefined" && /Mac|iPhone|iPad/i.test(navigator.platform);
+  const modKeyLabel = isMac ? "⌘" : "Ctrl";
 
   return (
     <>
-      <Tooltip title="搜索菜单">
+      <Tooltip title={`搜索菜单 (${modKeyLabel} + F)`}>
         <Button type="text" onClick={handleOpen} icon={<SearchOutlined />} />
       </Tooltip>
 
