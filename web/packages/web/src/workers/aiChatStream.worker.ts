@@ -7,6 +7,10 @@ type StartPayload = {
   token?: string | null;
   conversationId: number;
   content: string;
+  /** 调用模式：backend=Go后端，aiserver_chat=ai-server聊天，aiserver_knowledge=ai-server知识库问答 */
+  mode?: "backend" | "aiserver_chat" | "aiserver_knowledge";
+  /** 知识库问答配置 */
+  knowledgeConfig?: { top_k?: number };
 };
 
 type StopPayload = {
@@ -116,10 +120,17 @@ async function startStream(p: StartPayload) {
       headers.Authorization = `Bearer ${p.token}`;
     }
 
+    // 统一走 Go 后端，请求体格式一致
+    const body: Record<string, unknown> = {
+      conversationId: p.conversationId,
+      content: p.content,
+      mode: p.mode ?? "backend",
+    };
+
     const resp = await fetch(p.url, {
       method: "POST",
       headers,
-      body: JSON.stringify({ conversationId: p.conversationId, content: p.content }),
+      body: JSON.stringify(body),
       signal: ctrl.signal,
     });
 
@@ -191,7 +202,7 @@ async function startStream(p: StartPayload) {
     emitUpdate(p.streamId, p.conversationId, "", getOrInitConv(p.conversationId).fullText, true);
   } catch (e: any) {
     if (e?.name === "AbortError") {
-      // 被主动停止：保持内容不变，状态回 idle（更符合“暂停”语义）
+      // 被主动停止：保持内容不变，状态回 idle（更符合"暂停"语义）
       updateConv(p.conversationId, { status: "idle", activeStreamId: undefined });
       return;
     }

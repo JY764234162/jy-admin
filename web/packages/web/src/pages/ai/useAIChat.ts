@@ -3,6 +3,8 @@ import { message as antdMessage } from "antd";
 import { aiApi, type AIConversation, type AIMessage } from "@/api/ai";
 import { aiChatStreamClient } from "@/workers/aiChatStreamClient";
 
+export type ChatMode = "backend" | "aiserver_chat" | "aiserver_knowledge";
+
 // 前端消息类型（适配 UI 组件）
 export interface UiMessage {
   id: string;
@@ -33,7 +35,7 @@ export function useAIChat(options: UseAIChatOptions = {}) {
   // 当前会话的流式订阅解绑（页面卸载时解绑，但不停止 worker 流）
   const currentStreamUnsubRef = useRef<null | (() => void)>(null);
   const currentStreamIdRef = useRef<string | null>(null);
-  // 仅当“本 hook 发起的本次生成”结束时才刷新会话列表，避免切换会话时 snapshot(done) 也触发刷新
+  // 仅当"本 hook 发起的本次生成"结束时才刷新会话列表，避免切换会话时 snapshot(done) 也触发刷新
   const shouldRefreshSessionsRef = useRef(false);
   // 避免闭包拿到旧 sessions
   const sessionsRef = useRef<AIConversation[]>([]);
@@ -186,7 +188,7 @@ export function useAIChat(options: UseAIChatOptions = {}) {
   );
 
   const sendMessage = useCallback(
-    async (userContent: string) => {
+    async (userContent: string, mode: ChatMode = "backend") => {
       if (!userContent.trim() || !activeKey) return;
 
       const conversationId = parseInt(activeKey);
@@ -204,7 +206,7 @@ export function useAIChat(options: UseAIChatOptions = {}) {
         timestamp: Date.now(),
       };
 
-      // 进行中的 AI 消息使用稳定 id，便于“切路由回来继续更新”
+      // 进行中的 AI 消息使用稳定 id，便于"切路由回来继续更新"
       const aiMsgId = `ai-stream-${conversationId}`;
       const initialAiMsg: UiMessage = {
         id: aiMsgId,
@@ -225,9 +227,9 @@ export function useAIChat(options: UseAIChatOptions = {}) {
       setLoading(true);
 
       try {
-        // 启动 worker 流（流式更新由 activeKey 的订阅 effect 统一处理）
+        // 启动 worker 流（统一走 Go 后端，由 mode 参数区分目标服务）
         shouldRefreshSessionsRef.current = true;
-        const streamId = aiChatStreamClient.start(conversationId, content);
+        const streamId = aiChatStreamClient.start(conversationId, content, mode);
         currentStreamIdRef.current = streamId;
       } catch (error) {
         console.error("发送消息失败:", error);
@@ -275,7 +277,7 @@ export function useAIChat(options: UseAIChatOptions = {}) {
     }
   }, [activeKey, messagesBySession, loadMessages]);
 
-  // 进入页面/切换会话时：向 worker 拉取最新 snapshot，并尽快把“正在生成的那条 AI 消息”恢复到最新文本
+  // 进入页面/切换会话时：向 worker 拉取最新 snapshot，并尽快把"正在生成的那条 AI 消息"恢复到最新文本
   useEffect(() => {
     if (!activeKey) return;
     const conversationId = parseInt(activeKey);
@@ -284,7 +286,7 @@ export function useAIChat(options: UseAIChatOptions = {}) {
     const unsub = aiChatStreamClient.subscribe(conversationId, (snap) => {
       const streamMsgId = `ai-stream-${conversationId}`;
 
-      // streaming/idle 时，如果有文本但 UI 没有占位消息，则自动补一条，保证“切路由回来继续打字”
+      // streaming/idle 时，如果有文本但 UI 没有占位消息，则自动补一条，保证"切路由回来继续打字"
       if (snap.fullText && (snap.status === "streaming" || snap.status === "idle")) {
         setMessagesBySession((prev) => {
           const current = prev[activeKey] || [];

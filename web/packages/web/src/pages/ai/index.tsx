@@ -1,12 +1,12 @@
 import React, { useState, useEffect, useRef } from "react";
 import { Bubble, Conversations, Sender, type ConversationsProps } from "@ant-design/x";
-import { UserOutlined, PlusOutlined, MessageOutlined, DeleteOutlined, EditOutlined } from "@ant-design/icons";
-import { Button, theme, Empty, Flex, Avatar, Select, Input, Modal, message as antdMessage } from "antd";
+import { UserOutlined, PlusOutlined, MessageOutlined, DeleteOutlined, EditOutlined, RobotOutlined, BookOutlined } from "@ant-design/icons";
+import { Button, theme, Empty, Flex, Avatar, Select, Input, Modal, message as antdMessage, Tag } from "antd";
 import MDEditor from "@uiw/react-md-editor";
 import { useSelector } from "react-redux";
 import { layoutSlice } from "@/store/slice/layout";
 import styles from "./index.module.css";
-import { useAIChat } from "./useAIChat";
+import { useAIChat, type ChatMode } from "./useAIChat";
 import { aiApi } from "@/api/ai";
 
 export const Component = () => {
@@ -28,6 +28,7 @@ export const Component = () => {
   }, []);
 
   const [inputValue, setInputValue] = useState("");
+  const [chatMode, setChatMode] = useState<"backend" | "aiserver_chat" | "aiserver_knowledge">("aiserver_chat");
 
   // 滚动到底部的引用 & 消息列表滚动容器
   const messageScrollRef = useRef<HTMLDivElement>(null);
@@ -55,7 +56,7 @@ export const Component = () => {
   const isAtBottom = () => {
     const el = messageScrollRef.current;
     if (!el) return false;
-    const threshold = 80; // 允许更大误差，避免“差一点点”导致不跟随
+    const threshold = 80; // 允许更大误差，避免"差一点点"导致不跟随
     return el.scrollHeight - (el.scrollTop + el.clientHeight) <= threshold;
   };
 
@@ -85,7 +86,7 @@ export const Component = () => {
   });
 
   // 流式输出过程中，内容高度可能在消息更新之后继续变化（Markdown/图片/字体渲染）
-  // 用 ResizeObserver 在“需要跟随”时持续贴底，避免偶发不生效
+  // 用 ResizeObserver 在"需要跟随"时持续贴底，避免偶发不生效
   useEffect(() => {
     const el = messageScrollRef.current;
     if (!el) return;
@@ -169,7 +170,7 @@ export const Component = () => {
     const content = inputValue.trim();
     setInputValue("");
     autoScrollRef.current = true; // 主动发送后默认跟随到底部
-    await sendMessage(content);
+    await sendMessage(content, chatMode);
   };
 
   // Conversations 组件的 items 配置
@@ -299,7 +300,7 @@ export const Component = () => {
                 const nowAtBottom = isAtBottom();
                 autoScrollRef.current = nowAtBottom;
 
-                // 用户手动滚回到底部：立刻贴底并恢复“跟随输出”
+                // 用户手动滚回到底部：立刻贴底并恢复"跟随输出"
                 if (nowAtBottom && loading) {
                   scrollToBottomSoon();
                 }
@@ -431,13 +432,33 @@ export const Component = () => {
                 zIndex: 10,
               }}
             >
-              <Sender
-                value={inputValue}
-                onChange={setInputValue}
-                onSubmit={handleSend}
-                loading={loading}
-                placeholder="输入消息与 AI 对话..."
-              />
+              <Flex vertical gap={8}>
+                <Flex align="center" gap={8}>
+                  <span style={{ fontSize: 12, color: '#888' }}>对话模式：</span>
+                  <Select
+                    size="small"
+                    value={chatMode}
+                    onChange={setChatMode}
+                    style={{ width: 160 }}
+                    options={[
+                      { value: 'aiserver_chat', label: '基础对话 (AI Server)' },
+                      { value: 'aiserver_knowledge', label: '知识库问答' },
+                      { value: 'backend', label: '后端模式 (LongCat)' },
+                    ]}
+                  />
+                </Flex>
+                <Sender
+                  value={inputValue}
+                  onChange={setInputValue}
+                  onSubmit={handleSend}
+                  loading={loading}
+                  placeholder={
+                    chatMode === 'aiserver_knowledge'
+                      ? '输入问题，基于知识库内容回答...'
+                      : '输入消息与 AI 对话...'
+                  }
+                />
+              </Flex>
             </div>
           </>
         ) : (

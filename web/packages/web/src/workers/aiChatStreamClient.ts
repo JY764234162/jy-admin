@@ -102,8 +102,8 @@ export const aiChatStreamClient = {
     return latestSnapshotByConversation.get(conversationId) || null;
   },
 
-  /** 启动流式聊天，返回 streamId（worker 会持续跑，即使页面卸载） */
-  start(conversationId: number, content: string) {
+  /** 启动流式聊天，统一走 Go 后端，通过 mode 区分目标服务 */
+  start(conversationId: number, content: string, mode: "backend" | "aiserver_chat" | "aiserver_knowledge" = "backend") {
     const streamId = createStreamId();
     const token = localStg.get("token");
     ensureWorker().postMessage({
@@ -114,9 +114,20 @@ export const aiChatStreamClient = {
         token,
         conversationId,
         content,
+        mode,
       },
     });
     return streamId;
+  },
+
+  /** 兼容旧调用：启动 ai-server 基础对话流式聊天 */
+  startAiServerChat(conversationId: number, content: string) {
+    return this.start(conversationId, content, "aiserver_chat");
+  },
+
+  /** 兼容旧调用：启动 ai-server 知识库问答流式查询 */
+  startAiServerKnowledge(conversationId: number, content: string, _top_k = 3) {
+    return this.start(conversationId, content, "aiserver_knowledge");
   },
 
   /** 停止某个 stream */
