@@ -8,16 +8,22 @@ import (
 	"io"
 	"mime/multipart"
 	"net/http"
+	"path/filepath"
+	"strings"
 	"time"
 
 	"github.com/gin-gonic/gin"
+	"github.com/google/uuid"
 	"jiangyi.com/global"
+	"jiangyi.com/model/business"
 	"jiangyi.com/model/common"
+	"jiangyi.com/utils"
+	"jiangyi.com/utils/upload"
 )
 
-// GetKnowledgeList 获取知识库文档列表（代理到 ai-server）
+// GetKnowledgeList 获取知识库文档列表（从数据库查询）
 // @Summary      获取知识库文档列表
-// @Description  从 ai-server 获取知识库文档列表
+// @Description  查询当前用户的知识库文档列表（含COS地址）
 // @Security     ApiKeyAuth
 // @Tags         AI
 // @Accept       json
@@ -25,47 +31,51 @@ import (
 // @Success      200  {object}  common.Response{data=object{documents=[]object},msg=string}
 // @Router       /ai/knowledge/list [get]
 func (a *Api) GetKnowledgeList(c *gin.Context) {
-	aiServerURL := global.JY_Config.AI.AIServerURL
-	if aiServerURL == "" {
-		aiServerURL = "http://localhost:8000"
+	claims, exists := c.Get("claims")
+	if !exists {
+		common.FailWithMsg(c, "未登录")
+		return
 	}
+	userID := claims.(*utils.CustomClaims).ID
 
-	resp, err := http.Get(aiServerURL + "/api/knowledge/list")
-	if err != nil {
+	var files []business.AIKnowledgeFile
+	if err := global.JY_DB.Where("user_id = ?", userID).Order("created_at DESC").Find(&files).Error; err != nil {
 		common.FailWithMsg(c, "获取知识库列表失败")
 		return
 	}
-	defer resp.Body.Close()
 
-	if resp.StatusCode != http.StatusOK {
-		common.FailWithMsg(c, fmt.Sprintf("ai-server 返回状态: %d", resp.StatusCode))
-		return
+	documents := make([]gin.H, 0, len(files))
+	for _, f := range files {
+		documents = append(documents, gin.H{
+			"doc_id":      f.DocID,
+			"source":      f.Filename,
+			"chunk_count": f.ChunkCount,
+			"cos_url":     f.CosURL,
+			"file_type":   f.FileType,
+			"created_at":  f.CreatedAt,
+		})
 	}
 
-	body, err := io.ReadAll(resp.Body)
-	if err != nil {
-		common.FailWithMsg(c, "读取响应失败")
-		return
-	}
-
-	c.Data(http.StatusOK, "application/json", body)
+	common.OkWithData(c, gin.H{"documents": documents})
 }
 
-// UploadKnowledge 上传文档到知识库（代理到 ai-server）
+// UploadKnowledge 上传文档到知识库（COS + ai-server 解析）
 // @Summary      上传知识库文档
-// @Description  将文档上传到 ai-server 知识库
+// @Description  上传文档到COS，并调用ai-server进行解析和向量化
 // @Security     ApiKeyAuth
 // @Tags         AI
 // @Accept       multipart/form-data
 // @Produce      json
 // @Param        file  formData  file  true  "文档文件"
-// @Success      200   {object}  common.Response{data=object{knowledge_id=string,filename=string,chunks=int},msg=string}
+// @Success      200   {object}  common.Response{data=object{knowledge_id=string,filename=string,chunks=int,cos_url=string},msg=string}
 // @Router       /ai/knowledge/upload [post]
 func (a *Api) UploadKnowledge(c *gin.Context) {
-	aiServerURL := global.JY_Config.AI.AIServerURL
-	if aiServerURL == "" {
-		aiServerURL = "http://localhost:8000"
+	claims, exists := c.Get("claims")
+	if !exists {
+		common.FailWithMsg(c, "未登录")
+		return
 	}
+	userID := claims.(*utils.CustomClaims).ID
 
 	file, header, err := c.Request.FormFile("file")
 	if err != nil {
@@ -74,52 +84,123 @@ func (a *Api) UploadKnowledge(c *gin.Context) {
 	}
 	defer file.Close()
 
-	// 构建 multipart 请求体
-	var body bytes.Buffer
-	writer := multipart.NewWriter(&body)
-	part, err := writer.CreateFormFile("file", header.Filename)
-	if err != nil {
-		common.FailWithMsg(c, "创建表单失败")
+	ext := strings.ToLower(filepath.Ext(header.Filename))
+	supported := map[string]bool{
+		".pdf": true, ".txt": true, ".md": true,
+		".docx": true, ".xlsx": true, ".xls": true, ".csv": true,
+	}
+	if !supported[ext] {
+		common.FailWithMsg(c, fmt.Sprintf("不支持的文件格式: %s", ext))
 		return
 	}
+
+	// 1. 生成 doc_id
+	docID := uuid.New().String()[:12]
+	objectKey := fmt.Sprintf("ai-knowledge/%s_%s", docID, header.Filename)
+
+	// 2. 上传到 COS
+	oss, ok := global.JY_OSS.(upload.OSS)
+	if !ok {
+		common.FailWithMsg(c, "OSS未初始化")
+		return
+	}
+
+	// 使用 UploadFileWithKey（需要类型断言到具体类型）
+	cosUploader, ok := oss.(*upload.TencentCOS)
+	var cosURL string
+	if ok {
+		cosURL, _, err = cosUploader.UploadFileWithKey(objectKey, header)
+	} else {
+		// fallback: 使用普通上传
+		cosURL, _, err = oss.UploadFile(header)
+	}
+	if err != nil {
+		common.FailWithMsg(c, fmt.Sprintf("上传文件到COS失败: %v", err))
+		return
+	}
+
+	// 3. 调用 ai-server 解析（multipart 转发）
+	aiServerURL := global.JY_Config.AI.AIServerURL
+	if aiServerURL == "" {
+		aiServerURL = "http://ai-server:8000"
+	}
+
+	parseBody := &bytes.Buffer{}
+	writer := multipart.NewWriter(parseBody)
+	part, err := writer.CreateFormFile("file", header.Filename)
+	if err != nil {
+		common.FailWithMsg(c, "创建解析请求失败")
+		return
+	}
+	file.Seek(0, io.SeekStart)
 	if _, err := io.Copy(part, file); err != nil {
-		common.FailWithMsg(c, "复制文件失败")
+		common.FailWithMsg(c, "复制文件内容失败")
 		return
 	}
 	writer.Close()
 
-	req, err := http.NewRequest(http.MethodPost, aiServerURL+"/api/knowledge/upload", &body)
+	req, err := http.NewRequest(http.MethodPost, aiServerURL+"/api/knowledge/parse", parseBody)
 	if err != nil {
-		common.FailWithMsg(c, "创建请求失败")
+		common.FailWithMsg(c, "创建解析请求失败")
 		return
 	}
 	req.Header.Set("Content-Type", writer.FormDataContentType())
 
-	client := &http.Client{}
+	client := &http.Client{Timeout: 60 * time.Second}
 	resp, err := client.Do(req)
 	if err != nil {
-		common.FailWithMsg(c, "上传失败")
+		common.FailWithMsg(c, fmt.Sprintf("调用ai-server解析失败: %v", err))
 		return
 	}
 	defer resp.Body.Close()
 
 	respBody, err := io.ReadAll(resp.Body)
 	if err != nil {
-		common.FailWithMsg(c, "读取响应失败")
+		common.FailWithMsg(c, "读取解析响应失败")
 		return
 	}
 
 	if resp.StatusCode != http.StatusOK {
-		common.FailWithMsg(c, fmt.Sprintf("ai-server 返回状态: %d, %s", resp.StatusCode, string(respBody)))
+		common.FailWithMsg(c, fmt.Sprintf("ai-server解析失败: %s", string(respBody)))
 		return
 	}
 
-	c.Data(http.StatusOK, "application/json", respBody)
+	var parseResult struct {
+		DocID    string `json:"doc_id"`
+		Filename string `json:"filename"`
+		Chunks   int    `json:"chunks"`
+	}
+	if err := json.Unmarshal(respBody, &parseResult); err != nil {
+		common.FailWithMsg(c, "解析ai-server响应失败")
+		return
+	}
+
+	// 4. 保存元数据到数据库
+	knowledgeFile := business.AIKnowledgeFile{
+		DocID:      docID,
+		Filename:   header.Filename,
+		CosURL:     cosURL,
+		CosKey:     objectKey,
+		ChunkCount: parseResult.Chunks,
+		UserID:     userID,
+		FileType:   ext,
+	}
+	if err := global.JY_DB.Create(&knowledgeFile).Error; err != nil {
+		common.FailWithMsg(c, "保存知识库文件记录失败")
+		return
+	}
+
+	common.OkWithData(c, gin.H{
+		"knowledge_id": docID,
+		"filename":     header.Filename,
+		"chunks":       parseResult.Chunks,
+		"cos_url":      cosURL,
+	})
 }
 
-// DeleteKnowledge 删除知识库文档（代理到 ai-server）
+// DeleteKnowledge 删除知识库文档（COS + 向量 + DB）
 // @Summary      删除知识库文档
-// @Description  从 ai-server 知识库删除指定文档
+// @Description  删除COS文件、向量数据库记录和DB记录
 // @Security     ApiKeyAuth
 // @Tags         AI
 // @Accept       json
@@ -128,43 +209,49 @@ func (a *Api) UploadKnowledge(c *gin.Context) {
 // @Success      200    {object}  common.Response{data=object{message=string},msg=string}
 // @Router       /ai/knowledge/{docId} [delete]
 func (a *Api) DeleteKnowledge(c *gin.Context) {
-	aiServerURL := global.JY_Config.AI.AIServerURL
-	if aiServerURL == "" {
-		aiServerURL = "http://localhost:8000"
+	claims, exists := c.Get("claims")
+	if !exists {
+		common.FailWithMsg(c, "未登录")
+		return
 	}
+	userID := claims.(*utils.CustomClaims).ID
 
-	docId := c.Param("docId")
-	if docId == "" {
+	docID := c.Param("docId")
+	if docID == "" {
 		common.FailWithMsg(c, "文档ID不能为空")
 		return
 	}
 
-	req, err := http.NewRequest(http.MethodDelete, aiServerURL+"/api/knowledge/"+docId, nil)
-	if err != nil {
-		common.FailWithMsg(c, "创建请求失败")
+	// 查询记录
+	var file business.AIKnowledgeFile
+	if err := global.JY_DB.Where("doc_id = ? AND user_id = ?", docID, userID).First(&file).Error; err != nil {
+		common.FailWithMsg(c, "文档不存在或无权限")
 		return
 	}
 
-	client := &http.Client{}
-	resp, err := client.Do(req)
-	if err != nil {
-		common.FailWithMsg(c, "删除失败")
-		return
-	}
-	defer resp.Body.Close()
-
-	respBody, err := io.ReadAll(resp.Body)
-	if err != nil {
-		common.FailWithMsg(c, "读取响应失败")
-		return
+	// 1. 删除 COS 文件
+	if file.CosKey != "" {
+		if oss, ok := global.JY_OSS.(upload.OSS); ok {
+			cosUploader, isCos := oss.(*upload.TencentCOS)
+			if isCos {
+				_ = cosUploader.DeleteFileByKey(file.CosKey)
+			}
+		}
 	}
 
-	if resp.StatusCode != http.StatusOK {
-		common.FailWithMsg(c, fmt.Sprintf("ai-server 返回状态: %d, %s", resp.StatusCode, string(respBody)))
-		return
+	// 2. 删除 ai-server 向量
+	aiServerURL := global.JY_Config.AI.AIServerURL
+	if aiServerURL == "" {
+		aiServerURL = "http://ai-server:8000"
 	}
+	req, _ := http.NewRequest(http.MethodDelete, aiServerURL+"/api/knowledge/"+docID, nil)
+	client := &http.Client{Timeout: 10 * time.Second}
+	client.Do(req) // 忽略错误，即使向量删除失败也继续
 
-	c.Data(http.StatusOK, "application/json", respBody)
+	// 3. 删除 DB 记录
+	global.JY_DB.Where("doc_id = ?", docID).Delete(&business.AIKnowledgeFile{})
+
+	common.OkWithMsg(c, fmt.Sprintf("文档 %s 已删除", docID))
 }
 
 // QueryKnowledge 知识库问答（SSE 流式，代理到 ai-server）

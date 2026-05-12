@@ -21,6 +21,7 @@ require (
 )
 
 require (
+	github.com/google/uuid v1.1.1
 	github.com/gorilla/websocket v1.5.3
 	github.com/tencentyun/cos-go-sdk-v5 v0.7.72
 	gorm.io/driver/mysql v1.6.0
