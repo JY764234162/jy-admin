@@ -29,6 +29,8 @@ export function useAIChat(options: UseAIChatOptions = {}) {
   const currentStreamIdRef = useRef<string | null>(null);
   // 仅当"本 hook 发起的本次生成"结束时才刷新会话列表，避免切换会话时 snapshot(done) 也触发刷新
   const shouldRefreshSessionsRef = useRef(false);
+  // 当前活跃流对应的 AI 消息 id（每条独立，避免覆盖旧回复）
+  const currentAiMsgIdRef = useRef<string | null>(null);
   // 避免闭包拿到旧 sessions
   const sessionsRef = useRef<AIConversation[]>([]);
   useEffect(() => {
@@ -233,8 +235,9 @@ export function useAIChat(options: UseAIChatOptions = {}) {
         timestamp: Date.now(),
       };
 
-      // 进行中的 AI 消息使用稳定 id，便于"切路由回来继续更新"
-      const aiMsgId = `ai-stream-${conversationId}`;
+      // 每条 AI 消息使用独立 id，避免覆盖旧回复
+      const aiMsgId = `ai-${Date.now()}`;
+      currentAiMsgIdRef.current = aiMsgId;
       const initialAiMsg: UiMessage = {
         id: aiMsgId,
         content: "",
@@ -245,9 +248,11 @@ export function useAIChat(options: UseAIChatOptions = {}) {
 
       setMessagesBySession((prev) => {
         const current = prev[key] || [];
-        // 如果上一次还有遗留的 streaming 消息（同 id），先移除再追加
-        const withoutOldStream = current.filter((m) => m.id !== aiMsgId);
-        return { ...prev, [key]: [...withoutOldStream, userMsg, initialAiMsg] };
+        // 只移除上一次未完成的 loading AI 消息，保留已完成的回复
+        const withoutLoading = current.filter(
+          (m) => !(m.role === "ai" && m.status === "loading")
+        );
+        return { ...prev, [key]: [...withoutLoading, userMsg, initialAiMsg] };
       });
       options.onAfterMessagesChange?.();
 
@@ -264,12 +269,12 @@ export function useAIChat(options: UseAIChatOptions = {}) {
         shouldRefreshSessionsRef.current = false;
         setMessagesBySession((prev) => {
           const current = prev[key] || [];
-          const withoutAi = current.filter((m) => m.id !== aiMsgId);
+          const withoutAi = current.filter((m) => m.id !== currentAiMsgIdRef.current);
           return {
             ...prev,
             [key]: [
               ...withoutAi,
-              { id: aiMsgId, content: "发送失败，请重试", role: "ai", status: "error", timestamp: Date.now() },
+              { id: currentAiMsgIdRef.current ?? `ai-${Date.now()}`, content: "发送失败，请重试", role: "ai", status: "error", timestamp: Date.now() },
             ],
           };
         });
@@ -311,20 +316,20 @@ export function useAIChat(options: UseAIChatOptions = {}) {
     if (isNaN(conversationId)) return;
 
     const unsub = aiChatStreamClient.subscribe(conversationId, (snap) => {
-      const streamMsgId = `ai-stream-${conversationId}`;
+      const streamMsgId = currentAiMsgIdRef.current;
 
       // streaming/idle 时，如果有文本但 UI 没有占位消息，则自动补一条，保证"切路由回来继续打字"
       if (snap.fullText && (snap.status === "streaming" || snap.status === "idle")) {
         setMessagesBySession((prev) => {
           const current = prev[activeKey] || [];
-          const idx = current.findIndex((m) => m.id === streamMsgId);
+          const idx = streamMsgId ? current.findIndex((m) => m.id === streamMsgId) : -1;
           if (idx !== -1) return prev;
           return {
             ...prev,
             [activeKey]: [
               ...current,
               {
-                id: streamMsgId,
+                id: streamMsgId ?? `ai-${Date.now()}`,
                 content: snap.fullText,
                 role: "ai",
                 status: "loading",
@@ -337,7 +342,7 @@ export function useAIChat(options: UseAIChatOptions = {}) {
 
       setMessagesBySession((prev) => {
         const current = prev[activeKey] || [];
-        const idx = current.findIndex((m) => m.id === streamMsgId);
+        const idx = streamMsgId ? current.findIndex((m) => m.id === streamMsgId) : -1;
         if (idx === -1) return prev;
         const next = current.slice();
         const status: UiMessage["status"] =
@@ -348,15 +353,15 @@ export function useAIChat(options: UseAIChatOptions = {}) {
         return { ...prev, [activeKey]: next };
       });
 
-      if (snap.status === "done") {
+      if (snap.status === "done" || snap.status === "error") {
         setLoading(false);
-        if (shouldRefreshSessionsRef.current) {
+        currentAiMsgIdRef.current = null;
+        if (snap.status === "done" && shouldRefreshSessionsRef.current) {
           shouldRefreshSessionsRef.current = false;
           loadSessions();
+        } else if (snap.status === "error") {
+          shouldRefreshSessionsRef.current = false;
         }
-      } else if (snap.status === "error") {
-        setLoading(false);
-        shouldRefreshSessionsRef.current = false;
       } else if (snap.status === "streaming") {
         setLoading(true);
       }
