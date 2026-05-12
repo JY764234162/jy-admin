@@ -97,6 +97,19 @@ func (t *TencentCOS) UploadFile(file *multipart.FileHeader) (string, string, err
 	return fileURL, filename, nil
 }
 
+// DeleteFileByKey 使用完整对象键从COS删除文件（不添加PathPrefix）
+func (t *TencentCOS) DeleteFileByKey(objectKey string) error {
+	if objectKey == "" {
+		return errors.New("对象键不能为空")
+	}
+	ctx := context.Background()
+	_, err := t.client.Object.Delete(ctx, objectKey)
+	if err != nil {
+		return fmt.Errorf("从COS删除文件失败: %v", err)
+	}
+	return nil
+}
+
 // DeleteFile 从COS删除文件
 func (t *TencentCOS) DeleteFile(key string) error {
 	if key == "" {
@@ -126,6 +139,32 @@ func (t *TencentCOS) DeleteFile(key string) error {
 	}
 
 	return nil
+}
+
+// UploadFileWithKey 使用指定对象键上传文件到COS
+func (t *TencentCOS) UploadFileWithKey(objectKey string, file *multipart.FileHeader) (string, string, error) {
+	if objectKey == "" {
+		return "", "", errors.New("对象键不能为空")
+	}
+
+	// 打开文件
+	f, err := file.Open()
+	if err != nil {
+		return "", "", fmt.Errorf("打开文件失败: %v", err)
+	}
+	defer f.Close()
+
+	// 上传文件到COS
+	ctx := context.Background()
+	_, err = t.client.Object.Put(ctx, objectKey, f, nil)
+	if err != nil {
+		return "", "", fmt.Errorf("上传文件到COS失败: %v", err)
+	}
+
+	// 构建文件访问URL
+	fileURL := t.buildFileURL(objectKey)
+
+	return fileURL, objectKey, nil
 }
 
 // buildFileURL 构建文件访问URL
