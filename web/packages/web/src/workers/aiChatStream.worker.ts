@@ -169,8 +169,11 @@ async function startStream(p: StartPayload) {
           try {
             const parsed = JSON.parse(data) as { content?: string; done?: boolean; error?: string };
             if (parsed.error) {
-              updateConv(p.conversationId, { status: "error" });
-              emitUpdate(p.streamId, p.conversationId, "", getOrInitConv(p.conversationId).fullText, true, parsed.error);
+              const errText = parsed.error;
+              const cur = getOrInitConv(p.conversationId);
+              conversationState.set(p.conversationId, { ...cur, fullText: errText, status: "error", updatedAt: Date.now() });
+              updateConv(p.conversationId, { status: "error", fullText: errText });
+              emitUpdate(p.streamId, p.conversationId, "", errText, true, errText);
               stopStream(p.streamId);
               return;
             }
