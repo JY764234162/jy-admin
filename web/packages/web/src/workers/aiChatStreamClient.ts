@@ -103,7 +103,7 @@ export const aiChatStreamClient = {
   },
 
   /** 启动流式聊天，统一走 Go 后端，通过 mode 区分目标服务 */
-  start(conversationId: number, content: string, mode: "backend" | "aiserver_chat" | "aiserver_knowledge" = "backend") {
+  start(conversationId: number, content: string, mode: "aiserver_chat" | "aiserver_knowledge" = "aiserver_chat") {
     const streamId = createStreamId();
     const token = localStg.get("token");
     ensureWorker().postMessage({

@@ -7,8 +7,8 @@ type StartPayload = {
   token?: string | null;
   conversationId: number;
   content: string;
-  /** 调用模式：backend=Go后端，aiserver_chat=ai-server聊天，aiserver_knowledge=ai-server知识库问答 */
-  mode?: "backend" | "aiserver_chat" | "aiserver_knowledge";
+  /** 调用模式：aiserver_chat=ai-server聊天，aiserver_knowledge=ai-server知识库问答 */
+  mode?: "aiserver_chat" | "aiserver_knowledge";
   /** 知识库问答配置 */
   knowledgeConfig?: { top_k?: number };
 };
@@ -124,7 +124,7 @@ async function startStream(p: StartPayload) {
     const body: Record<string, unknown> = {
       conversationId: p.conversationId,
       content: p.content,
-      mode: p.mode ?? "backend",
+      mode: p.mode ?? "aiserver_chat",
     };
 
     const resp = await fetch(p.url, {

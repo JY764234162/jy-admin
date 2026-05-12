@@ -2,17 +2,9 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { message as antdMessage } from "antd";
 import { aiApi, type AIConversation, type AIMessage } from "@/api/ai";
 import { aiChatStreamClient } from "@/workers/aiChatStreamClient";
+import type { ChatMode, UiMessage } from "./types";
 
-export type ChatMode = "backend" | "aiserver_chat" | "aiserver_knowledge";
-
-// 前端消息类型（适配 UI 组件）
-export interface UiMessage {
-  id: string;
-  content: string;
-  role: "user" | "ai";
-  status?: "loading" | "success" | "error";
-  timestamp: number;
-}
+export type { ChatMode, UiMessage } from "./types";
 
 interface UseAIChatOptions {
   pageSize?: number;
@@ -142,6 +134,7 @@ export function useAIChat(options: UseAIChatOptions = {}) {
         setMessagesBySession((prev) => ({ ...prev, [newSession.ID.toString()]: [] }));
         setMessagePagination((prev) => ({ ...prev, [newSession.ID.toString()]: { page: 0, total: 0 } }));
         setActiveKey(newSession.ID.toString());
+        return newSession.ID;
       } else {
         antdMessage.error(res.msg || "创建会话失败");
       }
@@ -149,6 +142,7 @@ export function useAIChat(options: UseAIChatOptions = {}) {
       console.error("创建会话失败:", error);
       antdMessage.error("创建会话失败");
     }
+    return null;
   }, []);
 
   const deleteSession = useCallback(
@@ -187,16 +181,45 @@ export function useAIChat(options: UseAIChatOptions = {}) {
     []
   );
 
-  const sendMessage = useCallback(
-    async (userContent: string, mode: ChatMode = "backend") => {
-      if (!userContent.trim() || !activeKey) return;
-
-      const conversationId = parseInt(activeKey);
+  const renameSession = useCallback(
+    async (key: string, newTitle: string) => {
+      const conversationId = parseInt(key);
       if (isNaN(conversationId)) {
         antdMessage.error("会话ID无效");
+        return false;
+      }
+      const trimmed = newTitle.trim();
+      if (!trimmed) {
+        antdMessage.error("标题不能为空");
+        return false;
+      }
+      try {
+        const res = await aiApi.updateConversationTitle(conversationId, { title: trimmed });
+        if (res.code === 0) {
+          antdMessage.success("更新成功");
+          await loadSessions();
+          return true;
+        }
+        antdMessage.error(res.msg || "更新失败");
+        return false;
+      } catch (error) {
+        console.error("重命名会话失败:", error);
+        antdMessage.error("重命名会话失败");
+        return false;
+      }
+    },
+    [loadSessions]
+  );
+
+  const sendMessage = useCallback(
+    async (userContent: string, mode: ChatMode = "aiserver_chat", targetConversationId?: number) => {
+      const conversationId = targetConversationId ?? parseInt(activeKey);
+      if (!userContent.trim() || isNaN(conversationId)) {
+        if (isNaN(conversationId)) antdMessage.error("会话ID无效");
         return;
       }
 
+      const key = conversationId.toString();
       const content = userContent.trim();
       const userMsg: UiMessage = {
         id: `user-${Date.now()}`,
@@ -217,10 +240,10 @@ export function useAIChat(options: UseAIChatOptions = {}) {
       };
 
       setMessagesBySession((prev) => {
-        const current = prev[activeKey] || [];
+        const current = prev[key] || [];
         // 如果上一次还有遗留的 streaming 消息（同 id），先移除再追加
         const withoutOldStream = current.filter((m) => m.id !== aiMsgId);
-        return { ...prev, [activeKey]: [...withoutOldStream, userMsg, initialAiMsg] };
+        return { ...prev, [key]: [...withoutOldStream, userMsg, initialAiMsg] };
       });
       options.onAfterMessagesChange?.();
 
@@ -236,11 +259,11 @@ export function useAIChat(options: UseAIChatOptions = {}) {
         antdMessage.error("发送消息失败");
         shouldRefreshSessionsRef.current = false;
         setMessagesBySession((prev) => {
-          const current = prev[activeKey] || [];
+          const current = prev[key] || [];
           const withoutAi = current.filter((m) => m.id !== aiMsgId);
           return {
             ...prev,
-            [activeKey]: [
+            [key]: [
               ...withoutAi,
               { id: aiMsgId, content: "发送失败，请重试", role: "ai", status: "error", timestamp: Date.now() },
             ],
@@ -353,6 +376,7 @@ export function useAIChat(options: UseAIChatOptions = {}) {
     loadMoreHistory,
     addSession,
     deleteSession,
+    renameSession,
     sendMessage,
   };
 }
