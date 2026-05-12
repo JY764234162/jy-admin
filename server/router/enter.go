@@ -141,6 +141,13 @@ func registerRouter(Router *gin.Engine) *gin.Engine {
 		privateGroup.PUT("/ai/conversation/:id/title", apiGroup.AIApi.UpdateConversationTitle)
 		privateGroup.POST("/ai/chat", apiGroup.AIApi.ChatMessage)
 	}
+	//AI知识库（代理到 ai-server）
+	{
+		privateGroup.GET("/ai/knowledge/list", apiGroup.AIApi.GetKnowledgeList)
+		privateGroup.POST("/ai/knowledge/upload", apiGroup.AIApi.UploadKnowledge)
+		privateGroup.DELETE("/ai/knowledge/:docId", apiGroup.AIApi.DeleteKnowledge)
+		privateGroup.POST("/ai/knowledge/query", apiGroup.AIApi.QueryKnowledge)
+	}
 
 	Router.GET("/swagger/*any", ginSwagger.WrapHandler(swaggerFiles.Handler))
 
