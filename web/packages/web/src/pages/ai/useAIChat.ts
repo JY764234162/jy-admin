@@ -218,6 +218,10 @@ export function useAIChat(options: UseAIChatOptions = {}) {
         if (isNaN(conversationId)) antdMessage.error("会话ID无效");
         return;
       }
+      if (loading) {
+        antdMessage.warning("AI 正在回复中，请稍后再试");
+        return;
+      }
 
       const key = conversationId.toString();
       const content = userContent.trim();
@@ -273,7 +277,7 @@ export function useAIChat(options: UseAIChatOptions = {}) {
         setLoading(false);
       }
     },
-    [activeKey, loadSessions, options]
+    [activeKey, loadSessions, options, loading]
   );
 
   // 页面卸载（或路由切换导致组件卸载）时：解绑订阅即可（worker 继续跑）

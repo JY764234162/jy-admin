@@ -104,6 +104,7 @@ export const ChatInput = ({
   );
 
   const handleSubmit = () => {
+    if (loading) return;
     if (items.length > 0) {
       console.log("附件列表:", items);
     }
