@@ -50,32 +50,27 @@ func (a *Api) ChatMessage(c *gin.Context) {
 		req.Mode = "aiserver_chat"
 	}
 
-	// 知识库问答模式不需要会话验证和消息持久化（纯代理）
-	isKnowledgeMode := req.Mode == "aiserver_knowledge"
-
 	var conversation business.AIConversation
-	if !isKnowledgeMode {
-		if req.ConversationID == 0 {
-			common.FailWithMsg(c, "会话ID不能为空")
-			return
-		}
-		// 验证会话是否属于当前用户
-		if err := global.JY_DB.Where("id = ? AND user_id = ?", req.ConversationID, userID).First(&conversation).Error; err != nil {
-			common.FailWithMsg(c, "会话不存在或无权限")
-			return
-		}
+	if req.ConversationID == 0 {
+		common.FailWithMsg(c, "会话ID不能为空")
+		return
+	}
+	// 验证会话是否属于当前用户
+	if err := global.JY_DB.Where("id = ? AND user_id = ?", req.ConversationID, userID).First(&conversation).Error; err != nil {
+		common.FailWithMsg(c, "会话不存在或无权限")
+		return
+	}
 
-		// 保存用户消息
-		userMessage := business.AIMessage{
-			ConversationID: req.ConversationID,
-			Role:           "user",
-			Content:        req.Content,
-			UserID:         userID,
-		}
-		if err := global.JY_DB.Create(&userMessage).Error; err != nil {
-			common.FailWithMsg(c, "保存消息失败")
-			return
-		}
+	// 保存用户消息
+	userMessage := business.AIMessage{
+		ConversationID: req.ConversationID,
+		Role:           "user",
+		Content:        req.Content,
+		UserID:         userID,
+	}
+	if err := global.JY_DB.Create(&userMessage).Error; err != nil {
+		common.FailWithMsg(c, "保存消息失败")
+		return
 	}
 
 	// 设置 SSE 响应头
@@ -127,9 +122,8 @@ func (a *Api) ChatMessage(c *gin.Context) {
 		return
 	}
 
-	// 非知识库模式下保存助手消息并更新会话
-	if !isKnowledgeMode {
-		assistantMessage := business.AIMessage{
+	// 保存助手消息并更新会话
+	assistantMessage := business.AIMessage{
 			ConversationID: req.ConversationID,
 			Role:           "assistant",
 			Content:        assistantContent.String(),
@@ -147,7 +141,6 @@ func (a *Api) ChatMessage(c *gin.Context) {
 			"last_msg":      lastMsg,
 			"message_count": conversation.MessageCount + 2,
 		})
-	}
 
 	// 发送结束标记
 	endData := map[string]interface{}{"content": "", "done": true}
