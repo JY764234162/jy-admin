@@ -13,5 +13,9 @@ type AI struct {
 	// - LongCat-Flash-Thinking-2601
 	// - LongCat-Flash-Lite
 	LongCatModel string `mapstructure:"longcat-model" json:"longcatModel"`
+
+	// AI-Server 服务地址（用于代理基础对话和知识库问答）
+	// 例如：http://ai-server:8000 或 http://localhost:8000
+	AIServerURL string `mapstructure:"ai-server-url" json:"aiServerUrl"`
 }
 

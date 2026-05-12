@@ -57,6 +57,7 @@ services:
       MYSQL_PASSWORD: ${MYSQL_PASSWORD}
       LONGCAT_APP_KEY: ${LONGCAT_APP_KEY}
       LONGCAT_MODEL: ${LONGCAT_MODEL}
+      AI_SERVER_URL: ${AI_SERVER_URL:-http://ai-server:8000}
     # ⚠️ 不暴露端口到主机，只在 Docker 网络内访问
     ports:
       - "7777:7777"

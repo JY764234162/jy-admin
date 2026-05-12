@@ -84,4 +84,6 @@ ai:
   # - LongCat-Flash-Thinking-2601
   # - LongCat-Flash-Lite
   longcat-model: ${LONGCAT_MODEL}
+  # AI-Server 服务地址（Docker 内网使用服务名）
+  ai-server-url: ${AI_SERVER_URL:-http://ai-server:8000}
 
