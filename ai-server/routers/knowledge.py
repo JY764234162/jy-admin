@@ -75,19 +75,6 @@ async def upload_document(file: UploadFile = File(...)):
     return {"knowledge_id": doc_id, "filename": file.filename, "chunks": len(chunks)}
 
 
-@router.post("/query")
-async def query_knowledge(req: QueryRequest):
-    if not req.question.strip():
-        raise HTTPException(400, "问题不能为空")
-
-    docs = vector_store.list_documents()
-    if not docs:
-        raise HTTPException(400, "知识库为空，请先上传文档")
-
-    # 构建 LangChain Retriever
-    store = vector_store.get_store()
-    retriever = store.as_retriever(search_kwargs={"k": req.top_k})
-
 def _sse_json(data: dict) -> str:
     return f"data: {json.dumps(data, ensure_ascii=False)}\n\n"
 
