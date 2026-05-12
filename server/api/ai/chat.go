@@ -163,7 +163,7 @@ type StreamCallback func(chunk string)
 func (a *Api) callAIServerChatStream(messages []business.AIMessage, newContent string, conversationID uint, callback StreamCallback) error {
 	aiServerURL := global.JY_Config.AI.AIServerURL
 	if aiServerURL == "" {
-		aiServerURL = "http://ai-server:8000"
+		aiServerURL = "http://localhost:8000"
 	}
 
 	// 构建消息历史（传给 ai-server，避免 ai-server 因 conversation_id 不存在而报错）
@@ -180,7 +180,7 @@ func (a *Api) callAIServerChatStream(messages []business.AIMessage, newContent s
 	}
 
 	payload := map[string]interface{}{
-		"message": newContent,
+		"message":  newContent,
 		"messages": history,
 	}
 	body, err := json.Marshal(payload)
@@ -243,7 +243,7 @@ func (a *Api) callAIServerChatStream(messages []business.AIMessage, newContent s
 func (a *Api) callAIServerKnowledgeStream(question string, callback StreamCallback) error {
 	aiServerURL := global.JY_Config.AI.AIServerURL
 	if aiServerURL == "" {
-		aiServerURL = "http://ai-server:8000"
+		aiServerURL = "http://localhost:8000"
 	}
 
 	payload := map[string]interface{}{

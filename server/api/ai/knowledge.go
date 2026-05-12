@@ -1,18 +1,18 @@
 package ai
 
 import (
+	"bufio"
 	"bytes"
 	"encoding/json"
 	"fmt"
 	"io"
 	"mime/multipart"
-	"bufio"
 	"net/http"
 	"time"
 
 	"github.com/gin-gonic/gin"
-	"jiangyi.com/model/common"
 	"jiangyi.com/global"
+	"jiangyi.com/model/common"
 )
 
 // GetKnowledgeList 获取知识库文档列表（代理到 ai-server）
@@ -27,7 +27,7 @@ import (
 func (a *Api) GetKnowledgeList(c *gin.Context) {
 	aiServerURL := global.JY_Config.AI.AIServerURL
 	if aiServerURL == "" {
-		aiServerURL = "http://ai-server:8000"
+		aiServerURL = "http://localhost:8000"
 	}
 
 	resp, err := http.Get(aiServerURL + "/api/knowledge/list")
@@ -64,7 +64,7 @@ func (a *Api) GetKnowledgeList(c *gin.Context) {
 func (a *Api) UploadKnowledge(c *gin.Context) {
 	aiServerURL := global.JY_Config.AI.AIServerURL
 	if aiServerURL == "" {
-		aiServerURL = "http://ai-server:8000"
+		aiServerURL = "http://localhost:8000"
 	}
 
 	file, header, err := c.Request.FormFile("file")
@@ -130,7 +130,7 @@ func (a *Api) UploadKnowledge(c *gin.Context) {
 func (a *Api) DeleteKnowledge(c *gin.Context) {
 	aiServerURL := global.JY_Config.AI.AIServerURL
 	if aiServerURL == "" {
-		aiServerURL = "http://ai-server:8000"
+		aiServerURL = "http://localhost:8000"
 	}
 
 	docId := c.Param("docId")
@@ -180,7 +180,7 @@ func (a *Api) DeleteKnowledge(c *gin.Context) {
 func (a *Api) QueryKnowledge(c *gin.Context) {
 	aiServerURL := global.JY_Config.AI.AIServerURL
 	if aiServerURL == "" {
-		aiServerURL = "http://ai-server:8000"
+		aiServerURL = "http://localhost:8000"
 	}
 
 	var req struct {

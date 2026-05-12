@@ -74,5 +74,6 @@ log:
   compress: true
 
 ai:
-  ai-server-url: ${AI_SERVER_URL:-http://localhost:8000}
+  # Docker 内网调用 ai-server（后端也在 Docker 中运行时）
+  ai-server-url: "http://ai-server:8000"
 

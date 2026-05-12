@@ -74,5 +74,5 @@ log:
 
 ai:
   # AI-Server 服务地址（Docker 内网使用服务名）
-  ai-server-url: ${AI_SERVER_URL:-http://ai-server:8000}
+  ai-server-url: "http://ai-server:8000"
 
