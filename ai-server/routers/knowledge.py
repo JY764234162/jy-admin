@@ -1,10 +1,11 @@
+import json
 import uuid
 from pathlib import Path
 from typing import List
 
 from fastapi import APIRouter, UploadFile, File, HTTPException
 from pydantic import BaseModel
-from sse_starlette.sse import EventSourceResponse
+from starlette.responses import StreamingResponse
 from langchain_core.documents import Document
 from langchain_core.prompts import PromptTemplate
 from langchain_core.runnables import RunnablePassthrough
@@ -12,7 +13,7 @@ from langchain_core.output_parsers import StrOutputParser
 
 import config
 from services import document, vector_store
-from services.llm import llm, get_structured_llm
+from services.llm import llm
 
 router = APIRouter(prefix="/api/knowledge", tags=["knowledge"])
 
@@ -87,6 +88,23 @@ async def query_knowledge(req: QueryRequest):
     store = vector_store.get_store()
     retriever = store.as_retriever(search_kwargs={"k": req.top_k})
 
+def _sse_json(data: dict) -> str:
+    return f"data: {json.dumps(data, ensure_ascii=False)}\n\n"
+
+
+@router.post("/query")
+async def query_knowledge(req: QueryRequest):
+    if not req.question.strip():
+        raise HTTPException(400, "问题不能为空")
+
+    docs = vector_store.list_documents()
+    if not docs:
+        raise HTTPException(400, "知识库为空，请先上传文档")
+
+    # 构建 LangChain Retriever
+    store = vector_store.get_store()
+    retriever = store.as_retriever(search_kwargs={"k": req.top_k})
+
     if req.structured:
         # 结构化输出：Prompt 中要求返回 JSON，手动解析（兼容不支持 response_format 的模型）
         structured_prompt = PromptTemplate.from_template(
@@ -136,15 +154,18 @@ async def query_knowledge(req: QueryRequest):
             )
 
             # 优先使用异步流，回退到同步流
-            if hasattr(rag_chain, "astream"):
-                async for chunk in rag_chain.astream(req.question):
-                    yield {"data": chunk}
-            else:
-                for chunk in rag_chain.stream(req.question):
-                    yield {"data": chunk}
-            yield {"data": "[DONE]"}
+            try:
+                if hasattr(rag_chain, "astream"):
+                    async for chunk in rag_chain.astream(req.question):
+                        yield _sse_json({"content": chunk, "done": False})
+                else:
+                    for chunk in rag_chain.stream(req.question):
+                        yield _sse_json({"content": chunk, "done": False})
+                yield _sse_json({"content": "", "done": True})
+            except Exception as e:
+                yield _sse_json({"content": "", "done": True, "error": str(e)})
 
-        return EventSourceResponse(event_generator())
+        return StreamingResponse(event_generator(), media_type="text/event-stream")
 
 
 @router.get("/list")

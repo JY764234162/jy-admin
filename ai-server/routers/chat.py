@@ -1,8 +1,9 @@
-from typing import Optional
+import json
+from typing import Optional, List
 
 from fastapi import APIRouter, HTTPException, Header
 from pydantic import BaseModel
-from sse_starlette.sse import EventSourceResponse
+from starlette.responses import StreamingResponse
 
 from services.llm import llm
 from services.memory import memory
@@ -10,9 +11,19 @@ from services.memory import memory
 router = APIRouter(prefix="/api/chat", tags=["chat"])
 
 
+class ChatMessage(BaseModel):
+    role: str
+    content: str
+
+
 class ChatRequest(BaseModel):
     message: str
     conversation_id: Optional[str] = None
+    messages: Optional[List[ChatMessage]] = None
+
+
+def _sse_json(data: dict) -> str:
+    return f"data: {json.dumps(data, ensure_ascii=False)}\n\n"
 
 
 @router.post("")
@@ -25,36 +36,48 @@ async def chat_message(req: ChatRequest):
         conversation_id = memory.create_conversation()
     else:
         conversation_id = req.conversation_id
-        # 验证对话存在
-        convs = memory.get_conversations()
-        if not any(c["id"] == conversation_id for c in convs):
-            raise HTTPException(404, f"对话 {conversation_id} 不存在")
+        # 验证对话存在（仅当没有外部传入 messages 时才需要）
+        if not req.messages:
+            convs = memory.get_conversations()
+            if not any(c["id"] == conversation_id for c in convs):
+                raise HTTPException(404, f"对话 {conversation_id} 不存在")
 
-    # 添加用户消息
+    # 添加用户消息到 memory（用于后续通过 history 接口查询）
     memory.add_message(conversation_id, "user", req.message)
 
-    # 获取对话历史
-    messages = memory.get_messages(conversation_id)
-
     # 构建 LangChain 消息格式
+    # 优先使用外部传入的 messages（由 Go 后端提供完整历史），否则从 memory 获取
     langchain_messages = []
-    for msg in messages:
-        langchain_messages.append({"role": msg["role"], "content": msg["content"]})
+    if req.messages:
+        for msg in req.messages:
+            langchain_messages.append({"role": msg.role, "content": msg.content})
+        # 追加当前消息
+        langchain_messages.append({"role": "user", "content": req.message})
+    else:
+        messages = memory.get_messages(conversation_id)
+        for msg in messages:
+            langchain_messages.append({"role": msg["role"], "content": msg["content"]})
 
     async def event_generator():
         full_response = ""
-        for chunk in llm.stream(langchain_messages):
-            if chunk.content:
-                full_response += chunk.content
-                yield {"data": chunk.content}
+        try:
+            for chunk in llm.stream(langchain_messages):
+                if chunk.content:
+                    full_response += chunk.content
+                    yield _sse_json({"content": chunk.content, "done": False})
 
-        # 保存 AI 回复
-        memory.add_message(conversation_id, "assistant", full_response)
-        yield {"data": "[DONE]"}
+            # 保存 AI 回复到 memory
+            memory.add_message(conversation_id, "assistant", full_response)
+            yield _sse_json({"content": "", "done": True, "conversation_id": conversation_id})
+        except Exception as e:
+            yield _sse_json({"content": "", "done": True, "error": str(e)})
 
     # 返回 SSE 流，同时在 header 中返回 conversation_id
-    response = EventSourceResponse(event_generator())
-    response.headers["X-Conversation-Id"] = conversation_id
+    response = StreamingResponse(
+        event_generator(),
+        media_type="text/event-stream",
+        headers={"X-Conversation-Id": conversation_id},
+    )
     return response
 
 
