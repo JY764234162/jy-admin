@@ -88,6 +88,7 @@ export const dynamicLazyMap: Record<string, () => Promise<any>> = {
   // ========== 顶级页面 ==========
   home: () => import("@/pages/home"),
   ai: () => import("@/pages/ai"),
+  knowledge: () => import("@/pages/knowledge"),
   about: () => import("@/pages/about"),
   profile: () => import("@/pages/profile"),
 };
