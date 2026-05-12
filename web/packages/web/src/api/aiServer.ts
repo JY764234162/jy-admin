@@ -18,6 +18,9 @@ export interface KnowledgeDocument {
   doc_id: string;
   source: string;
   chunk_count: number;
+  cos_url?: string;
+  file_type?: string;
+  created_at?: string;
 }
 
 /** 知识库上传响应 */

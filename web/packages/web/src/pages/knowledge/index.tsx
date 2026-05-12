@@ -3,7 +3,11 @@ import {
   Table, Button, Space, Popconfirm, Card, Upload, Flex, Tag,
   Input, Divider, Empty, Spin, message as antdMessage
 } from "antd";
-import { UploadOutlined, DeleteOutlined, FileTextOutlined, BookOutlined } from "@ant-design/icons";
+import {
+  UploadOutlined, DeleteOutlined, FileTextOutlined, BookOutlined,
+  FilePdfOutlined, FileWordOutlined, FileExcelOutlined,
+  EyeOutlined, DownloadOutlined,
+} from "@ant-design/icons";
 import type { ColumnsType } from "antd/es/table";
 import { aiServerApi, type KnowledgeDocument } from "@/api/aiServer";
 import { aiChatStreamClient } from "@/workers/aiChatStreamClient";
@@ -52,6 +56,50 @@ export const Component = () => {
       setUploading(false);
     }
     return false;
+  };
+
+  // 根据文件类型返回对应图标和颜色
+  const getFileIcon = (fileType?: string) => {
+    const ext = (fileType || "").toLowerCase();
+    switch (ext) {
+      case ".pdf":
+        return <FilePdfOutlined style={{ color: "#ff4d4f", fontSize: 18 }} />;
+      case ".docx":
+      case ".doc":
+        return <FileWordOutlined style={{ color: "#1890ff", fontSize: 18 }} />;
+      case ".xlsx":
+      case ".xls":
+      case ".csv":
+        return <FileExcelOutlined style={{ color: "#52c41a", fontSize: 18 }} />;
+      case ".txt":
+      case ".md":
+      default:
+        return <FileTextOutlined style={{ color: "#8c8c8c", fontSize: 18 }} />;
+    }
+  };
+
+  // 预览文档
+  const handlePreview = (record: KnowledgeDocument) => {
+    if (!record.cos_url) {
+      antdMessage.warning("文件地址不可用");
+      return;
+    }
+    const ext = (record.file_type || "").toLowerCase();
+    if (ext === ".pdf") {
+      window.open(record.cos_url, "_blank");
+    } else {
+      antdMessage.info("该格式暂不支持预览，已为您下载");
+      window.open(record.cos_url, "_blank");
+    }
+  };
+
+  // 下载文档
+  const handleDownload = (record: KnowledgeDocument) => {
+    if (!record.cos_url) {
+      antdMessage.warning("文件地址不可用");
+      return;
+    }
+    window.open(record.cos_url, "_blank");
   };
 
   // 删除文档
@@ -105,9 +153,9 @@ export const Component = () => {
       title: "文档名称",
       dataIndex: "source",
       key: "source",
-      render: (text: string) => (
+      render: (text: string, record: KnowledgeDocument) => (
         <Space>
-          <FileTextOutlined />
+          {getFileIcon(record.file_type)}
           <span>{text}</span>
         </Space>
       ),
@@ -128,20 +176,36 @@ export const Component = () => {
     {
       title: "操作",
       key: "action",
-      width: 120,
+      width: 200,
       render: (_: any, record: KnowledgeDocument) => (
-        <Popconfirm
-          title="确认删除"
-          description={`确定要删除文档「${record.source}」吗？`}
-          onConfirm={() => handleDelete(record.doc_id)}
-          okText="删除"
-          cancelText="取消"
-          okButtonProps={{ danger: true }}
-        >
-          <Button type="link" danger icon={<DeleteOutlined />}>
-            删除
+        <Space>
+          <Button
+            type="link"
+            icon={<EyeOutlined />}
+            onClick={() => handlePreview(record)}
+          >
+            预览
           </Button>
-        </Popconfirm>
+          <Button
+            type="link"
+            icon={<DownloadOutlined />}
+            onClick={() => handleDownload(record)}
+          >
+            下载
+          </Button>
+          <Popconfirm
+            title="确认删除"
+            description={`确定要删除文档「${record.source}」吗？`}
+            onConfirm={() => handleDelete(record.doc_id)}
+            okText="删除"
+            cancelText="取消"
+            okButtonProps={{ danger: true }}
+          >
+            <Button type="link" danger icon={<DeleteOutlined />}>
+              删除
+            </Button>
+          </Popconfirm>
+        </Space>
       ),
     },
   ];
@@ -157,7 +221,7 @@ export const Component = () => {
           </Space>
         }
         extra={
-          <Upload beforeUpload={handleUpload} showUploadList={false} accept=".txt,.md,.pdf,.docx,.xlsx">
+          <Upload beforeUpload={handleUpload} showUploadList={false} accept=".txt,.md,.pdf,.docx,.xlsx,.csv">
             <Button type="primary" icon={<UploadOutlined />} loading={uploading}>
               上传文档
             </Button>
