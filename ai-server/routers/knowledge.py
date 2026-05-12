@@ -3,7 +3,7 @@ import uuid
 from pathlib import Path
 from typing import List
 
-from fastapi import APIRouter, UploadFile, File, HTTPException
+from fastapi import APIRouter, UploadFile, File, Form, HTTPException
 from pydantic import BaseModel
 from starlette.responses import StreamingResponse
 from langchain_core.documents import Document
@@ -76,8 +76,12 @@ async def upload_document(file: UploadFile = File(...)):
 
 
 @router.post("/parse")
-async def parse_document(file: UploadFile = File(...)):
-    """纯解析接口：解析文件、分块、向量存储，不保存原始文件到磁盘"""
+async def parse_document(file: UploadFile = File(...), doc_id: str = Form(None)):
+    """纯解析接口：解析文件、分块、向量存储，不保存原始文件到磁盘
+
+    - 若调用方传入 doc_id，则使用该 doc_id 写入向量库（与上游对齐）
+    - 否则自动生成
+    """
     if not file.filename:
         raise HTTPException(400, "文件名不能为空")
 
@@ -95,14 +99,14 @@ async def parse_document(file: UploadFile = File(...)):
     if not chunks:
         raise HTTPException(400, "文档拆分结果为空")
 
-    doc_id = uuid.uuid4().hex[:12]
+    final_doc_id = doc_id if doc_id else uuid.uuid4().hex[:12]
     documents = [
-        Document(page_content=chunk, metadata={"doc_id": doc_id, "source": file.filename})
+        Document(page_content=chunk, metadata={"doc_id": final_doc_id, "source": file.filename})
         for chunk in chunks
     ]
     vector_store.add_documents(documents)
 
-    return {"doc_id": doc_id, "filename": file.filename, "chunks": len(chunks)}
+    return {"doc_id": final_doc_id, "filename": file.filename, "chunks": len(chunks)}
 
 
 def _sse_json(data: dict) -> str:

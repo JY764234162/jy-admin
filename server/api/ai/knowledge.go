@@ -137,6 +137,11 @@ func (a *Api) UploadKnowledge(c *gin.Context) {
 		common.FailWithMsg(c, "复制文件内容失败")
 		return
 	}
+	// 传入 doc_id，让 ai-server 与后端共用同一 ID
+	if err := writer.WriteField("doc_id", docID); err != nil {
+		common.FailWithMsg(c, "写入解析参数失败")
+		return
+	}
 	writer.Close()
 
 	req, err := http.NewRequest(http.MethodPost, aiServerURL+"/api/knowledge/parse", parseBody)
