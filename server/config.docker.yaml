@@ -73,17 +73,6 @@ log:
   compress: true
 
 ai:
-  # LongCat OpenAI 兼容接口的 App Key
-  # 推荐在 Docker 中通过环境变量 LONGCAT_APP_KEY 注入，例如：
-  #   - LONGCAT_APP_KEY=your_app_key
-  # 也可以直接在这里写死，但不推荐在生产环境提交到仓库
-  longcat-app-key: ${LONGCAT_APP_KEY}
-  # LongCat 模型名称（四选一）
-  # - LongCat-Flash-Chat
-  # - LongCat-Flash-Thinking
-  # - LongCat-Flash-Thinking-2601
-  # - LongCat-Flash-Lite
-  longcat-model: ${LONGCAT_MODEL}
   # AI-Server 服务地址（Docker 内网使用服务名）
   ai-server-url: ${AI_SERVER_URL:-http://ai-server:8000}
 

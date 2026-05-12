@@ -95,18 +95,6 @@ func InitViper() {
 		fmt.Println("已从环境变量 COS_SECRET_KEY 读取 COS SecretKey")
 	}
 
-	// 支持从 LONGCAT_APP_KEY 环境变量读取 LongCat 大模型的 App Key（优先级最高）
-	if longcatKey := os.Getenv("LONGCAT_APP_KEY"); longcatKey != "" {
-		global.JY_Config.AI.LongCatAppKey = longcatKey
-		fmt.Println("已从环境变量 LONGCAT_APP_KEY 读取 LongCat App Key")
-	}
-
-	// 支持从 LONGCAT_MODEL 环境变量读取 LongCat 模型名称（优先级最高）
-	if longcatModel := os.Getenv("LONGCAT_MODEL"); longcatModel != "" {
-		global.JY_Config.AI.LongCatModel = longcatModel
-		fmt.Println("已从环境变量 LONGCAT_MODEL 读取 LongCat 模型名称")
-	}
-
 	// 支持从 AI_SERVER_URL 环境变量读取 AI-Server 地址（优先级最高）
 	if aiServerURL := os.Getenv("AI_SERVER_URL"); aiServerURL != "" {
 		global.JY_Config.AI.AIServerURL = aiServerURL

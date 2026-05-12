@@ -74,7 +74,5 @@ log:
   compress: true
 
 ai:
-  longcat-app-key: ${LONGCAT_APP_KEY}
-  longcat-model: ${LONGCAT_MODEL}
   ai-server-url: ${AI_SERVER_URL:-http://localhost:8000}
 
