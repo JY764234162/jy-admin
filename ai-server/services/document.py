@@ -52,12 +52,43 @@ def parse_markdown(file_bytes: bytes) -> str:
     return file_bytes.decode("utf-8", errors="ignore")
 
 
+def parse_docx(file_bytes: bytes) -> str:
+    from docx import Document as DocxDocument
+    doc = DocxDocument(io.BytesIO(file_bytes))
+    texts = []
+    for para in doc.paragraphs:
+        if para.text.strip():
+            texts.append(para.text)
+    for table in doc.tables:
+        for row in table.rows:
+            row_text = [cell.text.strip() for cell in row.cells if cell.text.strip()]
+            if row_text:
+                texts.append(" | ".join(row_text))
+    return "\n".join(texts)
+
+
+def parse_csv(file_bytes: bytes) -> str:
+    import csv
+    text = file_bytes.decode("utf-8", errors="ignore")
+    lines = text.splitlines()
+    reader = csv.reader(lines)
+    rows = list(reader)
+    if not rows:
+        return ""
+    result = []
+    for row in rows:
+        result.append(", ".join(cell.strip() for cell in row))
+    return "\n".join(result)
+
+
 PARSERS = {
     ".pdf": parse_pdf,
     ".xlsx": parse_excel,
     ".xls": parse_excel,
     ".txt": parse_txt,
     ".md": parse_markdown,
+    ".docx": parse_docx,
+    ".csv": parse_csv,
 }
 
 

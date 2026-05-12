@@ -75,6 +75,36 @@ async def upload_document(file: UploadFile = File(...)):
     return {"knowledge_id": doc_id, "filename": file.filename, "chunks": len(chunks)}
 
 
+@router.post("/parse")
+async def parse_document(file: UploadFile = File(...)):
+    """纯解析接口：解析文件、分块、向量存储，不保存原始文件到磁盘"""
+    if not file.filename:
+        raise HTTPException(400, "文件名不能为空")
+
+    ext = Path(file.filename).suffix.lower()
+    if ext not in document.PARSERS:
+        raise HTTPException(400, f"不支持的格式: {ext}，支持: {list(document.PARSERS.keys())}")
+
+    file_bytes = await file.read()
+
+    text = document.parse_file(file.filename, file_bytes)
+    if not text.strip():
+        raise HTTPException(400, "文件内容为空或无法提取文字")
+
+    chunks = document.split_text(text)
+    if not chunks:
+        raise HTTPException(400, "文档拆分结果为空")
+
+    doc_id = uuid.uuid4().hex[:12]
+    documents = [
+        Document(page_content=chunk, metadata={"doc_id": doc_id, "source": file.filename})
+        for chunk in chunks
+    ]
+    vector_store.add_documents(documents)
+
+    return {"doc_id": doc_id, "filename": file.filename, "chunks": len(chunks)}
+
+
 def _sse_json(data: dict) -> str:
     return f"data: {json.dumps(data, ensure_ascii=False)}\n\n"
 
