@@ -17,7 +17,8 @@ services:
       - mysql_data:/var/lib/mysql
       - ./init.sql:/docker-entrypoint-initdb.d/init.sql:ro
       - ./server/mysql/conf.d:/etc/mysql/conf.d:ro
-    command: --character-set-server=utf8mb4 --collation-server=utf8mb4_unicode_ci
+    command:
+      --character-set-server=utf8mb4 --collation-server=utf8mb4_unicode_ci
       --default-authentication-plugin=mysql_native_password
     networks:
       - jy-admin-network
@@ -57,7 +58,7 @@ services:
       MYSQL_PASSWORD: ${MYSQL_PASSWORD}
       LONGCAT_APP_KEY: ${LONGCAT_APP_KEY}
       LONGCAT_MODEL: ${LONGCAT_MODEL}
-      AI_SERVER_URL: ${AI_SERVER_URL:-http://ai-server:8000}
+      AI_SERVER_URL: ${AI_SERVER_URL}
     # ⚠️ 不暴露端口到主机，只在 Docker 网络内访问
     ports:
       - "7777:7777"
@@ -149,13 +150,17 @@ services:
       PG_DB: ai_vectors
       PG_USER: ai_admin
       PG_PASSWORD: ${PG_PASSWORD:-ai123456}
-    ports:
-      - "8000:8000"
+    # 不暴露端口到宿主机，仅 Docker 内网访问（Go 后端通过 http://ai-server:8000 调用）
+    # 如需临时调试 ai-server，取消下面注释
+    # ports:
+    #   - "8000:8000"
     volumes:
       - ai_uploads:/app/uploads
     depends_on:
       postgres-vector:
         condition: service_healthy
+    extra_hosts:
+      - "api.longcat.chat:101.50.8.136"
     networks:
       - jy-admin-network
     mem_limit: 512m
@@ -187,7 +192,6 @@ services:
   #     retries: 3
   #     start_period: 10s
 
-
 volumes:
   mysql_data:
     driver: local
@@ -203,3 +207,5 @@ volumes:
 networks:
   jy-admin-network:
     driver: bridge
+    driver_opts:
+      com.docker.network.driver.mtu: 900
