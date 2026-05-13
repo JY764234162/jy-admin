@@ -86,7 +86,9 @@ func (t *generationTask) removeSubscriber(ch chan string) {
 // finish 标记任务完成，关闭 done 通道，从全局 map 中移除
 func (t *generationTask) finish(err error) {
 	if atomic.CompareAndSwapInt32(&t.finished, 0, 1) {
-		t.err.Store(err)
+		if err != nil {
+			t.err.Store(err)
+		}
 		close(t.done)
 		generationTasks.Delete(t.conversationID)
 	}
@@ -103,5 +105,6 @@ func (t *generationTask) getError() error {
 	if v == nil {
 		return nil
 	}
-	return v.(error)
+	err, _ := v.(error)
+	return err
 }
