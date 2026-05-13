@@ -31,22 +31,26 @@ export function useAIChat(options: UseAIChatOptions = {}) {
   const shouldRefreshSessionsRef = useRef(false);
   // 当前活跃流对应的 AI 消息 id（每条独立，避免覆盖旧回复）
   const currentAiMsgIdRef = useRef<string | null>(null);
-  // 避免闭包拿到旧 sessions
+  // 避免闭包拿到旧 sessions / messages
   const sessionsRef = useRef<AIConversation[]>([]);
+  const messagesBySessionRef = useRef<Record<string, UiMessage[]>>({});
   useEffect(() => {
     sessionsRef.current = sessions;
   }, [sessions]);
+  useEffect(() => {
+    messagesBySessionRef.current = messagesBySession;
+  }, [messagesBySession]);
 
   const currentMessages = useMemo(() => messagesBySession[activeKey] || [], [messagesBySession, activeKey]);
 
   // 后端返回时间倒序（最新在前），转为展示顺序：旧在上、新在下（正序）
   const toDisplayOrder = useCallback(
-    (list: { ID: number; content: string; role: string; createdAt: string }[]): UiMessage[] =>
+    (list: AIMessage[]): UiMessage[] =>
       [...list].reverse().map((msg) => ({
         id: `msg-${msg.ID}`,
         content: msg.content,
         role: msg.role === "user" ? "user" : "ai",
-        status: "success" as const,
+        status: (msg.status === "loading" ? "loading" : msg.status === "error" ? "error" : "success") as UiMessage["status"],
         timestamp: new Date(msg.createdAt).getTime(),
       })),
     []
@@ -82,6 +86,27 @@ export function useAIChat(options: UseAIChatOptions = {}) {
           setMessagesBySession((prev) => ({ ...prev, [key]: messageList }));
           setMessagePagination((prev) => ({ ...prev, [key]: { page: 1, total } }));
           options.onAfterMessagesChange?.();
+
+          // 加载完成后，若 sessionStorage 中有 pending 请求且当前会话存在 loading 消息，自动恢复
+          const pendingRaw = sessionStorage.getItem("ai_pending_request");
+          if (pendingRaw) {
+            try {
+              const pending = JSON.parse(pendingRaw);
+              if (pending.conversationId === conversationId) {
+                const hasLoading = messageList.some((m) => m.role === "ai" && m.status === "loading");
+                if (hasLoading) {
+                  setTimeout(() => {
+                    sendMessage(pending.content, pending.mode, pending.conversationId, true);
+                  }, 0);
+                } else {
+                  // 没有 loading 消息，说明后端已处理完，清除 pending
+                  sessionStorage.removeItem("ai_pending_request");
+                }
+              }
+            } catch {
+              sessionStorage.removeItem("ai_pending_request");
+            }
+          }
         } else {
           antdMessage.error(res.msg || "加载消息失败");
           setMessagesBySession((prev) => ({ ...prev, [key]: [] }));
@@ -214,7 +239,7 @@ export function useAIChat(options: UseAIChatOptions = {}) {
   );
 
   const sendMessage = useCallback(
-    async (userContent: string, mode: ChatMode = "aiserver_chat", targetConversationId?: number) => {
+    async (userContent: string, mode: ChatMode = "aiserver_chat", targetConversationId?: number, resume = false) => {
       const conversationId = targetConversationId ?? parseInt(activeKey);
       if (!userContent.trim() || isNaN(conversationId)) {
         if (isNaN(conversationId)) antdMessage.error("会话ID无效");
@@ -227,6 +252,39 @@ export function useAIChat(options: UseAIChatOptions = {}) {
 
       const key = conversationId.toString();
       const content = userContent.trim();
+
+      if (resume) {
+        // 恢复模式：复用已有的 loading AI 消息，不添加新的 user 消息
+        const current = messagesBySessionRef.current[key] || [];
+        const loadingMsg = current.find((m) => m.role === "ai" && m.status === "loading");
+        if (!loadingMsg) {
+          antdMessage.error("没有可恢复的 AI 消息");
+          return;
+        }
+        currentAiMsgIdRef.current = loadingMsg.id;
+        setLoading(true);
+        try {
+          shouldRefreshSessionsRef.current = true;
+          const streamId = aiChatStreamClient.start(conversationId, content, mode, true);
+          currentStreamIdRef.current = streamId;
+        } catch (error) {
+          console.error("恢复流式输出失败:", error);
+          antdMessage.error("恢复流式输出失败");
+          shouldRefreshSessionsRef.current = false;
+          setMessagesBySession((prev) => {
+            const msgs = prev[key] || [];
+            const idx = msgs.findIndex((m) => m.id === loadingMsg.id);
+            if (idx === -1) return prev;
+            const next = msgs.slice();
+            next[idx] = { ...next[idx]!, content: "恢复失败，请重试", status: "error" };
+            return { ...prev, [key]: next };
+          });
+          setLoading(false);
+        }
+        return;
+      }
+
+      // 正常模式
       const userMsg: UiMessage = {
         id: `user-${Date.now()}`,
         content,
@@ -235,7 +293,6 @@ export function useAIChat(options: UseAIChatOptions = {}) {
         timestamp: Date.now(),
       };
 
-      // 每条 AI 消息使用独立 id，避免覆盖旧回复
       const aiMsgId = `ai-${Date.now()}`;
       currentAiMsgIdRef.current = aiMsgId;
       const initialAiMsg: UiMessage = {
@@ -248,7 +305,6 @@ export function useAIChat(options: UseAIChatOptions = {}) {
 
       setMessagesBySession((prev) => {
         const current = prev[key] || [];
-        // 只移除上一次未完成的 loading AI 消息，保留已完成的回复
         const withoutLoading = current.filter(
           (m) => !(m.role === "ai" && m.status === "loading")
         );
@@ -259,14 +315,20 @@ export function useAIChat(options: UseAIChatOptions = {}) {
       setLoading(true);
 
       try {
-        // 启动 worker 流（统一走 Go 后端，由 mode 参数区分目标服务）
         shouldRefreshSessionsRef.current = true;
         const streamId = aiChatStreamClient.start(conversationId, content, mode);
         currentStreamIdRef.current = streamId;
+
+        // 保存 pending 请求到 sessionStorage，刷新后自动恢复
+        sessionStorage.setItem(
+          "ai_pending_request",
+          JSON.stringify({ conversationId, content, mode, timestamp: Date.now() })
+        );
       } catch (error) {
         console.error("发送消息失败:", error);
         antdMessage.error("发送消息失败");
         shouldRefreshSessionsRef.current = false;
+        sessionStorage.removeItem("ai_pending_request");
         setMessagesBySession((prev) => {
           const current = prev[key] || [];
           const withoutAi = current.filter((m) => m.id !== currentAiMsgIdRef.current);
@@ -318,12 +380,25 @@ export function useAIChat(options: UseAIChatOptions = {}) {
     const unsub = aiChatStreamClient.subscribe(conversationId, (snap) => {
       const streamMsgId = currentAiMsgIdRef.current;
 
+      // 查找目标 AI 消息的索引：优先匹配 streamMsgId，否则找 loading 状态的 AI 消息
+      const findTargetIdx = (current: UiMessage[]): number => {
+        if (streamMsgId) {
+          const idx = current.findIndex((m) => m.id === streamMsgId);
+          if (idx !== -1) return idx;
+        }
+        return current.findIndex((m) => m.role === "ai" && m.status === "loading");
+      };
+
       // streaming/idle 时，如果有文本但 UI 没有占位消息，则自动补一条，保证"切路由回来继续打字"
       if (snap.fullText && (snap.status === "streaming" || snap.status === "idle")) {
         setMessagesBySession((prev) => {
           const current = prev[activeKey] || [];
-          const idx = streamMsgId ? current.findIndex((m) => m.id === streamMsgId) : -1;
-          if (idx !== -1) return prev;
+          const idx = findTargetIdx(current);
+          if (idx !== -1) {
+            const next = current.slice();
+            next[idx] = { ...next[idx]!, content: snap.fullText };
+            return { ...prev, [activeKey]: next };
+          }
           return {
             ...prev,
             [activeKey]: [
@@ -342,7 +417,7 @@ export function useAIChat(options: UseAIChatOptions = {}) {
 
       setMessagesBySession((prev) => {
         const current = prev[activeKey] || [];
-        const idx = streamMsgId ? current.findIndex((m) => m.id === streamMsgId) : -1;
+        const idx = findTargetIdx(current);
         if (idx === -1) return prev;
         const next = current.slice();
         const status: UiMessage["status"] =
@@ -356,6 +431,7 @@ export function useAIChat(options: UseAIChatOptions = {}) {
       if (snap.status === "done" || snap.status === "error") {
         setLoading(false);
         currentAiMsgIdRef.current = null;
+        sessionStorage.removeItem("ai_pending_request");
         if (snap.status === "done" && shouldRefreshSessionsRef.current) {
           shouldRefreshSessionsRef.current = false;
           loadSessions();

@@ -20,6 +20,7 @@ export interface AIMessage {
   role: "user" | "assistant";
   content: string;
   userId: number;
+  status?: string;
   createdAt: string;
   updatedAt: string;
 }

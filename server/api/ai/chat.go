@@ -41,6 +41,7 @@ func (a *Api) ChatMessage(c *gin.Context) {
 		ConversationID uint   `json:"conversationId"`
 		Content        string `json:"content" binding:"required"`
 		Mode           string `json:"mode"` // aiserver_chat | aiserver_knowledge
+		Resume         bool   `json:"resume"` // 是否为恢复模式（刷新后重连）
 	}
 	if err := c.ShouldBindJSON(&req); err != nil {
 		common.FailWithMsg(c, "参数错误: "+err.Error())
@@ -61,16 +62,42 @@ func (a *Api) ChatMessage(c *gin.Context) {
 		return
 	}
 
-	// 保存用户消息
-	userMessage := business.AIMessage{
-		ConversationID: req.ConversationID,
-		Role:           "user",
-		Content:        req.Content,
-		UserID:         userID,
-	}
-	if err := global.JY_DB.Create(&userMessage).Error; err != nil {
-		common.FailWithMsg(c, "保存消息失败")
-		return
+	var assistantMsgID uint
+
+	if req.Resume {
+		// 恢复模式：复用当前会话最后一条 loading 的 AI 消息
+		var lastLoading business.AIMessage
+		if err := global.JY_DB.Where("conversation_id = ? AND role = ? AND status = ?", req.ConversationID, "assistant", "loading").
+			Order("created_at DESC").First(&lastLoading).Error; err != nil {
+			common.FailWithMsg(c, "没有找到可恢复的 AI 消息")
+			return
+		}
+		assistantMsgID = lastLoading.ID
+	} else {
+		// 正常模式：保存用户消息并插入 AI 占位消息
+		userMessage := business.AIMessage{
+			ConversationID: req.ConversationID,
+			Role:           "user",
+			Content:        req.Content,
+			UserID:         userID,
+		}
+		if err := global.JY_DB.Create(&userMessage).Error; err != nil {
+			common.FailWithMsg(c, "保存消息失败")
+			return
+		}
+
+		assistantMessage := business.AIMessage{
+			ConversationID: req.ConversationID,
+			Role:           "assistant",
+			Content:        "",
+			UserID:         userID,
+			Status:         "loading",
+		}
+		if err := global.JY_DB.Create(&assistantMessage).Error; err != nil {
+			common.FailWithMsg(c, "保存助手消息失败")
+			return
+		}
+		assistantMsgID = assistantMessage.ID
 	}
 
 	// 设置 SSE 响应头
@@ -88,59 +115,66 @@ func (a *Api) ChatMessage(c *gin.Context) {
 	}
 
 	var assistantContent strings.Builder
-	var err error
+	var streamErr error
+
+	streamCallback := func(chunk string) {
+		assistantContent.WriteString(chunk)
+		data := map[string]interface{}{"content": chunk, "done": false}
+		jsonData, _ := json.Marshal(data)
+		fmt.Fprintf(c.Writer, "data: %s\n\n", jsonData)
+		flusher.Flush()
+
+		// 实时更新占位消息内容，刷新时消息不丢失
+		if dbErr := global.JY_DB.Model(&business.AIMessage{}).Where("id = ?", assistantMsgID).Update("content", assistantContent.String()).Error; dbErr != nil {
+			global.JY_LOG.Error("更新助手消息内容失败", zap.Error(dbErr))
+		}
+	}
 
 	switch req.Mode {
 	case "aiserver_chat":
 		// 获取会话历史消息（用于上下文）
 		var messages []business.AIMessage
 		global.JY_DB.Where("conversation_id = ?", req.ConversationID).Order("created_at ASC").Find(&messages)
-		err = a.callAIServerChatStream(messages, req.Content, req.ConversationID, func(chunk string) {
-			assistantContent.WriteString(chunk)
-			data := map[string]interface{}{"content": chunk, "done": false}
-			jsonData, _ := json.Marshal(data)
-			fmt.Fprintf(c.Writer, "data: %s\n\n", jsonData)
-			flusher.Flush()
-		})
+		streamErr = a.callAIServerChatStream(messages, req.Content, req.ConversationID, streamCallback)
 	case "aiserver_knowledge":
-		err = a.callAIServerKnowledgeStream(req.Content, func(chunk string) {
-			assistantContent.WriteString(chunk)
-			data := map[string]interface{}{"content": chunk, "done": false}
-			jsonData, _ := json.Marshal(data)
-			fmt.Fprintf(c.Writer, "data: %s\n\n", jsonData)
-			flusher.Flush()
-		})
+		streamErr = a.callAIServerKnowledgeStream(req.Content, streamCallback)
 	default:
-		err = fmt.Errorf("不支持的对话模式: %s", req.Mode)
+		streamErr = fmt.Errorf("不支持的对话模式: %s", req.Mode)
 	}
 
-	if err != nil {
-		errorData := map[string]interface{}{"error": err.Error(), "done": true}
+	if streamErr != nil {
+		global.JY_DB.Model(&business.AIMessage{}).Where("id = ?", assistantMsgID).Update("status", "error")
+		errorData := map[string]interface{}{"error": streamErr.Error(), "done": true}
 		jsonErrorData, _ := json.Marshal(errorData)
 		fmt.Fprintf(c.Writer, "data: %s\n\n", jsonErrorData)
 		flusher.Flush()
 		return
 	}
 
-	// 保存助手消息并更新会话
-	assistantMessage := business.AIMessage{
-			ConversationID: req.ConversationID,
-			Role:           "assistant",
-			Content:        assistantContent.String(),
-			UserID:         userID,
-		}
-		if err := global.JY_DB.Create(&assistantMessage).Error; err != nil {
-			global.JY_LOG.Error("保存助手消息失败", zap.Error(err))
-		}
+	// 流式结束，更新状态为 success
+	global.JY_DB.Model(&business.AIMessage{}).Where("id = ?", assistantMsgID).Updates(map[string]interface{}{
+		"status":  "success",
+		"content": assistantContent.String(),
+	})
 
-		lastMsg := req.Content
-		if len(lastMsg) > 100 {
-			lastMsg = lastMsg[:100]
+	lastMsg := assistantContent.String()
+	if len(lastMsg) > 100 {
+		lastMsg = lastMsg[:100]
+	}
+	if req.Resume {
+		global.JY_DB.Model(&conversation).Updates(map[string]interface{}{
+			"last_msg": lastMsg,
+		})
+	} else {
+		userLastMsg := req.Content
+		if len(userLastMsg) > 100 {
+			userLastMsg = userLastMsg[:100]
 		}
 		global.JY_DB.Model(&conversation).Updates(map[string]interface{}{
-			"last_msg":      lastMsg,
+			"last_msg":      userLastMsg,
 			"message_count": conversation.MessageCount + 2,
 		})
+	}
 
 	// 发送结束标记
 	endData := map[string]interface{}{"content": "", "done": true}

@@ -11,6 +11,8 @@ type StartPayload = {
   mode?: "aiserver_chat" | "aiserver_knowledge";
   /** 知识库问答配置 */
   knowledgeConfig?: { top_k?: number };
+  /** 是否为恢复模式（刷新后重连，不重复保存用户消息） */
+  resume?: boolean;
 };
 
 type StopPayload = {
@@ -125,6 +127,7 @@ async function startStream(p: StartPayload) {
       conversationId: p.conversationId,
       content: p.content,
       mode: p.mode ?? "aiserver_chat",
+      resume: p.resume ?? false,
     };
 
     const resp = await fetch(p.url, {
