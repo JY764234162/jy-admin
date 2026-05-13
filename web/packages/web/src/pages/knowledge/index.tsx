@@ -1,28 +1,20 @@
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect } from "react";
 import {
   Table, Button, Space, Popconfirm, Card, Upload, Flex, Tag,
-  Input, Divider, Empty, Spin, message as antdMessage
+  Empty, message as antdMessage
 } from "antd";
 import {
   UploadOutlined, DeleteOutlined, FileTextOutlined, BookOutlined,
   FilePdfOutlined, FileWordOutlined, FileExcelOutlined,
-  EyeOutlined, DownloadOutlined,
+  EyeOutlined, DownloadOutlined, ReloadOutlined, LoadingOutlined,
 } from "@ant-design/icons";
 import type { ColumnsType } from "antd/es/table";
 import { aiServerApi, type KnowledgeDocument } from "@/api/aiServer";
-import { aiChatStreamClient } from "@/workers/aiChatStreamClient";
 
 export const Component = () => {
   const [documents, setDocuments] = useState<KnowledgeDocument[]>([]);
   const [loading, setLoading] = useState(false);
   const [uploading, setUploading] = useState(false);
-
-  // 问答测试
-  const [question, setQuestion] = useState("");
-  const [answer, setAnswer] = useState("");
-  const [querying, setQuerying] = useState(false);
-  const currentStreamUnsubRef = useRef<null | (() => void)>(null);
-  const currentStreamIdRef = useRef<string | null>(null);
 
   // 加载文档列表
   const fetchDocuments = async () => {
@@ -47,7 +39,7 @@ export const Component = () => {
     setUploading(true);
     try {
       const res = await aiServerApi.uploadKnowledge(file);
-      antdMessage.success(`文档「${res.filename}」上传成功，共 ${res.chunks} 个片段`);
+      antdMessage.success(`文档「${res.filename}」已上传，正在后台解析`);
       fetchDocuments();
     } catch (error: any) {
       console.error("上传失败:", error);
@@ -56,6 +48,42 @@ export const Component = () => {
       setUploading(false);
     }
     return false;
+  };
+
+  // 重试解析
+  const handleRetry = async (docId: string) => {
+    try {
+      await aiServerApi.retryKnowledge(docId);
+      antdMessage.success("已重新入队解析");
+      fetchDocuments();
+    } catch (error: any) {
+      console.error("重试失败:", error);
+      antdMessage.error(error.message || "重试失败");
+    }
+  };
+
+  // 状态标签
+  const getStatusTag = (record: KnowledgeDocument) => {
+    switch (record.status) {
+      case "pending":
+        return <Tag color="default">等待解析</Tag>;
+      case "parsing":
+        return (
+          <Tag color="processing" icon={<LoadingOutlined />}>
+            解析中
+          </Tag>
+        );
+      case "indexed":
+        return <Tag color="success">已入库</Tag>;
+      case "failed":
+        return (
+          <Tag color="error" title={record.error_msg}>
+            失败
+          </Tag>
+        );
+      default:
+        return <Tag color="default">等待解析</Tag>;
+    }
   };
 
   // 根据文件类型返回对应图标和颜色
@@ -114,40 +142,6 @@ export const Component = () => {
     }
   };
 
-  // 知识库问答测试
-  const handleQuery = async () => {
-    if (!question.trim()) return;
-    if (querying) return;
-
-    const content = question.trim();
-    setAnswer("");
-    setQuerying(true);
-
-    // 使用固定 conversationId = 0 作为问答测试会话
-    const conversationId = 0;
-    const streamId = aiChatStreamClient.start(conversationId, content, "aiserver_knowledge");
-    currentStreamIdRef.current = streamId;
-
-    const unsub = aiChatStreamClient.subscribe(conversationId, (snap) => {
-      setAnswer(snap.fullText);
-      if (snap.status === "done" || snap.status === "error") {
-        setQuerying(false);
-        unsub();
-      }
-    });
-    currentStreamUnsubRef.current = unsub;
-  };
-
-  // 页面卸载时清理
-  useEffect(() => {
-    return () => {
-      currentStreamUnsubRef.current?.();
-      if (currentStreamIdRef.current) {
-        aiChatStreamClient.stop(currentStreamIdRef.current);
-      }
-    };
-  }, []);
-
   const columns: ColumnsType<KnowledgeDocument> = [
     {
       title: "文档名称",
@@ -167,22 +161,45 @@ export const Component = () => {
       render: (id: string) => <Tag color="blue">{id}</Tag>,
     },
     {
+      title: "状态",
+      key: "status",
+      width: 120,
+      render: (_: any, record: KnowledgeDocument) => getStatusTag(record),
+    },
+    {
       title: "片段数",
       dataIndex: "chunk_count",
       key: "chunk_count",
-      width: 100,
-      render: (count: number) => <Tag color="green">{count} 段</Tag>,
+      width: 110,
+      render: (_: any, record: KnowledgeDocument) => {
+        if (record.status === "indexed") {
+          return <Tag color="green">{record.chunk_count} 段</Tag>;
+        }
+        if (record.status === "parsing") {
+          return <span style={{ color: "#8c8c8c" }}>解析中...</span>;
+        }
+        return <span style={{ color: "#8c8c8c" }}>-</span>;
+      },
     },
     {
       title: "操作",
       key: "action",
-      width: 200,
+      width: 280,
       render: (_: any, record: KnowledgeDocument) => (
         <Space>
+          {record.status === "failed" && (
+            <Button
+              type="link"
+              onClick={() => handleRetry(record.doc_id)}
+            >
+              重试
+            </Button>
+          )}
           <Button
             type="link"
             icon={<EyeOutlined />}
             onClick={() => handlePreview(record)}
+            disabled={record.status !== "indexed"}
           >
             预览
           </Button>
@@ -221,11 +238,16 @@ export const Component = () => {
           </Space>
         }
         extra={
-          <Upload beforeUpload={handleUpload} showUploadList={false} accept=".txt,.md,.pdf,.docx,.xlsx,.csv">
-            <Button type="primary" icon={<UploadOutlined />} loading={uploading}>
-              上传文档
+          <Space>
+            <Button icon={<ReloadOutlined />} onClick={fetchDocuments} loading={loading}>
+              刷新
             </Button>
-          </Upload>
+            <Upload beforeUpload={handleUpload} showUploadList={false} accept=".txt,.md,.pdf,.docx,.xlsx,.csv">
+              <Button type="primary" icon={<UploadOutlined />} loading={uploading}>
+                上传文档
+              </Button>
+            </Upload>
+          </Space>
         }
       >
         <Table
@@ -236,44 +258,6 @@ export const Component = () => {
           pagination={false}
           locale={{ emptyText: <Empty description="暂无文档，请上传" /> }}
         />
-      </Card>
-
-      <Divider />
-
-      {/* 知识库问答测试 */}
-      <Card
-        title={
-          <Space>
-            <span>知识库问答测试</span>
-            {querying && <Spin size="small" />}
-          </Space>
-        }
-      >
-        <Flex gap={8}>
-          <Input.TextArea
-            value={question}
-            onChange={(e) => setQuestion(e.target.value)}
-            placeholder="输入问题，基于知识库内容进行问答..."
-            rows={2}
-            disabled={querying}
-          />
-          <Button
-            type="primary"
-            onClick={handleQuery}
-            loading={querying}
-            disabled={!question.trim()}
-            style={{ height: "auto" }}
-          >
-            发送
-          </Button>
-        </Flex>
-
-        {answer && (
-          <div style={{ marginTop: 16, padding: 16, background: "#f6ffed", borderRadius: 8, border: "1px solid #b7eb8f" }}>
-            <div style={{ fontWeight: "bold", marginBottom: 8, color: "#52c41a" }}>AI 回答：</div>
-            <div style={{ whiteSpace: "pre-wrap", lineHeight: 1.8 }}>{answer}</div>
-          </div>
-        )}
       </Card>
     </Flex>
   );
