@@ -38,7 +38,7 @@ func (a *Api) ChatMessage(c *gin.Context) {
 
 	var req struct {
 		ConversationID uint   `json:"conversationId"`
-		Content        string `json:"content" binding:"required"`
+		Content        string `json:"content"` // resume 模式下可以为空
 		Mode           string `json:"mode"`   // aiserver_chat | aiserver_knowledge
 		Resume         bool   `json:"resume"` // 是否为恢复模式（刷新后重连）
 	}
@@ -48,6 +48,10 @@ func (a *Api) ChatMessage(c *gin.Context) {
 	}
 	if req.Mode == "" {
 		req.Mode = "aiserver_chat"
+	}
+	if !req.Resume && req.Content == "" {
+		common.FailWithMsg(c, "消息内容不能为空")
+		return
 	}
 
 	var conversation business.AIConversation
@@ -294,6 +298,10 @@ func (a *Api) serveResume(c *gin.Context, task *generationTask) {
 
 // serveCompletedMessage 处理恢复模式：任务已完成，直接返回数据库中的内容
 func (a *Api) serveCompletedMessage(c *gin.Context, msg business.AIMessage) {
+	// 将残留的 loading 状态更新为 success
+	global.JY_DB.Model(&business.AIMessage{}).Where("id = ? AND status = ?", msg.ID, "loading").
+		Updates(map[string]interface{}{"status": "success"})
+
 	c.Header("Content-Type", "text/event-stream")
 	c.Header("Cache-Control", "no-cache")
 	c.Header("Connection", "keep-alive")
