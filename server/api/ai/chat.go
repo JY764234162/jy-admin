@@ -24,11 +24,10 @@ import (
 // @Tags         AI
 // @Accept       json
 // @Produce      text/event-stream
-// @Param        data  body      object{conversationId=int,content=string,mode=string}  true  "会话ID、消息内容、模式"
+// @Param        data  body      object{conversationId=int,content=string,mode=string,resume=bool}  true  "会话ID、消息内容、模式、是否恢复"
 // @Success      200   {string}  text/event-stream  "流式返回"
 // @Router       /ai/chat [post]
 func (a *Api) ChatMessage(c *gin.Context) {
-	// 获取用户ID
 	claims, exists := c.Get("claims")
 	if !exists {
 		common.FailWithMsg(c, "未登录")
@@ -40,7 +39,7 @@ func (a *Api) ChatMessage(c *gin.Context) {
 	var req struct {
 		ConversationID uint   `json:"conversationId"`
 		Content        string `json:"content" binding:"required"`
-		Mode           string `json:"mode"` // aiserver_chat | aiserver_knowledge
+		Mode           string `json:"mode"`   // aiserver_chat | aiserver_knowledge
 		Resume         bool   `json:"resume"` // 是否为恢复模式（刷新后重连）
 	}
 	if err := c.ShouldBindJSON(&req); err != nil {
@@ -56,7 +55,6 @@ func (a *Api) ChatMessage(c *gin.Context) {
 		common.FailWithMsg(c, "会话ID不能为空")
 		return
 	}
-	// 验证会话是否属于当前用户
 	if err := global.JY_DB.Where("id = ? AND user_id = ?", req.ConversationID, userID).First(&conversation).Error; err != nil {
 		common.FailWithMsg(c, "会话不存在或无权限")
 		return
@@ -73,34 +71,113 @@ func (a *Api) ChatMessage(c *gin.Context) {
 			return
 		}
 		assistantMsgID = lastLoading.ID
-	} else {
-		// 正常模式：保存用户消息并插入 AI 占位消息
-		userMessage := business.AIMessage{
-			ConversationID: req.ConversationID,
-			Role:           "user",
-			Content:        req.Content,
-			UserID:         userID,
-		}
-		if err := global.JY_DB.Create(&userMessage).Error; err != nil {
-			common.FailWithMsg(c, "保存消息失败")
+
+		// 先尝试获取正在进行的生成任务
+		if task, ok := getGenerationTask(req.ConversationID); ok {
+			a.serveResume(c, task)
 			return
 		}
 
-		assistantMessage := business.AIMessage{
-			ConversationID: req.ConversationID,
-			Role:           "assistant",
-			Content:        "",
-			UserID:         userID,
-			Status:         "loading",
-		}
-		if err := global.JY_DB.Create(&assistantMessage).Error; err != nil {
-			common.FailWithMsg(c, "保存助手消息失败")
-			return
-		}
-		assistantMsgID = assistantMessage.ID
+		// 任务已完成，直接从数据库返回最终内容
+		a.serveCompletedMessage(c, lastLoading)
+		return
 	}
 
-	// 设置 SSE 响应头
+	// 正常模式：保存用户消息并插入 AI 占位消息
+	userMessage := business.AIMessage{
+		ConversationID: req.ConversationID,
+		Role:           "user",
+		Content:        req.Content,
+		UserID:         userID,
+	}
+	if err := global.JY_DB.Create(&userMessage).Error; err != nil {
+		common.FailWithMsg(c, "保存消息失败")
+		return
+	}
+
+	assistantMessage := business.AIMessage{
+		ConversationID: req.ConversationID,
+		Role:           "assistant",
+		Content:        "",
+		UserID:         userID,
+		Status:         "loading",
+	}
+	if err := global.JY_DB.Create(&assistantMessage).Error; err != nil {
+		common.FailWithMsg(c, "保存助手消息失败")
+		return
+	}
+	assistantMsgID = assistantMessage.ID
+
+	// 创建后台生成任务
+	task := startGenerationTask(req.ConversationID, assistantMsgID)
+
+	// 主 goroutine 先注册观察者，再启动后台生成，确保不丢开头 chunk
+	ch := make(chan string, 1000)
+	task.addSubscriber(ch)
+
+	// 启动后台 goroutine 读取 ai-server 流
+	go a.runBackgroundGeneration(task, req.ConversationID, assistantMsgID, req.Content, req.Mode, conversation)
+
+	// 设置 SSE 并推送
+	a.serveStream(c, task, ch)
+}
+
+// runBackgroundGeneration 后台 goroutine：读取 ai-server 流，保存到 DB，通知观察者
+func (a *Api) runBackgroundGeneration(task *generationTask, conversationID, assistantMsgID uint, content, mode string, conversation business.AIConversation) {
+	var assistantContent strings.Builder
+	var streamErr error
+
+	streamCallback := func(chunk string) {
+		assistantContent.WriteString(chunk)
+		task.updateContent(assistantContent.String())
+
+		// 实时保存到 DB
+		if dbErr := global.JY_DB.Model(&business.AIMessage{}).Where("id = ?", assistantMsgID).Update("content", assistantContent.String()).Error; dbErr != nil {
+			global.JY_LOG.Error("更新助手消息内容失败", zap.Error(dbErr))
+		}
+
+		task.notifySubscribers(chunk)
+	}
+
+	switch mode {
+	case "aiserver_chat":
+		var messages []business.AIMessage
+		global.JY_DB.Where("conversation_id = ?", conversationID).Order("created_at ASC").Find(&messages)
+		streamErr = a.callAIServerChatStream(messages, content, conversationID, streamCallback)
+	case "aiserver_knowledge":
+		streamErr = a.callAIServerKnowledgeStream(content, streamCallback)
+	default:
+		streamErr = fmt.Errorf("不支持的对话模式: %s", mode)
+	}
+
+	if streamErr != nil {
+		global.JY_DB.Model(&business.AIMessage{}).Where("id = ?", assistantMsgID).Update("status", "error")
+	} else {
+		global.JY_DB.Model(&business.AIMessage{}).Where("id = ?", assistantMsgID).Updates(map[string]interface{}{
+			"status":  "success",
+			"content": assistantContent.String(),
+		})
+	}
+
+	// 更新会话
+	lastMsg := assistantContent.String()
+	if len(lastMsg) > 100 {
+		lastMsg = lastMsg[:100]
+	}
+	userLastMsg := content
+	if len(userLastMsg) > 100 {
+		userLastMsg = userLastMsg[:100]
+	}
+	global.JY_DB.Model(&conversation).Updates(map[string]interface{}{
+		"last_msg":      userLastMsg,
+		"message_count": conversation.MessageCount + 2,
+	})
+
+	task.finish(streamErr)
+}
+
+// serveStream 主 goroutine：设置 SSE，先返回已累积内容，然后监听观察者 channel 推送新 chunk
+func (a *Api) serveStream(c *gin.Context, task *generationTask, ch chan string) {
 	c.Header("Content-Type", "text/event-stream")
 	c.Header("Cache-Control", "no-cache")
 	c.Header("Connection", "keep-alive")
@@ -114,69 +191,129 @@ func (a *Api) ChatMessage(c *gin.Context) {
 		return
 	}
 
-	var assistantContent strings.Builder
-	var streamErr error
-
-	streamCallback := func(chunk string) {
-		assistantContent.WriteString(chunk)
-		data := map[string]interface{}{"content": chunk, "done": false}
+	// 先返回已累积的完整内容（resume 时尤为重要）
+	existingContent := task.getContent()
+	if existingContent != "" {
+		data := map[string]interface{}{"content": existingContent, "done": false}
 		jsonData, _ := json.Marshal(data)
 		fmt.Fprintf(c.Writer, "data: %s\n\n", jsonData)
 		flusher.Flush()
+	}
 
-		// 实时更新占位消息内容，刷新时消息不丢失
-		if dbErr := global.JY_DB.Model(&business.AIMessage{}).Where("id = ?", assistantMsgID).Update("content", assistantContent.String()).Error; dbErr != nil {
-			global.JY_LOG.Error("更新助手消息内容失败", zap.Error(dbErr))
+	defer task.removeSubscriber(ch)
+
+	for {
+		select {
+		case chunk, ok := <-ch:
+			if !ok {
+				return
+			}
+			data := map[string]interface{}{"content": chunk, "done": false}
+			jsonData, _ := json.Marshal(data)
+			fmt.Fprintf(c.Writer, "data: %s\n\n", jsonData)
+			flusher.Flush()
+
+		case <-task.done:
+			if err := task.getError(); err != nil {
+				errorData := map[string]interface{}{"error": err.Error(), "done": true}
+				jsonErrorData, _ := json.Marshal(errorData)
+				fmt.Fprintf(c.Writer, "data: %s\n\n", jsonErrorData)
+			} else {
+				endData := map[string]interface{}{"content": "", "done": true}
+				jsonEndData, _ := json.Marshal(endData)
+				fmt.Fprintf(c.Writer, "data: %s\n\n", jsonEndData)
+			}
+			flusher.Flush()
+			return
+
+		case <-c.Request.Context().Done():
+			// 前端断开，主 goroutine 返回，但后台任务继续运行
+			return
 		}
 	}
+}
 
-	switch req.Mode {
-	case "aiserver_chat":
-		// 获取会话历史消息（用于上下文）
-		var messages []business.AIMessage
-		global.JY_DB.Where("conversation_id = ?", req.ConversationID).Order("created_at ASC").Find(&messages)
-		streamErr = a.callAIServerChatStream(messages, req.Content, req.ConversationID, streamCallback)
-	case "aiserver_knowledge":
-		streamErr = a.callAIServerKnowledgeStream(req.Content, streamCallback)
-	default:
-		streamErr = fmt.Errorf("不支持的对话模式: %s", req.Mode)
-	}
+// serveResume 处理恢复模式：任务还在进行中
+func (a *Api) serveResume(c *gin.Context, task *generationTask) {
+	ch := make(chan string, 1000)
+	task.addSubscriber(ch)
 
-	if streamErr != nil {
-		global.JY_DB.Model(&business.AIMessage{}).Where("id = ?", assistantMsgID).Update("status", "error")
-		errorData := map[string]interface{}{"error": streamErr.Error(), "done": true}
-		jsonErrorData, _ := json.Marshal(errorData)
-		fmt.Fprintf(c.Writer, "data: %s\n\n", jsonErrorData)
-		flusher.Flush()
+	c.Header("Content-Type", "text/event-stream")
+	c.Header("Cache-Control", "no-cache")
+	c.Header("Connection", "keep-alive")
+	c.Header("X-Accel-Buffering", "no")
+	c.Header("Transfer-Encoding", "chunked")
+	c.Status(http.StatusOK)
+
+	flusher, ok := c.Writer.(http.Flusher)
+	if !ok {
+		common.FailWithMsg(c, "流式响应不支持")
 		return
 	}
 
-	// 流式结束，更新状态为 success
-	global.JY_DB.Model(&business.AIMessage{}).Where("id = ?", assistantMsgID).Updates(map[string]interface{}{
-		"status":  "success",
-		"content": assistantContent.String(),
-	})
-
-	lastMsg := assistantContent.String()
-	if len(lastMsg) > 100 {
-		lastMsg = lastMsg[:100]
+	// 先返回已累积的完整内容
+	existingContent := task.getContent()
+	if existingContent != "" {
+		data := map[string]interface{}{"content": existingContent, "done": false}
+		jsonData, _ := json.Marshal(data)
+		fmt.Fprintf(c.Writer, "data: %s\n\n", jsonData)
+		flusher.Flush()
 	}
-	if req.Resume {
-		global.JY_DB.Model(&conversation).Updates(map[string]interface{}{
-			"last_msg": lastMsg,
-		})
-	} else {
-		userLastMsg := req.Content
-		if len(userLastMsg) > 100 {
-			userLastMsg = userLastMsg[:100]
+
+	defer task.removeSubscriber(ch)
+
+	for {
+		select {
+		case chunk, ok := <-ch:
+			if !ok {
+				return
+			}
+			data := map[string]interface{}{"content": chunk, "done": false}
+			jsonData, _ := json.Marshal(data)
+			fmt.Fprintf(c.Writer, "data: %s\n\n", jsonData)
+			flusher.Flush()
+
+		case <-task.done:
+			if err := task.getError(); err != nil {
+				errorData := map[string]interface{}{"error": err.Error(), "done": true}
+				jsonErrorData, _ := json.Marshal(errorData)
+				fmt.Fprintf(c.Writer, "data: %s\n\n", jsonErrorData)
+			} else {
+				endData := map[string]interface{}{"content": "", "done": true}
+				jsonEndData, _ := json.Marshal(endData)
+				fmt.Fprintf(c.Writer, "data: %s\n\n", jsonEndData)
+			}
+			flusher.Flush()
+			return
+
+		case <-c.Request.Context().Done():
+			return
 		}
-		global.JY_DB.Model(&conversation).Updates(map[string]interface{}{
-			"last_msg":      userLastMsg,
-			"message_count": conversation.MessageCount + 2,
-		})
+	}
+}
+
+// serveCompletedMessage 处理恢复模式：任务已完成，直接返回数据库中的内容
+func (a *Api) serveCompletedMessage(c *gin.Context, msg business.AIMessage) {
+	c.Header("Content-Type", "text/event-stream")
+	c.Header("Cache-Control", "no-cache")
+	c.Header("Connection", "keep-alive")
+	c.Header("X-Accel-Buffering", "no")
+	c.Header("Transfer-Encoding", "chunked")
+	c.Status(http.StatusOK)
+
+	flusher, ok := c.Writer.(http.Flusher)
+	if !ok {
+		common.FailWithMsg(c, "流式响应不支持")
+		return
 	}
 
-	// 发送结束标记
+	if msg.Content != "" {
+		data := map[string]interface{}{"content": msg.Content, "done": false}
+		jsonData, _ := json.Marshal(data)
+		fmt.Fprintf(c.Writer, "data: %s\n\n", jsonData)
+		flusher.Flush()
+	}
+
 	endData := map[string]interface{}{"content": "", "done": true}
 	jsonEndData, _ := json.Marshal(endData)
 	fmt.Fprintf(c.Writer, "data: %s\n\n", jsonEndData)
@@ -193,7 +330,6 @@ func (a *Api) callAIServerChatStream(messages []business.AIMessage, newContent s
 		aiServerURL = "http://localhost:8000"
 	}
 
-	// 构建消息历史（传给 ai-server，避免 ai-server 因 conversation_id 不存在而报错）
 	var history []map[string]string
 	for _, m := range messages {
 		role := "user"

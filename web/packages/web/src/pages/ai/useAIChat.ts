@@ -31,6 +31,8 @@ export function useAIChat(options: UseAIChatOptions = {}) {
   const shouldRefreshSessionsRef = useRef(false);
   // 当前活跃流对应的 AI 消息 id（每条独立，避免覆盖旧回复）
   const currentAiMsgIdRef = useRef<string | null>(null);
+  // resume 模式下记录旧 content，用于新流长度未超过前继续显示旧内容
+  const resumeInitialContentRef = useRef<string | null>(null);
   // 避免闭包拿到旧 sessions / messages
   const sessionsRef = useRef<AIConversation[]>([]);
   const messagesBySessionRef = useRef<Record<string, UiMessage[]>>({});
@@ -262,6 +264,7 @@ export function useAIChat(options: UseAIChatOptions = {}) {
           return;
         }
         currentAiMsgIdRef.current = loadingMsg.id;
+        resumeInitialContentRef.current = loadingMsg.content;
         setLoading(true);
         try {
           shouldRefreshSessionsRef.current = true;
@@ -285,6 +288,7 @@ export function useAIChat(options: UseAIChatOptions = {}) {
       }
 
       // 正常模式
+      resumeInitialContentRef.current = null;
       const userMsg: UiMessage = {
         id: `user-${Date.now()}`,
         content,
@@ -396,7 +400,11 @@ export function useAIChat(options: UseAIChatOptions = {}) {
           const idx = findTargetIdx(current);
           if (idx !== -1) {
             const next = current.slice();
-            next[idx] = { ...next[idx]!, content: snap.fullText };
+            const initialContent = resumeInitialContentRef.current;
+            const displayContent = initialContent && snap.fullText.length < initialContent.length
+              ? initialContent
+              : snap.fullText;
+            next[idx] = { ...next[idx]!, content: displayContent };
             return { ...prev, [activeKey]: next };
           }
           return {
@@ -424,13 +432,18 @@ export function useAIChat(options: UseAIChatOptions = {}) {
           snap.status === "error" ? "error" : snap.status === "done" ? "success" : "loading";
         const existingMsg = next[idx];
         if (!existingMsg) return prev;
-        next[idx] = { ...existingMsg, content: snap.fullText, status };
+        const initialContent = resumeInitialContentRef.current;
+        const displayContent = initialContent && snap.fullText.length < initialContent.length
+          ? initialContent
+          : snap.fullText;
+        next[idx] = { ...existingMsg, content: displayContent, status };
         return { ...prev, [activeKey]: next };
       });
 
       if (snap.status === "done" || snap.status === "error") {
         setLoading(false);
         currentAiMsgIdRef.current = null;
+        resumeInitialContentRef.current = null;
         sessionStorage.removeItem("ai_pending_request");
         if (snap.status === "done" && shouldRefreshSessionsRef.current) {
           shouldRefreshSessionsRef.current = false;

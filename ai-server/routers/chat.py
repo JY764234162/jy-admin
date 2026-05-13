@@ -66,7 +66,7 @@ async def chat_message(req: ChatRequest):
                 if chunk.content:
                     full_response += chunk.content
                     yield _sse_json({"content": chunk.content, "done": False})
-                    await asyncio.sleep(0.03)
+                    await asyncio.sleep(0.08)
 
             # 保存 AI 回复到 memory
             memory.add_message(conversation_id, "assistant", full_response)
