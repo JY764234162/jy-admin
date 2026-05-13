@@ -194,12 +194,12 @@ func (a *Api) DeleteKnowledge(c *gin.Context) {
 		}
 	}
 
-	// 2. 删除 ai-server 向量
+	// 2. 删除 ai-server 向量（带上 user_id，确保只删除当前用户的向量）
 	aiServerURL := global.JY_Config.AI.AIServerURL
 	if aiServerURL == "" {
 		aiServerURL = "http://ai-server:8000"
 	}
-	req, _ := http.NewRequest(http.MethodDelete, aiServerURL+"/api/knowledge/"+docID, nil)
+	req, _ := http.NewRequest(http.MethodDelete, aiServerURL+"/api/knowledge/"+docID+"?user_id="+fmt.Sprintf("%d", userID), nil)
 	client := &http.Client{Timeout: 10 * time.Second}
 	client.Do(req) // 忽略错误，即使向量删除失败也继续
 
@@ -220,6 +220,13 @@ func (a *Api) DeleteKnowledge(c *gin.Context) {
 // @Success      200   {string}  text/event-stream  "流式返回"
 // @Router       /ai/knowledge/query [post]
 func (a *Api) QueryKnowledge(c *gin.Context) {
+	claims, exists := c.Get("claims")
+	if !exists {
+		common.FailWithMsg(c, "未登录")
+		return
+	}
+	userID := claims.(*utils.CustomClaims).ID
+
 	aiServerURL := global.JY_Config.AI.AIServerURL
 	if aiServerURL == "" {
 		aiServerURL = "http://localhost:8000"
@@ -242,6 +249,7 @@ func (a *Api) QueryKnowledge(c *gin.Context) {
 		"question":   req.Question,
 		"top_k":      req.TopK,
 		"structured": req.Structured,
+		"user_id":    fmt.Sprintf("%d", userID),
 	}
 	body, err := json.Marshal(payload)
 	if err != nil {

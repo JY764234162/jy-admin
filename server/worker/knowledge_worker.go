@@ -113,6 +113,10 @@ func processParseJob(job ParseJob) {
 		markFailed(job.DocID, fmt.Sprintf("写入 doc_id 失败: %v", err))
 		return
 	}
+	if err := writer.WriteField("user_id", fmt.Sprintf("%d", job.UserID)); err != nil {
+		markFailed(job.DocID, fmt.Sprintf("写入 user_id 失败: %v", err))
+		return
+	}
 	writer.Close()
 
 	req, err := http.NewRequest(http.MethodPost, aiServerURL+"/api/knowledge/parse", parseBody)
