@@ -146,6 +146,7 @@ func registerRouter(Router *gin.Engine) *gin.Engine {
 		privateGroup.GET("/ai/knowledge/list", apiGroup.AIApi.GetKnowledgeList)
 		privateGroup.POST("/ai/knowledge/upload", apiGroup.AIApi.UploadKnowledge)
 		privateGroup.DELETE("/ai/knowledge/:docId", apiGroup.AIApi.DeleteKnowledge)
+		privateGroup.POST("/ai/knowledge/:docId/retry", apiGroup.AIApi.RetryKnowledge)
 		privateGroup.POST("/ai/knowledge/query", apiGroup.AIApi.QueryKnowledge)
 	}
 

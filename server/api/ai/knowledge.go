@@ -6,7 +6,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
-	"mime/multipart"
 	"net/http"
 	"path/filepath"
 	"strings"
@@ -19,6 +18,7 @@ import (
 	"jiangyi.com/model/common"
 	"jiangyi.com/utils"
 	"jiangyi.com/utils/upload"
+	"jiangyi.com/worker"
 )
 
 // GetKnowledgeList 获取知识库文档列表（从数据库查询）
@@ -52,6 +52,8 @@ func (a *Api) GetKnowledgeList(c *gin.Context) {
 			"chunk_count": f.ChunkCount,
 			"cos_url":     f.CosURL,
 			"file_type":   f.FileType,
+			"status":      f.Status,
+			"error_msg":   f.ErrorMsg,
 			"created_at":  f.CreatedAt,
 		})
 	}
@@ -119,86 +121,34 @@ func (a *Api) UploadKnowledge(c *gin.Context) {
 		return
 	}
 
-	// 3. 调用 ai-server 解析（multipart 转发）
-	aiServerURL := global.JY_Config.AI.AIServerURL
-	if aiServerURL == "" {
-		aiServerURL = "http://ai-server:8000"
-	}
-
-	parseBody := &bytes.Buffer{}
-	writer := multipart.NewWriter(parseBody)
-	part, err := writer.CreateFormFile("file", header.Filename)
-	if err != nil {
-		common.FailWithMsg(c, "创建解析请求失败")
-		return
-	}
-	file.Seek(0, io.SeekStart)
-	if _, err := io.Copy(part, file); err != nil {
-		common.FailWithMsg(c, "复制文件内容失败")
-		return
-	}
-	// 传入 doc_id，让 ai-server 与后端共用同一 ID
-	if err := writer.WriteField("doc_id", docID); err != nil {
-		common.FailWithMsg(c, "写入解析参数失败")
-		return
-	}
-	writer.Close()
-
-	req, err := http.NewRequest(http.MethodPost, aiServerURL+"/api/knowledge/parse", parseBody)
-	if err != nil {
-		common.FailWithMsg(c, "创建解析请求失败")
-		return
-	}
-	req.Header.Set("Content-Type", writer.FormDataContentType())
-
-	client := &http.Client{Timeout: 60 * time.Second}
-	resp, err := client.Do(req)
-	if err != nil {
-		common.FailWithMsg(c, fmt.Sprintf("调用ai-server解析失败: %v", err))
-		return
-	}
-	defer resp.Body.Close()
-
-	respBody, err := io.ReadAll(resp.Body)
-	if err != nil {
-		common.FailWithMsg(c, "读取解析响应失败")
-		return
-	}
-
-	if resp.StatusCode != http.StatusOK {
-		common.FailWithMsg(c, fmt.Sprintf("ai-server解析失败: %s", string(respBody)))
-		return
-	}
-
-	var parseResult struct {
-		DocID    string `json:"doc_id"`
-		Filename string `json:"filename"`
-		Chunks   int    `json:"chunks"`
-	}
-	if err := json.Unmarshal(respBody, &parseResult); err != nil {
-		common.FailWithMsg(c, "解析ai-server响应失败")
-		return
-	}
-
-	// 4. 保存元数据到数据库
+	// 3. 保存元数据到数据库（状态为 pending）
 	knowledgeFile := business.AIKnowledgeFile{
 		DocID:      docID,
 		Filename:   header.Filename,
 		CosURL:     cosURL,
 		CosKey:     objectKey,
-		ChunkCount: parseResult.Chunks,
+		ChunkCount: 0,
 		UserID:     userID,
 		FileType:   ext,
+		Status:     "pending",
 	}
 	if err := global.JY_DB.Create(&knowledgeFile).Error; err != nil {
 		common.FailWithMsg(c, "保存知识库文件记录失败")
 		return
 	}
 
+	// 4. 入队异步解析任务
+	worker.EnqueueParseJob(worker.ParseJob{
+		DocID:    docID,
+		CosKey:   objectKey,
+		Filename: header.Filename,
+		UserID:   userID,
+	})
+
 	common.OkWithData(c, gin.H{
 		"knowledge_id": docID,
 		"filename":     header.Filename,
-		"chunks":       parseResult.Chunks,
+		"status":       "pending",
 		"cos_url":      cosURL,
 	})
 }
@@ -372,4 +322,61 @@ func (a *Api) QueryKnowledge(c *gin.Context) {
 		fmt.Fprintf(c.Writer, "data: %s\n\n", fmt.Sprintf(`{"error":"%s","done":true}`, err.Error()))
 		flusher.Flush()
 	}
+}
+
+// RetryKnowledge 重试失败的文档解析
+// @Summary      重试解析失败的文档
+// @Description  将状态为 failed 的文档重新入队解析
+// @Security     ApiKeyAuth
+// @Tags         AI
+// @Accept       json
+// @Produce      json
+// @Param        docId  path      string  true  "文档ID"
+// @Success      200    {object}  common.Response{data=object{message=string},msg=string}
+// @Router       /ai/knowledge/{docId}/retry [post]
+func (a *Api) RetryKnowledge(c *gin.Context) {
+	claims, exists := c.Get("claims")
+	if !exists {
+		common.FailWithMsg(c, "未登录")
+		return
+	}
+	userID := claims.(*utils.CustomClaims).ID
+
+	docID := c.Param("docId")
+	if docID == "" {
+		common.FailWithMsg(c, "文档ID不能为空")
+		return
+	}
+
+	// 查询记录
+	var file business.AIKnowledgeFile
+	if err := global.JY_DB.Where("doc_id = ? AND user_id = ?", docID, userID).First(&file).Error; err != nil {
+		common.FailWithMsg(c, "文档不存在或无权限")
+		return
+	}
+
+	if file.Status != "failed" {
+		common.FailWithMsg(c, fmt.Sprintf("当前状态为 %s，仅失败的文档可以重试", file.Status))
+		return
+	}
+
+	// 更新状态为 pending 并入队
+	if err := global.JY_DB.Model(&business.AIKnowledgeFile{}).
+		Where("doc_id = ?", docID).
+		Updates(map[string]interface{}{
+			"status":    "pending",
+			"error_msg": "",
+		}).Error; err != nil {
+		common.FailWithMsg(c, "重置状态失败")
+		return
+	}
+
+	worker.EnqueueParseJob(worker.ParseJob{
+		DocID:    docID,
+		CosKey:   file.CosKey,
+		Filename: file.Filename,
+		UserID:   userID,
+	})
+
+	common.OkWithMsg(c, fmt.Sprintf("文档 %s 已重新入队", docID))
 }
