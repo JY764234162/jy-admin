@@ -1,3 +1,4 @@
+import asyncio
 import json
 import uuid
 from pathlib import Path
@@ -272,9 +273,11 @@ async def query_knowledge(req: QueryRequest):
                 if hasattr(rag_chain, "astream"):
                     async for chunk in rag_chain.astream(req.question):
                         yield _sse_json({"content": chunk, "done": False})
+                        await asyncio.sleep(0.03)
                 else:
                     for chunk in rag_chain.stream(req.question):
                         yield _sse_json({"content": chunk, "done": False})
+                        await asyncio.sleep(0.03)
                 yield _sse_json({"content": "", "done": True})
             except Exception as e:
                 yield _sse_json({"content": "", "done": True, "error": str(e)})
