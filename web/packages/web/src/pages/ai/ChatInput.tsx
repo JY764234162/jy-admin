@@ -3,10 +3,9 @@ import {
   CloudUploadOutlined,
   LinkOutlined,
   BookOutlined,
-  MessageOutlined,
 } from "@ant-design/icons";
 import { Attachments, type AttachmentsProps, Sender } from "@ant-design/x";
-import { Badge, Button, Flex, Dropdown, Divider, type MenuProps } from "antd";
+import { Badge, Button, Flex, Divider } from "antd";
 import type { ChatMode } from "./types";
 
 const Switch = Sender.Switch;
@@ -21,16 +20,6 @@ interface ChatInputProps {
   isMobile: boolean;
 }
 
-const modeOptions: MenuProps["items"] = [
-  { key: "aiserver_chat", icon: <MessageOutlined />, label: "基础对话" },
-  { key: "aiserver_knowledge", icon: <BookOutlined />, label: "知识库问答" },
-];
-
-const modeLabelMap: Record<ChatMode, string> = {
-  aiserver_chat: "基础对话",
-  aiserver_knowledge: "知识库",
-};
-
 export const ChatInput = ({
   value,
   onChange,
@@ -43,7 +32,6 @@ export const ChatInput = ({
   const [open, setOpen] = useState(false);
   const [items, setItems] = useState<NonNullable<AttachmentsProps["items"]>>([]);
   const [deepThink, setDeepThink] = useState(false);
-  const [useKnowledge, setUseKnowledge] = useState(false);
   const senderRef = useRef<any>(null);
 
   useEffect(() => {
@@ -112,8 +100,8 @@ export const ChatInput = ({
     setItems([]);
   };
 
-  const handleModeClick: MenuProps["onClick"] = (e) => {
-    onModeChange(e.key as ChatMode);
+  const handleKnowledgeChange = (checked: boolean) => {
+    onModeChange(checked ? "aiserver_knowledge" : "aiserver_chat");
   };
 
   return (
@@ -152,17 +140,6 @@ export const ChatInput = ({
         footer={(actionNode) => (
           <Flex justify="space-between" align="center">
             <Flex gap="small" align="center">
-              <Dropdown
-                menu={{
-                  selectedKeys: [mode],
-                  onClick: handleModeClick,
-                  items: modeOptions,
-                }}
-              >
-                <Switch value={false} icon={<MessageOutlined />}>
-                  {modeLabelMap[mode]}
-                </Switch>
-              </Dropdown>
               <Switch
                 value={deepThink}
                 checkedChildren="深度思考"
@@ -170,10 +147,10 @@ export const ChatInput = ({
                 onChange={setDeepThink}
               />
               <Switch
-                value={useKnowledge}
+                value={mode === "aiserver_knowledge"}
                 checkedChildren="知识库"
                 unCheckedChildren="知识库"
-                onChange={setUseKnowledge}
+                onChange={handleKnowledgeChange}
                 icon={<BookOutlined />}
               />
             </Flex>

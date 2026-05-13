@@ -38,8 +38,14 @@ func (a *Api) GetKnowledgeList(c *gin.Context) {
 	}
 	userID := claims.(*utils.CustomClaims).ID
 
+	keyword := c.Query("keyword")
+
 	var files []business.AIKnowledgeFile
-	if err := global.JY_DB.Where("user_id = ?", userID).Order("created_at DESC").Find(&files).Error; err != nil {
+	db := global.JY_DB.Where("user_id = ?", userID)
+	if keyword != "" {
+		db = db.Where("filename LIKE ?", "%"+keyword+"%")
+	}
+	if err := db.Order("created_at DESC").Find(&files).Error; err != nil {
 		common.FailWithMsg(c, "获取知识库列表失败")
 		return
 	}

@@ -1,12 +1,13 @@
 import { useState, useEffect } from "react";
 import {
   Table, Button, Space, Popconfirm, Card, Upload, Flex, Tag,
-  Empty, message as antdMessage
+  Empty, message as antdMessage, Input
 } from "antd";
 import {
   UploadOutlined, DeleteOutlined, FileTextOutlined, BookOutlined,
   FilePdfOutlined, FileWordOutlined, FileExcelOutlined,
   EyeOutlined, DownloadOutlined, ReloadOutlined, LoadingOutlined,
+  SearchOutlined,
 } from "@ant-design/icons";
 import type { ColumnsType } from "antd/es/table";
 import { aiServerApi, type KnowledgeDocument } from "@/api/aiServer";
@@ -15,12 +16,13 @@ export const Component = () => {
   const [documents, setDocuments] = useState<KnowledgeDocument[]>([]);
   const [loading, setLoading] = useState(false);
   const [uploading, setUploading] = useState(false);
+  const [searchKeyword, setSearchKeyword] = useState("");
 
   // 加载文档列表
-  const fetchDocuments = async () => {
+  const fetchDocuments = async (keyword?: string) => {
     setLoading(true);
     try {
-      const res = await aiServerApi.getKnowledgeList();
+      const res = await aiServerApi.getKnowledgeList(keyword);
       setDocuments(res.documents || []);
     } catch (error: any) {
       console.error("获取知识库列表失败:", error);
@@ -239,7 +241,7 @@ export const Component = () => {
         }
         extra={
           <Space>
-            <Button icon={<ReloadOutlined />} onClick={fetchDocuments} loading={loading}>
+            <Button icon={<ReloadOutlined />} onClick={() => fetchDocuments(searchKeyword)} loading={loading}>
               刷新
             </Button>
             <Upload beforeUpload={handleUpload} showUploadList={false} accept=".txt,.md,.pdf,.docx,.xlsx,.csv">
@@ -250,6 +252,14 @@ export const Component = () => {
           </Space>
         }
       >
+        <Input.Search
+          placeholder="搜索文档名称"
+          allowClear
+          value={searchKeyword}
+          onChange={(e) => setSearchKeyword(e.target.value)}
+          onSearch={(value) => fetchDocuments(value)}
+          style={{ marginBottom: 16, maxWidth: 300 }}
+        />
         <Table
           rowKey="doc_id"
           columns={columns}

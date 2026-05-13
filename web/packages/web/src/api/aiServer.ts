@@ -59,8 +59,12 @@ export interface KnowledgeQueryResponse {
 /** AI Server API 客户端（通过 Go 后端代理） */
 export const aiServerApi = {
   /** 获取知识库文档列表（代理） */
-  getKnowledgeList: async (): Promise<{ documents: KnowledgeDocument[] }> => {
-    const res = await fetch(`${BASE_URL}/ai/knowledge/list`, {
+  getKnowledgeList: async (keyword?: string): Promise<{ documents: KnowledgeDocument[] }> => {
+    const url = new URL(`${BASE_URL}/ai/knowledge/list`, window.location.origin);
+    if (keyword) {
+      url.searchParams.set("keyword", keyword);
+    }
+    const res = await fetch(url.toString(), {
       headers: getHeaders(),
     });
     return unwrap<{ documents: KnowledgeDocument[] }>(res, "获取知识库列表失败");
