@@ -10,6 +10,7 @@ package main
 import (
 	"jiangyi.com/core"
 	"jiangyi.com/global"
+	"jiangyi.com/worker"
 )
 
 func main() {
@@ -25,6 +26,8 @@ func main() {
 		core.LoadBlacklistFromDB()
 		// 启动JWT token清理定时任务（每天凌晨执行一次）
 		go core.StartJwtCleanupTask()
+		// 启动知识库异步解析 Worker
+		go worker.StartKnowledgeWorker()
 		// close db connection logic if needed
 		sqlDB, _ := global.JY_DB.DB()
 		defer sqlDB.Close()
