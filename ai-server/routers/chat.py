@@ -62,7 +62,20 @@ async def chat_message(req: ChatRequest):
     async def event_generator():
         full_response = ""
         try:
-            for chunk in llm.stream(langchain_messages):
+            # llm.stream 是同步生成器，放到线程池中执行避免阻塞 asyncio 事件循环
+            sync_gen = llm.stream(langchain_messages)
+            loop = asyncio.get_event_loop()
+
+            def next_chunk():
+                try:
+                    return next(sync_gen)
+                except StopIteration:
+                    return None
+
+            while True:
+                chunk = await loop.run_in_executor(None, next_chunk)
+                if chunk is None:
+                    break
                 if chunk.content:
                     full_response += chunk.content
                     yield _sse_json({"content": chunk.content, "done": False})

@@ -1,21 +1,22 @@
 package ai
 
 import (
+	"context"
 	"sync"
-	"sync/atomic"
 )
 
 // generationTask 代表一个正在后台进行的 AI 生成任务
 // 前端断开 SSE 后，该任务继续运行，把内容实时保存到 DB
-// 前端重连时，先返回已累积内容，再注册为观察者继续接收新 chunk
+// 前端重连时，通过 signal 通道的 close+recreate 模式广播通知
+// 无 atomic.Value，无 sync.Map 订阅者 channel，从根本上消除 panic 和丢 chunk
 type generationTask struct {
+	mu             sync.Mutex
 	conversationID uint
 	assistantMsgID uint
-	content        atomic.Value // string，当前已累积的完整内容
-	subscribers    sync.Map     // key: chan string, value: struct{}
-	done           chan struct{}
-	err            atomic.Value // error
-	finished       int32        // 0=进行中, 1=已完成
+	content        string        // 当前已累积的完整内容
+	done           bool          // 是否已完成
+	err            error         // 完成时的错误（如果有）
+	signal         chan struct{} // close+recreate 广播 "有新内容" 或 "已完成"
 }
 
 var generationTasks sync.Map // key: uint(conversationID), value: *generationTask
@@ -25,83 +26,77 @@ func startGenerationTask(conversationID, assistantMsgID uint) *generationTask {
 	task := &generationTask{
 		conversationID: conversationID,
 		assistantMsgID: assistantMsgID,
-		done:           make(chan struct{}),
+		signal:         make(chan struct{}),
 	}
-	task.content.Store("")
-	task.err.Store(error(nil))
 	generationTasks.Store(conversationID, task)
 	return task
 }
 
-// getGenerationTask 获取正在进行的生成任务
+// getGenerationTask 获取生成任务（包括已完成的）
 func getGenerationTask(conversationID uint) (*generationTask, bool) {
-	taskI, ok := generationTasks.Load(conversationID)
+	v, ok := generationTasks.Load(conversationID)
 	if !ok {
 		return nil, false
 	}
-	task := taskI.(*generationTask)
-	// 如果任务已经标记为完成，视为不存在
-	if atomic.LoadInt32(&task.finished) == 1 {
-		return nil, false
+	return v.(*generationTask), true
+}
+
+// append 追加内容并广播通知所有等待者
+func (t *generationTask) append(chunk string) {
+	t.mu.Lock()
+	defer t.mu.Unlock()
+	if t.done {
+		return
 	}
-	return task, true
+	t.content += chunk
+	old := t.signal
+	t.signal = make(chan struct{})
+	close(old)
 }
 
-// updateContent 原子更新已累积内容
-func (t *generationTask) updateContent(content string) {
-	t.content.Store(content)
-}
-
-// getContent 原子读取已累积内容
-func (t *generationTask) getContent() string {
-	v := t.content.Load()
-	if v == nil {
-		return ""
-	}
-	return v.(string)
-}
-
-// notifySubscribers 向所有观察者发送 chunk（非阻塞）
-func (t *generationTask) notifySubscribers(chunk string) {
-	t.subscribers.Range(func(key, value interface{}) bool {
-		ch := key.(chan string)
-		select {
-		case ch <- chunk:
-		default:
-		}
-		return true
-	})
-}
-
-// addSubscriber 注册观察者
-func (t *generationTask) addSubscriber(ch chan string) {
-	t.subscribers.Store(ch, struct{}{})
-}
-
-// removeSubscriber 注销观察者
-func (t *generationTask) removeSubscriber(ch chan string) {
-	t.subscribers.Delete(ch)
-}
-
-// finish 标记任务完成，关闭 done 通道，从全局 map 中移除
+// finish 标记任务完成，广播通知，并从全局 map 中移除
 func (t *generationTask) finish(err error) {
-	if atomic.CompareAndSwapInt32(&t.finished, 0, 1) {
-		t.err.Store(err)
-		close(t.done)
-		generationTasks.Delete(t.conversationID)
+	t.mu.Lock()
+	defer t.mu.Unlock()
+	if t.done {
+		return
 	}
+	t.done = true
+	t.err = err
+	generationTasks.Delete(t.conversationID)
+	close(t.signal)
 }
 
-// isFinished 返回任务是否已完成
-func (t *generationTask) isFinished() bool {
-	return atomic.LoadInt32(&t.finished) == 1
+// getContent 读取当前已累积内容
+func (t *generationTask) getContent() string {
+	t.mu.Lock()
+	defer t.mu.Unlock()
+	return t.content
 }
 
-// getError 获取任务错误（如果有）
-func (t *generationTask) getError() error {
-	v := t.err.Load()
-	if v == nil {
+// isDone 返回任务是否已完成
+func (t *generationTask) isDone() bool {
+	t.mu.Lock()
+	defer t.mu.Unlock()
+	return t.done
+}
+
+// getErr 获取任务错误
+func (t *generationTask) getErr() error {
+	t.mu.Lock()
+	defer t.mu.Unlock()
+	return t.err
+}
+
+// wait 等待新内容或 context 取消（客户端断开）
+func (t *generationTask) wait(ctx context.Context) error {
+	t.mu.Lock()
+	sig := t.signal
+	t.mu.Unlock()
+	select {
+	case <-sig:
 		return nil
+	case <-ctx.Done():
+		return ctx.Err()
 	}
-	return v.(error)
 }

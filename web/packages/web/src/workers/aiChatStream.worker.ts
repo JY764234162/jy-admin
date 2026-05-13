@@ -122,13 +122,10 @@ async function startStream(p: StartPayload) {
       headers.Authorization = `Bearer ${p.token}`;
     }
 
-    // 统一走 Go 后端，请求体格式一致
-    const body: Record<string, unknown> = {
-      conversationId: p.conversationId,
-      content: p.content,
-      mode: p.mode ?? "aiserver_chat",
-      resume: p.resume ?? false,
-    };
+    // resume 模式走 /ai/chat/resume，仅传 conversationId；正常聊天走 /ai/chat
+    const body: Record<string, unknown> = p.resume
+      ? { conversationId: p.conversationId }
+      : { conversationId: p.conversationId, content: p.content, mode: p.mode ?? "aiserver_chat" };
 
     const resp = await fetch(p.url, {
       method: "POST",

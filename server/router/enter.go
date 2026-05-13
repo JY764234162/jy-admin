@@ -140,6 +140,7 @@ func registerRouter(Router *gin.Engine) *gin.Engine {
 		privateGroup.DELETE("/ai/conversation/:id", apiGroup.AIApi.DeleteConversation)
 		privateGroup.PUT("/ai/conversation/:id/title", apiGroup.AIApi.UpdateConversationTitle)
 		privateGroup.POST("/ai/chat", apiGroup.AIApi.ChatMessage)
+		privateGroup.POST("/ai/chat/resume", apiGroup.AIApi.ResumeChat)
 	}
 	//AI知识库（代理到 ai-server）
 	{

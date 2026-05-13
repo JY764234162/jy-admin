@@ -62,10 +62,10 @@ function ensureWorker() {
   return workerSingleton;
 }
 
-function buildChatUrl() {
+function buildChatUrl(resume = false) {
   const API_PREFIX = import.meta.env.VITE_API_PREFIX || "/api";
   const VITE_API_BASE_URL = import.meta.env.VITE_API_BASE_URL || "";
-  return `${VITE_API_BASE_URL}${API_PREFIX}/ai/chat`;
+  return `${VITE_API_BASE_URL}${API_PREFIX}/ai/chat${resume ? "/resume" : ""}`;
 }
 
 function createStreamId() {
@@ -115,7 +115,7 @@ export const aiChatStreamClient = {
       type: "START",
       payload: {
         streamId,
-        url: buildChatUrl(),
+        url: buildChatUrl(resume),
         token,
         conversationId,
         content,

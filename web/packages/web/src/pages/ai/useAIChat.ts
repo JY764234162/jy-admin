@@ -31,8 +31,6 @@ export function useAIChat(options: UseAIChatOptions = {}) {
   const shouldRefreshSessionsRef = useRef(false);
   // 当前活跃流对应的 AI 消息 id（每条独立，避免覆盖旧回复）
   const currentAiMsgIdRef = useRef<string | null>(null);
-  // resume 模式下记录旧 content，用于新流长度未超过前继续显示旧内容
-  const resumeInitialContentRef = useRef<string | null>(null);
   // 避免闭包拿到旧 sessions / messages
   const sessionsRef = useRef<AIConversation[]>([]);
   const messagesBySessionRef = useRef<Record<string, UiMessage[]>>({});
@@ -89,25 +87,14 @@ export function useAIChat(options: UseAIChatOptions = {}) {
           setMessagePagination((prev) => ({ ...prev, [key]: { page: 1, total } }));
           options.onAfterMessagesChange?.();
 
-          // 加载完成后，若 sessionStorage 中有 pending 请求且当前会话存在 loading 消息，自动恢复
-          const pendingRaw = sessionStorage.getItem("ai_pending_request");
-          if (pendingRaw) {
-            try {
-              const pending = JSON.parse(pendingRaw);
-              if (pending.conversationId === conversationId) {
-                const hasLoading = messageList.some((m) => m.role === "ai" && m.status === "loading");
-                if (hasLoading) {
-                  setTimeout(() => {
-                    sendMessage(pending.content, pending.mode, pending.conversationId, true);
-                  }, 0);
-                } else {
-                  // 没有 loading 消息，说明后端已处理完，清除 pending
-                  sessionStorage.removeItem("ai_pending_request");
-                }
-              }
-            } catch {
-              sessionStorage.removeItem("ai_pending_request");
-            }
+          // 加载完成后，若存在 loading 的 AI 消息，自动 resume（不依赖 sessionStorage）
+          const loadingMsg = messageList.find((m) => m.role === "ai" && m.status === "loading");
+          if (loadingMsg) {
+            const loadingIdx = messageList.indexOf(loadingMsg);
+            const userMsg = loadingIdx > 0 ? messageList[loadingIdx - 1] : null;
+            setTimeout(() => {
+              sendMessage(userMsg?.content || "", "aiserver_chat", conversationId, true);
+            }, 0);
           }
         } else {
           antdMessage.error(res.msg || "加载消息失败");
@@ -264,7 +251,6 @@ export function useAIChat(options: UseAIChatOptions = {}) {
           return;
         }
         currentAiMsgIdRef.current = loadingMsg.id;
-        resumeInitialContentRef.current = loadingMsg.content;
         setLoading(true);
         try {
           shouldRefreshSessionsRef.current = true;
@@ -288,7 +274,6 @@ export function useAIChat(options: UseAIChatOptions = {}) {
       }
 
       // 正常模式
-      resumeInitialContentRef.current = null;
       const userMsg: UiMessage = {
         id: `user-${Date.now()}`,
         content,
@@ -322,17 +307,10 @@ export function useAIChat(options: UseAIChatOptions = {}) {
         shouldRefreshSessionsRef.current = true;
         const streamId = aiChatStreamClient.start(conversationId, content, mode);
         currentStreamIdRef.current = streamId;
-
-        // 保存 pending 请求到 sessionStorage，刷新后自动恢复
-        sessionStorage.setItem(
-          "ai_pending_request",
-          JSON.stringify({ conversationId, content, mode, timestamp: Date.now() })
-        );
       } catch (error) {
         console.error("发送消息失败:", error);
         antdMessage.error("发送消息失败");
         shouldRefreshSessionsRef.current = false;
-        sessionStorage.removeItem("ai_pending_request");
         setMessagesBySession((prev) => {
           const current = prev[key] || [];
           const withoutAi = current.filter((m) => m.id !== currentAiMsgIdRef.current);
@@ -400,11 +378,7 @@ export function useAIChat(options: UseAIChatOptions = {}) {
           const idx = findTargetIdx(current);
           if (idx !== -1) {
             const next = current.slice();
-            const initialContent = resumeInitialContentRef.current;
-            const displayContent = initialContent && snap.fullText.length < initialContent.length
-              ? initialContent
-              : snap.fullText;
-            next[idx] = { ...next[idx]!, content: displayContent };
+            next[idx] = { ...next[idx]!, content: snap.fullText };
             return { ...prev, [activeKey]: next };
           }
           return {
@@ -432,19 +406,13 @@ export function useAIChat(options: UseAIChatOptions = {}) {
           snap.status === "error" ? "error" : snap.status === "done" ? "success" : "loading";
         const existingMsg = next[idx];
         if (!existingMsg) return prev;
-        const initialContent = resumeInitialContentRef.current;
-        const displayContent = initialContent && snap.fullText.length < initialContent.length
-          ? initialContent
-          : snap.fullText;
-        next[idx] = { ...existingMsg, content: displayContent, status };
+        next[idx] = { ...existingMsg, content: snap.fullText, status };
         return { ...prev, [activeKey]: next };
       });
 
       if (snap.status === "done" || snap.status === "error") {
         setLoading(false);
         currentAiMsgIdRef.current = null;
-        resumeInitialContentRef.current = null;
-        sessionStorage.removeItem("ai_pending_request");
         if (snap.status === "done" && shouldRefreshSessionsRef.current) {
           shouldRefreshSessionsRef.current = false;
           loadSessions();
