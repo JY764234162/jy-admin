@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"io"
 	"mime/multipart"
 	"path/filepath"
 	"strings"
@@ -165,6 +166,19 @@ func (t *TencentCOS) UploadFileWithKey(objectKey string, file *multipart.FileHea
 	fileURL := t.buildFileURL(objectKey)
 
 	return fileURL, objectKey, nil
+}
+
+// DownloadFileByKey 使用完整对象键从COS下载文件
+func (t *TencentCOS) DownloadFileByKey(objectKey string) (io.ReadCloser, error) {
+	if objectKey == "" {
+		return nil, errors.New("对象键不能为空")
+	}
+	ctx := context.Background()
+	resp, err := t.client.Object.Get(ctx, objectKey, nil)
+	if err != nil {
+		return nil, fmt.Errorf("从COS下载文件失败: %v", err)
+	}
+	return resp.Body, nil
 }
 
 // buildFileURL 构建文件访问URL

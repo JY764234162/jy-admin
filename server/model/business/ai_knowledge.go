@@ -12,4 +12,6 @@ type AIKnowledgeFile struct {
 	ChunkCount int    `json:"chunkCount" gorm:"default:0;comment:片段数"`
 	UserID     uint   `json:"userId" gorm:"index;comment:用户ID"`
 	FileType   string `json:"fileType" gorm:"comment:文件类型扩展名"`
+	Status     string `json:"status" gorm:"default:'pending';comment:状态:pending/parsing/indexed/failed"`
+	ErrorMsg   string `json:"errorMsg" gorm:"comment:错误信息"`
 }
