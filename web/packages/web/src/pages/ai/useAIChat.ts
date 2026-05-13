@@ -89,16 +89,26 @@ export function useAIChat(options: UseAIChatOptions = {}) {
           setMessagePagination((prev) => ({ ...prev, [key]: { page: 1, total } }));
           options.onAfterMessagesChange?.();
 
-          // 加载完成后，若存在 loading 的 AI 消息，自动 resume（不依赖 sessionStorage）
-          const loadingMsg = messageList.find((m) => m.role === "ai" && m.status === "loading");
-          if (loadingMsg) {
-            const loadingIdx = messageList.indexOf(loadingMsg);
-            const userMsg = loadingIdx > 0 ? messageList[loadingIdx - 1] : null;
-            setTimeout(() => {
-              sendMessage(userMsg?.content || "", "aiserver_chat", conversationId, true);
-            }, 0);
+          // 加载完成后，若 sessionStorage 中有 pending 请求且当前会话存在 loading 消息，自动恢复
+          const pendingRaw = sessionStorage.getItem("ai_pending_request");
+          if (pendingRaw) {
+            try {
+              const pending = JSON.parse(pendingRaw);
+              if (pending.conversationId === conversationId) {
+                const hasLoading = messageList.some((m) => m.role === "ai" && m.status === "loading");
+                if (hasLoading) {
+                  setTimeout(() => {
+                    sendMessage(pending.content, pending.mode, pending.conversationId, true);
+                  }, 0);
+                } else {
+                  // 没有 loading 消息，说明后端已处理完，清除 pending
+                  sessionStorage.removeItem("ai_pending_request");
+                }
+              }
+            } catch {
+              sessionStorage.removeItem("ai_pending_request");
+            }
           }
-          sessionStorage.removeItem("ai_pending_request");
         } else {
           antdMessage.error(res.msg || "加载消息失败");
           setMessagesBySession((prev) => ({ ...prev, [key]: [] }));
