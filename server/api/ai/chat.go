@@ -133,9 +133,10 @@ func (a *Api) ResumeChat(c *gin.Context) {
 		return
 	}
 
-	// 尝试获取正在进行的生成任务
+	// 尝试获取正在进行的生成任务：重连时第一帧直接发出当前完整缓存，后续 chunk 增量转发
+	// 不再依赖 DB 中可能滞后的 lastLoading.Content 作为起点，避免中间 chunk 丢失
 	if task, ok := getGenerationTask(req.ConversationID); ok {
-		a.serveSSE(c, task, len([]rune(lastLoading.Content)))
+		a.serveSSE(c, task, 0)
 		return
 	}
 
@@ -144,23 +145,23 @@ func (a *Api) ResumeChat(c *gin.Context) {
 }
 
 // runBackgroundGeneration 后台 goroutine：读取 ai-server 流，保存到 DB，通知等待者
+//
+// 设计要点：
+//  1. streamCallback 只做"内存追加 + 广播"，从而不会阻塞 ai-server → Go 的 scanner 循环，
+//     避免长回复时因 TCP 背压让上游 chunk 间隔越来越大。
+//  2. DB 落库放到独立 goroutine，按时间窗口（dbSyncInterval）周期性写入。
+//     finish 前停止该 goroutine，并由主流程做最终一次落库。
 func (a *Api) runBackgroundGeneration(task *generationTask, conversationID, assistantMsgID uint, content, mode string, conversation business.AIConversation) {
-	var assistantContent strings.Builder
 	var streamErr error
-	chunkCount := 0
 
 	streamCallback := func(chunk string) {
-		assistantContent.WriteString(chunk)
 		task.append(chunk)
-
-		// 每 5 个 chunk 写一次 DB，减少写放大
-		chunkCount++
-		if chunkCount%5 == 0 {
-			if dbErr := global.JY_DB.Model(&business.AIMessage{}).Where("id = ?", assistantMsgID).Update("content", assistantContent.String()).Error; dbErr != nil {
-				global.JY_LOG.Error("更新助手消息内容失败", zap.Error(dbErr))
-			}
-		}
 	}
+
+	// 启动独立的 DB 同步 goroutine，从热路径解耦
+	dbSyncStop := make(chan struct{})
+	dbSyncDone := make(chan struct{})
+	go a.runDBSyncLoop(task, assistantMsgID, dbSyncStop, dbSyncDone)
 
 	switch mode {
 	case "aiserver_chat":
@@ -173,12 +174,20 @@ func (a *Api) runBackgroundGeneration(task *generationTask, conversationID, assi
 		streamErr = fmt.Errorf("不支持的对话模式: %s", mode)
 	}
 
+	// 停止周期落库 goroutine，再由这里统一做最终落库
+	close(dbSyncStop)
+	<-dbSyncDone
+
+	finalContent := task.getContent()
 	if streamErr != nil {
-		global.JY_DB.Model(&business.AIMessage{}).Where("id = ?", assistantMsgID).Update("status", "error")
+		global.JY_DB.Model(&business.AIMessage{}).Where("id = ?", assistantMsgID).Updates(map[string]interface{}{
+			"status":  "error",
+			"content": finalContent,
+		})
 	} else {
 		global.JY_DB.Model(&business.AIMessage{}).Where("id = ?", assistantMsgID).Updates(map[string]interface{}{
 			"status":  "success",
-			"content": assistantContent.String(),
+			"content": finalContent,
 		})
 	}
 
@@ -193,6 +202,39 @@ func (a *Api) runBackgroundGeneration(task *generationTask, conversationID, assi
 	})
 
 	task.finish(streamErr)
+}
+
+// runDBSyncLoop 周期性把 task 当前内容写入 DB（仅用于"Go 崩溃时的恢复"），
+// 默认每 2s 一次，且只在内容相比上次落库有新增长度时才发起 UPDATE。
+func (a *Api) runDBSyncLoop(task *generationTask, assistantMsgID uint, stop <-chan struct{}, done chan<- struct{}) {
+	defer close(done)
+	ticker := time.NewTicker(2 * time.Second)
+	defer ticker.Stop()
+
+	lastSavedLen := 0
+	flush := func() {
+		curLen := task.contentLen()
+		if curLen <= lastSavedLen {
+			return
+		}
+		snapshot := task.getContent()
+		if err := global.JY_DB.Model(&business.AIMessage{}).
+			Where("id = ?", assistantMsgID).
+			Update("content", snapshot).Error; err != nil {
+			global.JY_LOG.Error("流式内容落库失败", zap.Error(err))
+			return
+		}
+		lastSavedLen = curLen
+	}
+
+	for {
+		select {
+		case <-ticker.C:
+			flush()
+		case <-stop:
+			return
+		}
+	}
 }
 
 // serveSSE 统一的 SSE 推送：从 startPos 开始读取 task 内容，有新内容就 push
@@ -211,9 +253,12 @@ func (a *Api) serveSSE(c *gin.Context, task *generationTask, startPos int) {
 
 	pos := startPos
 	for {
-		// 读取当前最新内容
+		// 读取当前最新内容（pos 与 task.content 都按字节计，避免 UTF-8 多字节字符被截断）
 		task.mu.Lock()
-		newContent := task.content[pos:]
+		var newContent string
+		if pos < len(task.content) {
+			newContent = string(task.content[pos:])
+		}
 		isDone := task.done
 		err := task.err
 		task.mu.Unlock()
@@ -221,7 +266,7 @@ func (a *Api) serveSSE(c *gin.Context, task *generationTask, startPos int) {
 		// 发送新内容
 		if newContent != "" {
 			writeSSE(c.Writer, flusher, map[string]interface{}{"content": newContent, "done": false})
-			pos += len([]rune(newContent))
+			pos += len(newContent)
 		}
 
 		// 已完成

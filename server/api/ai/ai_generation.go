@@ -13,7 +13,7 @@ type generationTask struct {
 	mu             sync.Mutex
 	conversationID uint
 	assistantMsgID uint
-	content        string        // 当前已累积的完整内容
+	content        []byte        // 当前已累积的完整内容（用 []byte 让 append 摊销 O(1)，避免 string += 的 O(n²)）
 	done           bool          // 是否已完成
 	err            error         // 完成时的错误（如果有）
 	signal         chan struct{} // close+recreate 广播 "有新内容" 或 "已完成"
@@ -48,7 +48,7 @@ func (t *generationTask) append(chunk string) {
 	if t.done {
 		return
 	}
-	t.content += chunk
+	t.content = append(t.content, chunk...)
 	old := t.signal
 	t.signal = make(chan struct{})
 	close(old)
@@ -71,7 +71,14 @@ func (t *generationTask) finish(err error) {
 func (t *generationTask) getContent() string {
 	t.mu.Lock()
 	defer t.mu.Unlock()
-	return t.content
+	return string(t.content)
+}
+
+// contentLen 当前累积内容的字节长度
+func (t *generationTask) contentLen() int {
+	t.mu.Lock()
+	defer t.mu.Unlock()
+	return len(t.content)
 }
 
 // isDone 返回任务是否已完成
