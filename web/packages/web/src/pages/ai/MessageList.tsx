@@ -2,6 +2,7 @@ import { useEffect, useRef } from "react";
 import { Bubble } from "@ant-design/x";
 import type { UiMessage } from "./types";
 import { MessageBubble, MessageAvatar } from "./MessageBubble";
+import listStyles from "./MessageList.module.css";
 
 interface MessageListProps {
   messages: UiMessage[];
@@ -118,10 +119,11 @@ export const MessageList: React.FC<MessageListProps> = ({
   return (
     <div
       ref={scrollRef}
+      className={isMobile ? listStyles.mobile : undefined}
       style={{
         flex: 1,
         overflowY: "auto",
-        padding: isMobile ? "12px 12px 12px" : "24px",
+        padding: isMobile ? "12px" : "24px",
         minHeight: 0,
       }}
       onScroll={handleScroll}
@@ -138,7 +140,17 @@ export const MessageList: React.FC<MessageListProps> = ({
           向上滚动加载更多
         </div>
       )}
-      <Bubble.List items={bubbleItems} />
+      <Bubble.List
+        items={bubbleItems}
+        styles={{
+          content: { minWidth: 0, maxWidth: "100%", width: "100%", overflow: "hidden" },
+          ...(isMobile
+            ? {
+                bubble: { width: "100%", maxWidth: "100%", boxSizing: "border-box" },
+              }
+            : {}),
+        }}
+      />
     </div>
   );
 };

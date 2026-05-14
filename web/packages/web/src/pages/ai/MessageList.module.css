@@ -1,0 +1,39 @@
+/*
+ * 移动端：Bubble.List 的 scroll 区默认 align-items:center，且列表内 .ant-bubble-start/end 带 15% 侧内边距，
+ * 会导致气泡无法占满宽度。用外层包裹 + :global 覆盖（不依赖 hash 类名）。
+ */
+.mobile :global(.ant-bubble-list-scroll-box) {
+  align-items: stretch !important;
+  padding-inline: 0 !important;
+  width: 100% !important;
+  box-sizing: border-box;
+}
+
+.mobile :global(.ant-bubble-list .ant-bubble-start:not(.ant-bubble-divider):not(.ant-bubble-system)),
+.mobile :global(.ant-bubble-list .ant-bubble-end:not(.ant-bubble-divider):not(.ant-bubble-system)) {
+  flex-direction: column !important;
+  align-items: stretch !important;
+  row-gap: 8px;
+  column-gap: 0 !important;
+  width: 100% !important;
+  max-width: 100% !important;
+  box-sizing: border-box;
+  padding-inline-start: 0 !important;
+  padding-inline-end: 0 !important;
+}
+
+.mobile :global(.ant-bubble-list .ant-bubble-start:not(.ant-bubble-divider):not(.ant-bubble-system) .ant-bubble-avatar) {
+  align-self: flex-start;
+}
+
+.mobile :global(.ant-bubble-list .ant-bubble-end:not(.ant-bubble-divider):not(.ant-bubble-system) .ant-bubble-avatar) {
+  align-self: flex-end;
+}
+
+.mobile :global(.ant-bubble-list .ant-bubble .ant-bubble-body),
+.mobile :global(.ant-bubble-list .ant-bubble .ant-bubble-content) {
+  width: 100% !important;
+  max-width: 100% !important;
+  min-width: 0;
+  align-self: stretch;
+}
