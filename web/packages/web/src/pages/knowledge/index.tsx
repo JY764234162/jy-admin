@@ -1,18 +1,42 @@
 import { useState, useEffect } from "react";
+import { useSelector } from "react-redux";
 import {
-  Table, Button, Space, Popconfirm, Card, Upload, Flex, Tag,
-  Empty, message as antdMessage, Input
+  Table,
+  Button,
+  Space,
+  Popconfirm,
+  Card,
+  Upload,
+  Flex,
+  Tag,
+  Empty,
+  message as antdMessage,
+  Input,
+  Dropdown,
+  Typography,
+  Modal,
 } from "antd";
+import type { MenuProps } from "antd";
 import {
-  UploadOutlined, DeleteOutlined, FileTextOutlined, BookOutlined,
-  FilePdfOutlined, FileWordOutlined, FileExcelOutlined,
-  EyeOutlined, DownloadOutlined, ReloadOutlined, LoadingOutlined,
-  SearchOutlined,
+  UploadOutlined,
+  DeleteOutlined,
+  FileTextOutlined,
+  BookOutlined,
+  FilePdfOutlined,
+  FileWordOutlined,
+  FileExcelOutlined,
+  EyeOutlined,
+  DownloadOutlined,
+  ReloadOutlined,
+  LoadingOutlined,
+  MoreOutlined,
 } from "@ant-design/icons";
 import type { ColumnsType } from "antd/es/table";
 import { aiServerApi, type KnowledgeDocument } from "@/api/aiServer";
+import { layoutSlice } from "@/store/slice/layout";
 
 export const Component = () => {
+  const isMobile = useSelector(layoutSlice.selectors.getIsMobile);
   const [documents, setDocuments] = useState<KnowledgeDocument[]>([]);
   const [loading, setLoading] = useState(false);
   const [uploading, setUploading] = useState(false);
@@ -144,94 +168,174 @@ export const Component = () => {
     }
   };
 
-  const columns: ColumnsType<KnowledgeDocument> = [
-    {
-      title: "文档名称",
-      dataIndex: "source",
-      key: "source",
-      render: (text: string, record: KnowledgeDocument) => (
-        <Space>
-          {getFileIcon(record.file_type)}
-          <span>{text}</span>
-        </Space>
-      ),
-    },
-    {
-      title: "文档ID",
-      dataIndex: "doc_id",
-      key: "doc_id",
-      render: (id: string) => <Tag color="blue">{id}</Tag>,
-    },
-    {
-      title: "状态",
-      key: "status",
-      width: 120,
-      render: (_: any, record: KnowledgeDocument) => getStatusTag(record),
-    },
-    {
-      title: "片段数",
-      dataIndex: "chunk_count",
-      key: "chunk_count",
-      width: 110,
-      render: (_: any, record: KnowledgeDocument) => {
-        if (record.status === "indexed") {
-          return <Tag color="green">{record.chunk_count} 段</Tag>;
-        }
-        if (record.status === "parsing") {
-          return <span style={{ color: "#8c8c8c" }}>解析中...</span>;
-        }
-        return <span style={{ color: "#8c8c8c" }}>-</span>;
+  const columns: ColumnsType<KnowledgeDocument> = (() => {
+    const chunkCell = (_: unknown, record: KnowledgeDocument) => {
+      if (record.status === "indexed") {
+        return <Tag color="green">{record.chunk_count} 段</Tag>;
+      }
+      if (record.status === "parsing") {
+        return <span style={{ color: "#8c8c8c" }}>解析中...</span>;
+      }
+      return <span style={{ color: "#8c8c8c" }}>-</span>;
+    };
+
+    const actionDesktop = (_: unknown, record: KnowledgeDocument) => (
+      <Space wrap size="small">
+        {record.status === "failed" && (
+          <Button type="link" size="small" onClick={() => handleRetry(record.doc_id)}>
+            重试
+          </Button>
+        )}
+        <Button
+          type="link"
+          size="small"
+          icon={<EyeOutlined />}
+          onClick={() => handlePreview(record)}
+          disabled={record.status !== "indexed"}
+        >
+          预览
+        </Button>
+        <Button type="link" size="small" icon={<DownloadOutlined />} onClick={() => handleDownload(record)}>
+          下载
+        </Button>
+        <Popconfirm
+          title="确认删除"
+          description={`确定要删除文档「${record.source}」吗？`}
+          onConfirm={() => handleDelete(record.doc_id)}
+          okText="删除"
+          cancelText="取消"
+          okButtonProps={{ danger: true }}
+        >
+          <Button type="link" danger size="small" icon={<DeleteOutlined />}>
+            删除
+          </Button>
+        </Popconfirm>
+      </Space>
+    );
+
+    const actionMobile = (_: unknown, record: KnowledgeDocument) => {
+      const items: MenuProps["items"] = [
+        ...(record.status === "failed"
+          ? [{ key: "retry", label: "重试解析", onClick: () => void handleRetry(record.doc_id) }]
+          : []),
+        {
+          key: "preview",
+          label: "预览",
+          disabled: record.status !== "indexed",
+          onClick: () => handlePreview(record),
+        },
+        { key: "download", label: "下载", onClick: () => handleDownload(record) },
+        {
+          key: "delete",
+          label: "删除",
+          danger: true,
+          onClick: () => {
+            Modal.confirm({
+              title: "确认删除",
+              content: `确定要删除文档「${record.source}」吗？`,
+              okText: "删除",
+              okType: "danger",
+              cancelText: "取消",
+              onOk: () => handleDelete(record.doc_id),
+            });
+          },
+        },
+      ];
+      return (
+        <Dropdown menu={{ items }} trigger={["click"]}>
+          <Button type="text" icon={<MoreOutlined />} aria-label="更多操作" />
+        </Dropdown>
+      );
+    };
+
+    if (isMobile) {
+      return [
+        {
+          title: "文档",
+          key: "doc",
+          ellipsis: true,
+          render: (_: unknown, record: KnowledgeDocument) => (
+            <Flex vertical gap={4} style={{ minWidth: 0 }}>
+              <Space align="start" style={{ width: "100%", minWidth: 0 }}>
+                {getFileIcon(record.file_type)}
+                <Typography.Text ellipsis style={{ flex: 1, margin: 0 }}>
+                  {record.source}
+                </Typography.Text>
+              </Space>
+              <Typography.Text
+                type="secondary"
+                copyable={{ text: record.doc_id }}
+                style={{ fontSize: 12, wordBreak: "break-all", lineHeight: 1.4 }}
+              >
+                {record.doc_id}
+              </Typography.Text>
+            </Flex>
+          ),
+        },
+        {
+          title: "状态",
+          key: "status",
+          width: 96,
+          render: (_: unknown, record: KnowledgeDocument) => getStatusTag(record),
+        },
+        {
+          title: "片段",
+          key: "chunk_count",
+          width: 72,
+          render: chunkCell,
+        },
+        {
+          title: "",
+          key: "action",
+          width: 44,
+          align: "center",
+          render: actionMobile,
+        },
+      ];
+    }
+
+    return [
+      {
+        title: "文档名称",
+        dataIndex: "source",
+        key: "source",
+        render: (text: string, record: KnowledgeDocument) => (
+          <Space>
+            {getFileIcon(record.file_type)}
+            <span>{text}</span>
+          </Space>
+        ),
       },
-    },
-    {
-      title: "操作",
-      key: "action",
-      width: 280,
-      render: (_: any, record: KnowledgeDocument) => (
-        <Space>
-          {record.status === "failed" && (
-            <Button
-              type="link"
-              onClick={() => handleRetry(record.doc_id)}
-            >
-              重试
-            </Button>
-          )}
-          <Button
-            type="link"
-            icon={<EyeOutlined />}
-            onClick={() => handlePreview(record)}
-            disabled={record.status !== "indexed"}
-          >
-            预览
-          </Button>
-          <Button
-            type="link"
-            icon={<DownloadOutlined />}
-            onClick={() => handleDownload(record)}
-          >
-            下载
-          </Button>
-          <Popconfirm
-            title="确认删除"
-            description={`确定要删除文档「${record.source}」吗？`}
-            onConfirm={() => handleDelete(record.doc_id)}
-            okText="删除"
-            cancelText="取消"
-            okButtonProps={{ danger: true }}
-          >
-            <Button type="link" danger icon={<DeleteOutlined />}>
-              删除
-            </Button>
-          </Popconfirm>
-        </Space>
-      ),
-    },
-  ];
+      {
+        title: "文档ID",
+        dataIndex: "doc_id",
+        key: "doc_id",
+        render: (id: string) => <Tag color="blue">{id}</Tag>,
+      },
+      {
+        title: "状态",
+        key: "status",
+        width: 120,
+        render: (_: unknown, record: KnowledgeDocument) => getStatusTag(record),
+      },
+      {
+        title: "片段数",
+        dataIndex: "chunk_count",
+        key: "chunk_count",
+        width: 110,
+        render: chunkCell,
+      },
+      {
+        title: "操作",
+        key: "action",
+        width: 280,
+        render: actionDesktop,
+      },
+    ];
+  })();
 
   return (
-    <Flex vertical gap={16} style={{ padding: 16, height: "100%", overflow: "auto" }}>
-      {/* 文档上传 */}
+    <Flex vertical gap={isMobile ? 12 : 16} style={{ padding: isMobile ? 12 : 16, height: "100%", overflow: "auto" }}>
       <Card
         title={
           <Space>
@@ -240,25 +344,39 @@ export const Component = () => {
           </Space>
         }
         extra={
-          <Space>
-            <Button icon={<ReloadOutlined />} onClick={() => fetchDocuments(searchKeyword)} loading={loading}>
+          !isMobile ? (
+            <Space>
+              <Button icon={<ReloadOutlined />} onClick={() => fetchDocuments(searchKeyword)} loading={loading}>
+                刷新
+              </Button>
+              <Upload beforeUpload={handleUpload} showUploadList={false} accept=".txt,.md,.pdf,.docx,.xlsx,.csv">
+                <Button type="primary" icon={<UploadOutlined />} loading={uploading}>
+                  上传文档
+                </Button>
+              </Upload>
+            </Space>
+          ) : undefined
+        }
+      >
+        {isMobile && (
+          <Flex vertical gap={8} style={{ marginBottom: 12 }}>
+            <Button icon={<ReloadOutlined />} onClick={() => fetchDocuments(searchKeyword)} loading={loading} block>
               刷新
             </Button>
             <Upload beforeUpload={handleUpload} showUploadList={false} accept=".txt,.md,.pdf,.docx,.xlsx,.csv">
-              <Button type="primary" icon={<UploadOutlined />} loading={uploading}>
+              <Button type="primary" icon={<UploadOutlined />} loading={uploading} block>
                 上传文档
               </Button>
             </Upload>
-          </Space>
-        }
-      >
+          </Flex>
+        )}
         <Input.Search
           placeholder="搜索文档名称"
           allowClear
           value={searchKeyword}
           onChange={(e) => setSearchKeyword(e.target.value)}
           onSearch={(value) => fetchDocuments(value)}
-          style={{ marginBottom: 16, maxWidth: 300 }}
+          style={{ marginBottom: 16, width: "100%", maxWidth: isMobile ? "100%" : 300 }}
         />
         <Table
           rowKey="doc_id"
@@ -266,6 +384,8 @@ export const Component = () => {
           dataSource={documents}
           loading={loading}
           pagination={false}
+          size={isMobile ? "small" : "middle"}
+          scroll={isMobile ? { x: "max-content" } : undefined}
           locale={{ emptyText: <Empty description="暂无文档，请上传" /> }}
         />
       </Card>
