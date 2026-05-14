@@ -2,11 +2,21 @@
   padding: 24px;
 }
 
+.fileContainer[data-mobile="1"] {
+  padding: 12px;
+}
+
 .header {
   display: flex;
   justify-content: space-between;
   align-items: center;
   margin-bottom: 16px;
+}
+
+.fileContainer[data-mobile="1"] .header {
+  flex-direction: column;
+  align-items: stretch;
+  gap: 12px;
 }
 
 .header h2 {
@@ -15,3 +25,6 @@
   font-weight: 500;
 }
 
+.fileContainer[data-mobile="1"] .header h2 {
+  font-size: 18px;
+}
