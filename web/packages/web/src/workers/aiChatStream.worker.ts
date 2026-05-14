@@ -23,9 +23,15 @@ type SnapshotPayload = {
   conversationId: number;
 };
 
+type StopConversationPayload = {
+  conversationId: number;
+};
+
 type WorkerInMessage =
   | { type: "START"; payload: StartPayload }
   | { type: "STOP"; payload: StopPayload }
+  | { type: "STOP_CONVERSATION"; payload: StopConversationPayload }
+  | { type: "STOP_ALL"; payload?: Record<string, never> }
   | { type: "SNAPSHOT"; payload: SnapshotPayload };
 
 type WorkerOutMessage =
@@ -99,6 +105,21 @@ function stopStream(streamId: string) {
   if (ctrl) {
     ctrl.abort();
     controllers.delete(streamId);
+  }
+}
+
+/** 中止指定会话当前活跃的 fetch（例如页面卸载、不再需要该路 SSE） */
+function stopConversationStream(conversationId: number) {
+  const conv = conversationState.get(conversationId);
+  if (conv?.activeStreamId) {
+    stopStream(conv.activeStreamId);
+  }
+}
+
+function stopAllStreams() {
+  const ids = [...controllers.keys()];
+  for (const streamId of ids) {
+    stopStream(streamId);
   }
 }
 
@@ -226,6 +247,14 @@ self.onmessage = (evt: MessageEvent<WorkerInMessage>) => {
   }
   if (msg.type === "STOP") {
     stopStream(msg.payload.streamId);
+    return;
+  }
+  if (msg.type === "STOP_CONVERSATION") {
+    stopConversationStream(msg.payload.conversationId);
+    return;
+  }
+  if (msg.type === "STOP_ALL") {
+    stopAllStreams();
     return;
   }
   if (msg.type === "SNAPSHOT") {

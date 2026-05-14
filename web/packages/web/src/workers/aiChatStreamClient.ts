@@ -24,13 +24,29 @@ type SnapshotMsg = {
 
 type WorkerOut = UpdateMsg | SnapshotMsg;
 
-type Snapshot = SnapshotMsg["payload"];
+export type AiChatStreamSnapshot = SnapshotMsg["payload"];
 
-type Subscriber = (snapshot: Snapshot) => void;
+type Subscriber = (snapshot: AiChatStreamSnapshot) => void;
+
+type StreamLifecycleListener = (snapshot: AiChatStreamSnapshot) => void;
 
 let workerSingleton: Worker | null = null;
 const subscribersByConversation = new Map<number, Set<Subscriber>>();
-const latestSnapshotByConversation = new Map<number, Snapshot>();
+const latestSnapshotByConversation = new Map<number, AiChatStreamSnapshot>();
+const streamLifecycleListeners = new Set<StreamLifecycleListener>();
+
+function dispatchSnapshot(snap: AiChatStreamSnapshot) {
+  latestSnapshotByConversation.set(snap.conversationId, snap);
+  const subs = subscribersByConversation.get(snap.conversationId);
+  subs?.forEach((fn) => fn(snap));
+  streamLifecycleListeners.forEach((fn) => {
+    try {
+      fn(snap);
+    } catch {
+      // ignore broken listeners
+    }
+  });
+}
 
 function ensureWorker() {
   if (workerSingleton) return workerSingleton;
@@ -40,22 +56,18 @@ function ensureWorker() {
     if (!msg) return;
 
     if (msg.type === "SNAPSHOT") {
-      latestSnapshotByConversation.set(msg.payload.conversationId, msg.payload);
-      const subs = subscribersByConversation.get(msg.payload.conversationId);
-      subs?.forEach((fn) => fn(msg.payload));
+      dispatchSnapshot(msg.payload);
       return;
     }
 
     if (msg.type === "UPDATE") {
-      const snap: Snapshot = {
+      const snap: AiChatStreamSnapshot = {
         conversationId: msg.payload.conversationId,
         fullText: msg.payload.fullText,
         status: msg.payload.error ? "error" : msg.payload.done ? "done" : "streaming",
         updatedAt: Date.now(),
       };
-      latestSnapshotByConversation.set(msg.payload.conversationId, snap);
-      const subs = subscribersByConversation.get(msg.payload.conversationId);
-      subs?.forEach((fn) => fn(snap));
+      dispatchSnapshot(snap);
       return;
     }
   };
@@ -73,6 +85,17 @@ function createStreamId() {
 }
 
 export const aiChatStreamClient = {
+  /**
+   * 订阅任意会话流式状态快照（含无 UI 订阅者时 worker 仍会持续产出）。
+   * 用于按会话维度维护 loading 等状态，支持多会话并行流式。
+   */
+  subscribeStreamLifecycle(fn: StreamLifecycleListener) {
+    streamLifecycleListeners.add(fn);
+    return () => {
+      streamLifecycleListeners.delete(fn);
+    };
+  },
+
   /** 订阅某个会话的最新拼接文本（返回 unsubscribe） */
   subscribe(conversationId: number, fn: Subscriber) {
     const set = subscribersByConversation.get(conversationId) || new Set<Subscriber>();
@@ -98,7 +121,7 @@ export const aiChatStreamClient = {
   },
 
   /** 获取某会话最新快照（同步内存）；没有则返回 null */
-  getLatestSnapshot(conversationId: number): Snapshot | null {
+  getLatestSnapshot(conversationId: number): AiChatStreamSnapshot | null {
     return latestSnapshotByConversation.get(conversationId) || null;
   },
 
@@ -139,6 +162,17 @@ export const aiChatStreamClient = {
   /** 停止某个 stream */
   stop(streamId: string) {
     ensureWorker().postMessage({ type: "STOP", payload: { streamId } });
+  },
+
+  /** 中止指定会话在 Worker 内当前活跃的 SSE（AbortController），避免页面卸载后旧连接仍与 resume 叠双流 */
+  stopConversation(conversationId: number) {
+    ensureWorker().postMessage({ type: "STOP_CONVERSATION", payload: { conversationId } });
+  },
+
+  /** 中止 Worker 内全部活跃 fetch（离开 AI 模块等场景） */
+  stopAllStreams() {
+    if (!workerSingleton) return;
+    workerSingleton.postMessage({ type: "STOP_ALL" });
   },
 
   /** 主动向 worker 拉一次 snapshot（异步通过 subscribe 回来） */

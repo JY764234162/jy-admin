@@ -1,4 +1,12 @@
-import { startTransition, useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
+import {
+  startTransition,
+  useCallback,
+  useEffect,
+  useLayoutEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { message as antdMessage } from "antd";
 import { aiApi, type AIConversation, type AIMessage } from "@/api/ai";
@@ -22,6 +30,7 @@ interface UseAIChatOptions {
  * - `optionsRef`：避免调用方每次 render 传入新 `options` 对象导致 `useCallback` 抖动。
  * - `loadingMoreRef`：分页加载互斥，用 ref 不触发多余渲染。
  * - 无 URL 会话时：点「新对话」只进草稿页；首条发送时再 `createConversation`（标题取首问），避免空会话。
+ * - **流式 loading 按会话隔离**：`loading` 仅表示「当前 URL 会话是否在流式生成」；其它会话可在后台并行，互不阻塞发送。
  */
 export function useAIChat(conversationId: number | null, options: UseAIChatOptions = {}) {
   const PAGE_SIZE = options.pageSize ?? 10;
@@ -36,8 +45,29 @@ export function useAIChat(conversationId: number | null, options: UseAIChatOptio
   const [messagePagination, setMessagePagination] = useState<{ page: number; total: number } | null>(null);
   const [messagesLoading, setMessagesLoading] = useState(false);
 
-  const [loading, setLoading] = useState(false);
+  /** 正在流式生成中的会话 id（可多会话并行）；配合 tick 驱动当前会话 loading 重算 */
+  const streamingConversationIdsRef = useRef(new Set<number>());
+  const [streamingTick, setStreamingTick] = useState(0);
   const [loadingSessions, setLoadingSessions] = useState(false);
+
+  const markConversationStreaming = useCallback((cid: number) => {
+    const set = streamingConversationIdsRef.current;
+    if (!set.has(cid)) {
+      set.add(cid);
+      setStreamingTick((n) => n + 1);
+    }
+  }, []);
+
+  const markConversationStreamEnded = useCallback((cid: number) => {
+    if (streamingConversationIdsRef.current.delete(cid)) {
+      setStreamingTick((n) => n + 1);
+    }
+  }, []);
+
+  const loading = useMemo(() => {
+    if (conversationId == null || !Number.isFinite(conversationId)) return false;
+    return streamingConversationIdsRef.current.has(conversationId);
+  }, [conversationId, streamingTick]);
 
   /** 并发保护：加载更多历史时避免重复请求 */
   const loadingMoreRef = useRef(false);
@@ -81,26 +111,29 @@ export function useAIChat(conversationId: number | null, options: UseAIChatOptio
   );
 
   /** 列表里存在未完成的 AI 条目标记为 loading 时，由 worker 续传；与 sendMessage(resume) 共用一套启动逻辑 */
-  const beginResumeStream = useCallback((cid: number, loadingMsg: UiMessage, resumeContent: string, mode: ChatMode) => {
-    live.current.streamingAiMsgId = loadingMsg.id;
-    setLoading(true);
-    try {
-      live.current.refreshSessionsAfterStream = true;
-      aiChatStreamClient.start(cid, resumeContent, mode, true);
-    } catch (error) {
-      console.error("恢复流式输出失败:", error);
-      antdMessage.error("恢复流式输出失败");
-      live.current.refreshSessionsAfterStream = false;
-      setMessages((msgs) => {
-        const idx = msgs.findIndex((m) => m.id === loadingMsg.id);
-        if (idx === -1) return msgs;
-        const next = msgs.slice();
-        next[idx] = { ...next[idx]!, content: "恢复失败，请重试", status: "error" };
-        return next;
-      });
-      setLoading(false);
-    }
-  }, []);
+  const beginResumeStream = useCallback(
+    (cid: number, loadingMsg: UiMessage, resumeContent: string, mode: ChatMode) => {
+      live.current.streamingAiMsgId = loadingMsg.id;
+      markConversationStreaming(cid);
+      try {
+        live.current.refreshSessionsAfterStream = true;
+        aiChatStreamClient.start(cid, resumeContent, mode, true);
+      } catch (error) {
+        console.error("恢复流式输出失败:", error);
+        antdMessage.error("恢复流式输出失败");
+        live.current.refreshSessionsAfterStream = false;
+        setMessages((msgs) => {
+          const idx = msgs.findIndex((m) => m.id === loadingMsg.id);
+          if (idx === -1) return msgs;
+          const next = msgs.slice();
+          next[idx] = { ...next[idx]!, content: "恢复失败，请重试", status: "error" };
+          return next;
+        });
+        markConversationStreamEnded(cid);
+      }
+    },
+    [markConversationStreaming, markConversationStreamEnded]
+  );
 
   const loadSessions = useCallback(async () => {
     setLoadingSessions(true);
@@ -270,10 +303,6 @@ export function useAIChat(conversationId: number | null, options: UseAIChatOptio
       if (!userContent.trim() && !resume) {
         return false;
       }
-      if (loading) {
-        antdMessage.warning("AI 正在回复中，请稍后再试");
-        return false;
-      }
 
       let cid = targetConversationId ?? conversationId;
 
@@ -300,6 +329,11 @@ export function useAIChat(conversationId: number | null, options: UseAIChatOptio
 
       if (cid == null || !Number.isFinite(cid)) {
         antdMessage.error("会话ID无效");
+        return false;
+      }
+
+      if (streamingConversationIdsRef.current.has(cid)) {
+        antdMessage.warning("该会话正在回复中，请稍后再试");
         return false;
       }
 
@@ -339,7 +373,7 @@ export function useAIChat(conversationId: number | null, options: UseAIChatOptio
       });
       optionsRef.current.onAfterMessagesChange?.();
 
-      setLoading(true);
+      markConversationStreaming(cid);
 
       try {
         live.current.refreshSessionsAfterStream = true;
@@ -363,22 +397,39 @@ export function useAIChat(conversationId: number | null, options: UseAIChatOptio
           ];
         });
         optionsRef.current.onAfterMessagesChange?.();
-        setLoading(false);
+        markConversationStreamEnded(cid);
         return false;
       }
     },
-    [conversationId, loading, beginResumeStream, navigateToConversation]
+    [
+      conversationId,
+      beginResumeStream,
+      navigateToConversation,
+      markConversationStreaming,
+      markConversationStreamEnded,
+    ]
   );
 
   useEffect(() => {
-    return () => {
-      setLoading(false);
-    };
-  }, []);
+    return aiChatStreamClient.subscribeStreamLifecycle((snap) => {
+      // 仅 done / error 视为结束；idle 可能出现在「同会话打断旧流」的竞态中，不能用来清 loading
+      if (snap.status === "done" || snap.status === "error") {
+        markConversationStreamEnded(snap.conversationId);
+      }
+    });
+  }, [markConversationStreamEnded]);
 
   useEffect(() => {
     void loadSessions();
   }, [loadSessions]);
+
+  /** 离开 AI 页时中止 Worker 内全部 SSE，避免旧连接未断又与下次 resume 并行 */
+  useEffect(() => {
+    return () => {
+      aiChatStreamClient.stopAllStreams();
+      streamingConversationIdsRef.current.clear();
+    };
+  }, []);
 
   // 切换会话时在下一次绘制前清空旧消息；从草稿首次落盘到某会话时不清理（由首条 sendMessage 写入）
   useLayoutEffect(() => {
@@ -464,7 +515,6 @@ export function useAIChat(conversationId: number | null, options: UseAIChatOptio
       });
 
       if (snap.status === "done" || snap.status === "error") {
-        setLoading(false);
         live.current.streamingAiMsgId = null;
         if (snap.status === "done" && live.current.refreshSessionsAfterStream) {
           live.current.refreshSessionsAfterStream = false;
@@ -472,8 +522,6 @@ export function useAIChat(conversationId: number | null, options: UseAIChatOptio
         } else if (snap.status === "error") {
           live.current.refreshSessionsAfterStream = false;
         }
-      } else if (snap.status === "streaming") {
-        setLoading(true);
       }
     });
     aiChatStreamClient.requestSnapshot(conversationId);
