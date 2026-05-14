@@ -1,8 +1,8 @@
-import { useState } from "react";
 import { Conversations, type ConversationsProps } from "@ant-design/x";
-import { PlusOutlined, MessageOutlined, DeleteOutlined, EditOutlined } from "@ant-design/icons";
-import { Button, Input, Modal, Flex } from "antd";
+import { MessageOutlined, DeleteOutlined, EditOutlined } from "@ant-design/icons";
+import { Input, Modal, Flex } from "antd";
 import type { AIConversation } from "@/api/ai";
+import { getConversationTimeGroupKey } from "./conversationTimeGroup";
 
 interface ChatSidebarProps {
   sessions: AIConversation[];
@@ -27,7 +27,7 @@ export const ChatSidebar: React.FC<ChatSidebarProps> = ({
     key: session.ID.toString(),
     label: session.title || "新对话",
     icon: <MessageOutlined />,
-    group: "历史记录",
+    group: getConversationTimeGroupKey(session),
   }));
 
   const handleRename = (key: string) => {
@@ -62,11 +62,6 @@ export const ChatSidebar: React.FC<ChatSidebarProps> = ({
         borderRight: "1px solid rgba(0, 0, 0, 0.06)",
       }}
     >
-      <div style={{ padding: 12 }}>
-        <Button type="primary" icon={<PlusOutlined />} onClick={onAddSession} block loading={loadingSessions}>
-          新对话
-        </Button>
-      </div>
       <div style={{ flex: 1, overflowY: "auto", padding: "0 12px 12px" }}>
         {loadingSessions ? (
           <div style={{ textAlign: "center", padding: 20, color: "#999" }}>加载中...</div>
@@ -74,6 +69,13 @@ export const ChatSidebar: React.FC<ChatSidebarProps> = ({
           <Conversations
             items={conversationItems}
             activeKey={activeKey}
+            groupable={{
+              label: (group) => String(group).replace(/^\d+-/, ""),
+            }}
+            creation={{
+              onClick: onAddSession,
+              label: "新对话",
+            }}
             onActiveChange={onActiveChange}
             menu={(item) => ({
               items: [

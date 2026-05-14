@@ -1,6 +1,7 @@
 import { PlusOutlined, EditOutlined } from "@ant-design/icons";
 import { Button, Select, Flex, Input, Modal } from "antd";
 import type { AIConversation } from "@/api/ai";
+import { buildSessionSelectGroups } from "./conversationTimeGroup";
 
 interface MobileSessionBarProps {
   sessions: AIConversation[];
@@ -65,10 +66,7 @@ export const MobileSessionBar: React.FC<MobileSessionBarProps> = ({
             }
             onActiveChange(val);
           }}
-          options={sessions.map((s) => ({
-            label: s.title || "新对话",
-            value: s.ID.toString(),
-          }))}
+          options={buildSessionSelectGroups(sessions)}
         />
         <Button type="primary" icon={<PlusOutlined />} onClick={onAddSession} loading={loadingSessions} />
         <Button icon={<EditOutlined />} onClick={handleRename} disabled={!activeKey} />
