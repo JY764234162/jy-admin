@@ -1,8 +1,61 @@
-.markdown{
-  background: "transparent";
+.markdown {
+  background: transparent;
+  max-width: 100%;
 }
-.markdown code{
+
+.markdown :global(*) {
+  max-width: 100%;
+}
+
+.markdown :global(pre) {
+  overflow-x: auto;
+  white-space: pre;
+}
+
+.markdown :global(code) {
   white-space: pre-wrap !important;
+  word-break: break-word;
+}
+
+.markdown :global(table) {
+  display: block;
+  overflow-x: auto;
+  width: max-content;
+  max-width: 100%;
+}
+
+.markdown :global(img) {
+  max-width: 100%;
+  height: auto;
+}
+
+/* 流式中正在生长的块：不开启 content-visibility，保证可见区域始终被渲染 */
+.markdownBlockLive {
+  max-width: 100%;
+}
+.markdownBlockLive + .markdownBlockLive,
+.markdownBlockFrozen + .markdownBlockLive,
+.markdownBlockLive + .markdownBlockFrozen,
+.markdownBlockFrozen + .markdownBlockFrozen {
+  margin-top: 8px;
+}
+
+/*
+ * 已完结块：
+ *  - content-visibility: auto 让浏览器跳过视口外块的 layout/paint
+ *  - contain-intrinsic-size: auto 让浏览器记忆上次渲染尺寸，避免滚动时跳动
+ */
+.markdownBlockFrozen {
+  max-width: 100%;
+  content-visibility: auto;
+  contain-intrinsic-size: auto 80px;
+}
+
+/* 流式结束后的整段渲染容器：长消息也允许跳过视口外的 layout/paint */
+.markdownDone {
+  max-width: 100%;
+  content-visibility: auto;
+  contain-intrinsic-size: auto 400px;
 }
 
 .loadingDots {

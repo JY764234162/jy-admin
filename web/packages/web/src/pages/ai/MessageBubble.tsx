@@ -1,16 +1,15 @@
+import { memo } from "react";
 import { UserOutlined, MessageOutlined } from "@ant-design/icons";
 import { Avatar, theme } from "antd";
-import MDEditor from "@uiw/react-md-editor";
 import styles from "./index.module.css";
+import { StreamingMarkdown } from "./StreamingMarkdown";
 import type { UiMessage } from "./types";
 
 interface MessageBubbleProps {
   msg: UiMessage;
 }
 
-export const MessageBubble: React.FC<MessageBubbleProps> = ({ msg }) => {
-  const { token } = theme.useToken();
-
+const MessageBubbleInner: React.FC<MessageBubbleProps> = ({ msg }) => {
   // AI 正在生成且暂无内容时展示 loading 动画
   if (msg.role === "ai" && msg.status === "loading" && !msg.content) {
     return (
@@ -31,34 +30,49 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({ msg }) => {
     );
   }
 
-  // AI 消息使用 Markdown 渲染
+  // AI 消息：流式期间按块切分 + memo + content-visibility 优化；
+  // 结束后整段一次性渲染。具体策略见 StreamingMarkdown。
   if (msg.role === "ai") {
     return (
       <div
-        data-color-mode="light"
         className={styles.markdown}
         style={{
           maxWidth: "100%",
           overflowX: "hidden",
+          overflowWrap: "anywhere",
         }}
       >
-        <MDEditor.Markdown
-          source={msg.content}
-          style={{
-            background: "transparent",
-            fontSize: 14,
-            maxWidth: "100%",
-            overflowX: "auto",
-            wordBreak: "break-word",
-          }}
+        <StreamingMarkdown
+          content={msg.content}
+          streaming={msg.status === "loading"}
         />
       </div>
     );
   }
 
   // 用户消息纯文本
-  return <>{msg.content}</>;
+  return (
+    <div
+      style={{
+        whiteSpace: "pre-wrap",
+        wordBreak: "break-word",
+        overflowWrap: "anywhere",
+      }}
+    >
+      {msg.content}
+    </div>
+  );
 };
+
+// 只在与渲染相关的字段变化时重渲染，避免历史气泡被无谓 reconcile
+export const MessageBubble = memo(
+  MessageBubbleInner,
+  (prev, next) =>
+    prev.msg.id === next.msg.id &&
+    prev.msg.content === next.msg.content &&
+    prev.msg.status === next.msg.status &&
+    prev.msg.role === next.msg.role
+);
 
 export const MessageAvatar: React.FC<{ role: UiMessage["role"] }> = ({ role }) => {
   const { token } = theme.useToken();
