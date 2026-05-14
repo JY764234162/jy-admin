@@ -6,6 +6,7 @@ const { Footer } = AntdLayout;
 
 export const GlobalFooter = memo(() => {
   const isMobile = useSelector(layoutSlice.selectors.getIsMobile);
+  if (isMobile) return null;
   return (
     <Footer
       style={{
@@ -15,7 +16,7 @@ export const GlobalFooter = memo(() => {
         display: "flex",
         justifyContent: "center",
         alignItems: "center",
-        height: isMobile ? "50px" : "unset",
+        height: "50px",
       }}
     >
       前端技术学习实验室 ©{new Date().getFullYear()} Created by JiangYi
