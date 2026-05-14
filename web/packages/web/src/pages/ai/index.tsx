@@ -70,6 +70,7 @@ export const Component = () => {
             loadingSessions={chat.loadingSessions}
             onActiveChange={handleSessionRouteChange}
             onAddSession={chat.openNewDraft}
+            onDeleteSession={chat.deleteSession}
             onRenameSession={chat.renameSession}
           />
         )}

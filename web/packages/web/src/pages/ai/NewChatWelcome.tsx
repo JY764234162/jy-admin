@@ -1,10 +1,4 @@
-import {
-  BulbOutlined,
-  InfoCircleOutlined,
-  RocketOutlined,
-  SmileOutlined,
-  WarningOutlined,
-} from "@ant-design/icons";
+import { BulbOutlined, InfoCircleOutlined, RocketOutlined, SmileOutlined, WarningOutlined } from "@ant-design/icons";
 import type { PromptsProps } from "@ant-design/x";
 import { Prompts, Welcome } from "@ant-design/x";
 import { Avatar, Flex } from "antd";
@@ -110,15 +104,6 @@ export function NewChatWelcome({ onPickPrompt, loading = false, isMobile = false
           icon={<Avatar src={agentAvatar} size={isMobile ? 48 : 58} />}
           title="你好，我是芳芳"
           description="选一个示例问题开始对话，或在下方输入你的问题"
-          styles={
-            isMobile
-              ? {
-                  root: { width: "100%", paddingInline: 4 },
-                  title: { fontSize: 20, lineHeight: 1.35, textAlign: "center" },
-                  description: { fontSize: 13, lineHeight: 1.5, textAlign: "center", marginTop: 6 },
-                }
-              : undefined
-          }
         />
         <Prompts
           title="试试这些问题"

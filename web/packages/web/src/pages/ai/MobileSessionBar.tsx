@@ -1,7 +1,8 @@
-import { PlusOutlined, EditOutlined } from "@ant-design/icons";
-import { Button, Select, Flex, Input, Modal } from "antd";
+import { useState } from "react";
+import { MenuOutlined } from "@ant-design/icons";
+import { Button, Drawer, Flex, Typography } from "antd";
 import type { AIConversation } from "@/api/ai";
-import { buildSessionSelectGroups } from "./conversationTimeGroup";
+import { ChatSidebar } from "./ChatSidebar";
 
 interface MobileSessionBarProps {
   sessions: AIConversation[];
@@ -9,6 +10,7 @@ interface MobileSessionBarProps {
   loadingSessions: boolean;
   onActiveChange: (key: string) => void;
   onAddSession: () => void;
+  onDeleteSession: (key: string) => void;
   onRenameSession: (key: string, newTitle: string) => Promise<boolean>;
 }
 
@@ -18,59 +20,68 @@ export const MobileSessionBar: React.FC<MobileSessionBarProps> = ({
   loadingSessions,
   onActiveChange,
   onAddSession,
+  onDeleteSession,
   onRenameSession,
 }) => {
-  const handleRename = () => {
-    if (!activeKey) return;
-    const session = sessions.find((s) => s.ID.toString() === activeKey);
-    const initialTitle = session?.title ?? "新对话";
-    let nextTitle = initialTitle;
+  const [drawerOpen, setDrawerOpen] = useState(false);
 
-    Modal.confirm({
-      title: "重命名会话",
-      content: (
-        <Input
-          defaultValue={initialTitle}
-          maxLength={50}
-          placeholder="请输入会话名称"
-          onChange={(e) => {
-            nextTitle = e.target.value;
-          }}
-        />
-      ),
-      okText: "保存",
-      cancelText: "取消",
-      onOk: () => onRenameSession(activeKey, nextTitle),
-    });
+  const activeSession = activeKey ? sessions.find((s) => s.ID.toString() === activeKey) : undefined;
+  const titleText = activeKey ? activeSession?.title?.trim() || "新对话" : "新对话";
+
+  const handleActiveChange = (key: string) => {
+    onActiveChange(key);
+    setDrawerOpen(false);
+  };
+
+  const handleAddSession = () => {
+    onAddSession();
+    setDrawerOpen(false);
   };
 
   return (
-    <div
-      style={{
-        padding: "12px 16px",
-        borderBottom: "1px solid rgba(0, 0, 0, 0.06)",
-        background: "#fafafa",
-      }}
-    >
-      <Flex gap={8} align="center">
-        <Select
-          allowClear
-          placeholder="选择会话"
-          style={{ flex: 1 }}
-          loading={loadingSessions}
-          value={activeKey || undefined}
-          onChange={(val) => {
-            if (!val) {
-              onActiveChange("");
-              return;
-            }
-            onActiveChange(val);
-          }}
-          options={buildSessionSelectGroups(sessions)}
-        />
-        <Button type="primary" icon={<PlusOutlined />} onClick={onAddSession} loading={loadingSessions} />
-        <Button icon={<EditOutlined />} onClick={handleRename} disabled={!activeKey} />
-      </Flex>
-    </div>
+    <>
+      <div
+        style={{
+          padding: "10px 12px",
+          borderBottom: "1px solid rgba(0, 0, 0, 0.06)",
+          background: "#fafafa",
+        }}
+      >
+        <Flex align="center" gap={10}>
+          <Button
+            type="text"
+            icon={<MenuOutlined style={{ fontSize: 18 }} />}
+            onClick={() => setDrawerOpen(true)}
+            aria-label="打开历史会话"
+          />
+          <Typography.Text strong ellipsis style={{ flex: 1, margin: 0, minWidth: 0 }}>
+            {titleText}
+          </Typography.Text>
+        </Flex>
+      </div>
+
+      <Drawer
+        placement="left"
+        width={300}
+        open={drawerOpen}
+        onClose={() => setDrawerOpen(false)}
+        styles={{ header: { display: "none" }, body: { padding: 0 }, footer: { display: "none" } }}
+      >
+        <div
+        className="h-full flex flex-col justify-center items-center"
+        >
+          <ChatSidebar
+            embedded
+            sessions={sessions}
+            activeKey={activeKey}
+            loadingSessions={loadingSessions}
+            onActiveChange={handleActiveChange}
+            onAddSession={handleAddSession}
+            onDeleteSession={onDeleteSession}
+            onRenameSession={onRenameSession}
+          />
+        </div>
+      </Drawer>
+    </>
   );
 };
