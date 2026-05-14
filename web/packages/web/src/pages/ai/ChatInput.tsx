@@ -1,38 +1,28 @@
-import { useState, useRef, useEffect } from "react";
-import {
-  CloudUploadOutlined,
-  LinkOutlined,
-  BookOutlined,
-} from "@ant-design/icons";
+import { useState, useRef, useEffect, type ComponentRef } from "react";
+import { useSelector } from "react-redux";
+import { CloudUploadOutlined, LinkOutlined, BookOutlined } from "@ant-design/icons";
 import { Attachments, type AttachmentsProps, Sender } from "@ant-design/x";
 import { Badge, Button, Flex, Divider } from "antd";
+import { layoutSlice } from "@/store/slice/layout";
 import type { ChatMode } from "./types";
 
 const Switch = Sender.Switch;
 
+type SendFromInput = (content: string, mode: ChatMode) => Promise<boolean>;
+
 interface ChatInputProps {
-  value: string;
-  onChange: (val: string) => void;
-  onSubmit: () => void;
   loading: boolean;
-  mode: ChatMode;
-  onModeChange: (mode: ChatMode) => void;
-  isMobile: boolean;
+  sendMessage: SendFromInput;
 }
 
-export const ChatInput = ({
-  value,
-  onChange,
-  onSubmit,
-  loading,
-  mode,
-  onModeChange,
-  isMobile,
-}: ChatInputProps) => {
+export const ChatInput = ({ loading, sendMessage }: ChatInputProps) => {
+  const isMobile = useSelector(layoutSlice.selectors.getIsMobile);
+  const [value, setValue] = useState("");
+  const [mode, setMode] = useState<ChatMode>("aiserver_chat");
   const [open, setOpen] = useState(false);
   const [items, setItems] = useState<NonNullable<AttachmentsProps["items"]>>([]);
   const [deepThink, setDeepThink] = useState(false);
-  const senderRef = useRef<any>(null);
+  const senderRef = useRef<ComponentRef<typeof Sender>>(null);
 
   useEffect(() => {
     return () => {
@@ -60,11 +50,7 @@ export const ChatInput = ({
         items={items}
         onChange={({ file, fileList }) => {
           const updatedFileList = fileList.map((item) => {
-            if (
-              item.uid === file.uid &&
-              file.status !== "removed" &&
-              item.originFileObj
-            ) {
+            if (item.uid === file.uid && file.status !== "removed" && item.originFileObj) {
               if (item.url?.startsWith("blob:")) {
                 URL.revokeObjectURL(item.url);
               }
@@ -91,17 +77,23 @@ export const ChatInput = ({
     </Sender.Header>
   );
 
-  const handleSubmit = () => {
+  const handleSubmit = async () => {
     if (loading) return;
     if (items.length > 0) {
       console.log("附件列表:", items);
     }
-    onSubmit();
+    const text = value.trim();
+    if (!text) return;
+
+    const ok = await sendMessage(text, mode);
+    if (ok) {
+      setValue("");
+    }
     setItems([]);
   };
 
   const handleKnowledgeChange = (checked: boolean) => {
-    onModeChange(checked ? "aiserver_knowledge" : "aiserver_chat");
+    setMode(checked ? "aiserver_knowledge" : "aiserver_chat");
   };
 
   return (
@@ -119,33 +111,20 @@ export const ChatInput = ({
         header={senderHeader}
         prefix={
           <Badge dot={items.length > 0 && !open}>
-            <Button
-              type="text"
-              onClick={() => setOpen(!open)}
-              icon={<LinkOutlined />}
-            />
+            <Button type="text" onClick={() => setOpen(!open)} icon={<LinkOutlined />} />
           </Badge>
         }
         value={value}
-        onChange={onChange}
+        onChange={setValue}
         onSubmit={handleSubmit}
         loading={loading}
-        placeholder={
-          mode === "aiserver_knowledge"
-            ? "输入问题，基于知识库内容回答..."
-            : "输入消息与 AI 对话..."
-        }
+        placeholder={mode === "aiserver_knowledge" ? "输入问题，基于知识库内容回答..." : "输入消息与 AI 对话..."}
         suffix={false}
         autoSize={{ minRows: 2, maxRows: 6 }}
         footer={(actionNode) => (
           <Flex justify="space-between" align="center">
             <Flex gap="small" align="center">
-              <Switch
-                value={deepThink}
-                checkedChildren="深度思考"
-                unCheckedChildren="深度思考"
-                onChange={setDeepThink}
-              />
+              <Switch value={deepThink} checkedChildren="深度思考" unCheckedChildren="深度思考" onChange={setDeepThink} />
               <Switch
                 value={mode === "aiserver_knowledge"}
                 checkedChildren="知识库"
