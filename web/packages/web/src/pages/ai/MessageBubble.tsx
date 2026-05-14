@@ -1,6 +1,10 @@
 import { memo } from "react";
-import { UserOutlined, MessageOutlined } from "@ant-design/icons";
-import { Avatar, theme } from "antd";
+import { useSelector } from "react-redux";
+import { UserOutlined } from "@ant-design/icons";
+import { Avatar } from "antd";
+import agentAvatar from "@/assets/agentAvatar.png";
+import { getImageUrl } from "@/utils/image";
+import { userSlice } from "@/store/slice/user";
 import styles from "./index.module.css";
 import { StreamingMarkdown } from "./StreamingMarkdown";
 import type { UiMessage } from "./types";
@@ -37,7 +41,9 @@ const MessageBubbleInner: React.FC<MessageBubbleProps> = ({ msg }) => {
       <div
         className={styles.markdown}
         style={{
+          width: "100%",
           maxWidth: "100%",
+          minWidth: 0,
           overflowX: "hidden",
           overflowWrap: "anywhere",
         }}
@@ -75,13 +81,14 @@ export const MessageBubble = memo(
 );
 
 export const MessageAvatar: React.FC<{ role: UiMessage["role"] }> = ({ role }) => {
-  const { token } = theme.useToken();
-  return (
-    <Avatar
-      icon={role === "user" ? <UserOutlined /> : <MessageOutlined />}
-      style={{
-        backgroundColor: role === "user" ? token.colorInfo : token.colorPrimary,
-      }}
-    />
-  );
+  const userInfo = useSelector(userSlice.selectors.getUserInfo);
+  const userAvatarUrl = getImageUrl(userInfo?.headerImg);
+
+  if (role === "user") {
+    return (
+      <Avatar src={userAvatarUrl} icon={!userAvatarUrl ? <UserOutlined /> : undefined} />
+    );
+  }
+
+  return <Avatar src={agentAvatar} />;
 };

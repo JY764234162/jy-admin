@@ -47,9 +47,11 @@ function splitMarkdownBlocks(content: string): string[] {
 const innerMarkdownStyle: CSSProperties = {
   background: "transparent",
   fontSize: 14,
+  width: "100%",
   maxWidth: "100%",
-  overflowX: "hidden",
-  wordBreak: "break-word", 
+  minWidth: 0,
+  overflowX: "auto",
+  wordBreak: "break-word",
   overflowWrap: "anywhere",
 };
 
@@ -59,7 +61,7 @@ const innerMarkdownStyle: CSSProperties = {
  */
 const InnerMarkdown = memo(
   ({ source }: { source: string }) => (
-    <MDEditor.Markdown source={source} style={innerMarkdownStyle} />
+    <MDEditor.Markdown source={source}  style={innerMarkdownStyle} />
   ),
   (prev, next) => prev.source === next.source
 );
@@ -103,7 +105,7 @@ const StreamingMarkdownInner: React.FC<StreamingMarkdownProps> = ({ content, str
   const lastIdx = blocks.length - 1;
 
   return (
-    <div data-color-mode="light">
+    <div data-color-mode="light" className={styles.markdownStreamBlocks}>
       {blocks.map((block, i) => (
         // append-only 切块保证：旧块索引和内容都不变；新块只会追加在末尾。
         // 因此使用 index 作为 key 是安全的，且能让 React.memo 命中。
