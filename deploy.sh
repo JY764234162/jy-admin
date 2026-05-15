@@ -120,13 +120,21 @@ fi
 # 构建和启动（后端 build，前端不 build）
 echo -e "\n${BLUE}开始构建和启动服务...${NC}\n"
 
-if docker compose version &> /dev/null; then
-    # 构建并启动所有服务（前端 build 很轻量，只是 COPY 文件到 nginx）
-    docker compose up -d --build
-else
-    docker-compose up -d --build
+COMPOSE_CMD="docker compose"
+if ! docker compose version &> /dev/null; then
+    COMPOSE_CMD="docker-compose"
 fi
 
+# 明确构建 ai-server 并拉取 pgvector 镜像
+echo -e "${BLUE}构建 ai-server 镜像...${NC}"
+$COMPOSE_CMD build ai-server
+
+echo -e "${BLUE}拉取 pgvector 镜像...${NC}"
+$COMPOSE_CMD pull postgres-vector
+
+# 构建并启动所有服务（前端 build 很轻量，只是 COPY 文件到 nginx）
+$COMPOSE_CMD up -d --build
+ 
 echo -e "\n${GREEN}✓ 部署完成！${NC}\n"
 
 # 显示服务状态
@@ -134,7 +142,7 @@ echo -e "${BLUE}服务状态：${NC}"
 if docker compose version &> /dev/null; then
     docker compose ps
 else
-    docker-compose ps
+      ps
 fi
 
 echo ""
