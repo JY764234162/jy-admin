@@ -13,6 +13,8 @@ type StartPayload = {
   knowledgeConfig?: { top_k?: number };
   /** 是否为恢复模式（刷新后重连，不重复保存用户消息） */
   resume?: boolean;
+  /** 是否启用深度思考 */
+  deepThinking?: boolean;
 };
 
 type StopPayload = {
@@ -34,6 +36,16 @@ type WorkerInMessage =
   | { type: "STOP_ALL"; payload?: Record<string, never> }
   | { type: "SNAPSHOT"; payload: SnapshotPayload };
 
+interface ThinkingProcess {
+  plan: { status: "processing" | "successful" | "failed"; message: string };
+  step: {
+    status: "processing" | "successful" | "failed";
+    processes: { step_id: string; status: "processing" | "successful" | "failed"; message: string; description: string }[];
+    source: unknown[];
+  };
+  task_status: "processing" | "successful" | "failed";
+}
+
 type WorkerOutMessage =
   | {
       type: "UPDATE";
@@ -44,6 +56,8 @@ type WorkerOutMessage =
         fullText: string;
         done: boolean;
         error?: string;
+        thinkingProcess?: ThinkingProcess;
+        thinkingStatus?: "processing" | "successful" | "failed";
       };
     }
   | {
@@ -53,6 +67,8 @@ type WorkerOutMessage =
         fullText: string;
         status: "idle" | "streaming" | "done" | "error";
         updatedAt: number;
+        thinkingProcess?: ThinkingProcess;
+        thinkingStatus?: "processing" | "successful" | "failed";
       };
     };
 
@@ -61,6 +77,8 @@ type ConversationState = {
   status: "idle" | "streaming" | "done" | "error";
   updatedAt: number;
   activeStreamId?: string;
+  thinkingProcess?: ThinkingProcess;
+  thinkingStatus?: "processing" | "successful" | "failed";
 };
 
 const conversationState = new Map<number, ConversationState>();
@@ -89,14 +107,25 @@ function updateConv(conversationId: number, patch: Partial<ConversationState>) {
       fullText: next.fullText,
       status: next.status,
       updatedAt: next.updatedAt,
+      thinkingProcess: next.thinkingProcess,
+      thinkingStatus: next.thinkingStatus,
     },
   });
 }
 
-function emitUpdate(streamId: string, conversationId: number, delta: string, fullText: string, done: boolean, error?: string) {
+function emitUpdate(
+  streamId: string,
+  conversationId: number,
+  delta: string,
+  fullText: string,
+  done: boolean,
+  error?: string,
+  thinkingProcess?: ThinkingProcess,
+  thinkingStatus?: "processing" | "successful" | "failed"
+) {
   post({
     type: "UPDATE",
-    payload: { streamId, conversationId, delta, fullText, done, error },
+    payload: { streamId, conversationId, delta, fullText, done, error, thinkingProcess, thinkingStatus },
   });
 }
 
@@ -146,7 +175,12 @@ async function startStream(p: StartPayload) {
     // resume 模式走 /ai/chat/resume，仅传 conversationId；正常聊天走 /ai/chat
     const body: Record<string, unknown> = p.resume
       ? { conversationId: p.conversationId }
-      : { conversationId: p.conversationId, content: p.content, mode: p.mode ?? "aiserver_chat" };
+      : {
+          conversationId: p.conversationId,
+          content: p.content,
+          mode: p.mode ?? "aiserver_chat",
+          deepThinking: p.deepThinking ?? false,
+        };
 
     const resp = await fetch(p.url, {
       method: "POST",
@@ -186,30 +220,116 @@ async function startStream(p: StartPayload) {
           if (!trimmed.startsWith("data:")) continue;
           const data = trimmed.replace(/^data:\s?/, "");
           if (!data) continue;
-          // 你的后端会发送 JSON：{content, done, error}
+          // 后端发送 JSON：{content, done, error, status, process}
           try {
-            const parsed = JSON.parse(data) as { content?: string; done?: boolean; error?: string };
+            const parsed = JSON.parse(data) as {
+              content?: string;
+              answer?: string;
+              done?: boolean;
+              error?: string;
+              status?: string;
+              process?: ThinkingProcess;
+            };
             if (parsed.error) {
               const errText = parsed.error;
               const cur = getOrInitConv(p.conversationId);
-              conversationState.set(p.conversationId, { ...cur, fullText: errText, status: "error", updatedAt: Date.now() });
+              conversationState.set(p.conversationId, {
+                ...cur,
+                fullText: errText,
+                status: "error",
+                updatedAt: Date.now(),
+              });
               updateConv(p.conversationId, { status: "error", fullText: errText });
               emitUpdate(p.streamId, p.conversationId, "", errText, true, errText);
               stopStream(p.streamId);
               return;
             }
 
-            const delta = parsed.content ?? "";
+            // 处理 thinking process 和 status
+            const cur = getOrInitConv(p.conversationId);
+            let nextThinkingProcess = cur.thinkingProcess;
+            let nextThinkingStatus = cur.thinkingStatus;
+
+            if (parsed.status === "processing") {
+              nextThinkingStatus = "processing";
+            } else if (parsed.status === "successful") {
+              nextThinkingStatus = "successful";
+            } else if (parsed.status === "failed") {
+              nextThinkingStatus = "failed";
+            } else if (parsed.status === "stream_answer_content" && parsed.process) {
+              // ai-server 开始流式回答且已携带 process，说明思考完成
+              nextThinkingStatus = "successful";
+            }
+
+            if (parsed.process) {
+              nextThinkingProcess = parsed.process;
+            }
+
+            // 更新 thinking 状态到 conversationState
+            if (nextThinkingProcess !== cur.thinkingProcess || nextThinkingStatus !== cur.thinkingStatus) {
+              conversationState.set(p.conversationId, {
+                ...cur,
+                thinkingProcess: nextThinkingProcess,
+                thinkingStatus: nextThinkingStatus,
+                updatedAt: Date.now(),
+              });
+            }
+
+            // 累加文本内容（content 或 answer 都算）
+            const delta = parsed.content ?? parsed.answer ?? "";
             if (delta) {
-              const cur = getOrInitConv(p.conversationId);
               const nextFull = cur.fullText + delta;
-              conversationState.set(p.conversationId, { ...cur, fullText: nextFull, updatedAt: Date.now(), status: "streaming", activeStreamId: p.streamId });
-              emitUpdate(p.streamId, p.conversationId, delta, nextFull, false);
+              conversationState.set(p.conversationId, {
+                ...cur,
+                fullText: nextFull,
+                updatedAt: Date.now(),
+                status: "streaming",
+                activeStreamId: p.streamId,
+                thinkingProcess: nextThinkingProcess,
+                thinkingStatus: nextThinkingStatus,
+              });
+              emitUpdate(
+                p.streamId,
+                p.conversationId,
+                delta,
+                nextFull,
+                false,
+                undefined,
+                nextThinkingProcess,
+                nextThinkingStatus
+              );
+            } else if (parsed.process || parsed.status) {
+              // 只有 process/status 变化但没有内容增量时，也发一次 update
+              emitUpdate(
+                p.streamId,
+                p.conversationId,
+                "",
+                cur.fullText,
+                false,
+                undefined,
+                nextThinkingProcess,
+                nextThinkingStatus
+              );
             }
 
             if (parsed.done) {
-              updateConv(p.conversationId, { status: "done", activeStreamId: undefined });
-              emitUpdate(p.streamId, p.conversationId, "", getOrInitConv(p.conversationId).fullText, true);
+              const finalConv = getOrInitConv(p.conversationId);
+              updateConv(p.conversationId, {
+                status: "done",
+                activeStreamId: undefined,
+                thinkingProcess: finalConv.thinkingProcess,
+                thinkingStatus: finalConv.thinkingStatus,
+              });
+              emitUpdate(
+                p.streamId,
+                p.conversationId,
+                "",
+                finalConv.fullText,
+                true,
+                undefined,
+                finalConv.thinkingProcess,
+                finalConv.thinkingStatus
+              );
               stopStream(p.streamId);
               return;
             }
