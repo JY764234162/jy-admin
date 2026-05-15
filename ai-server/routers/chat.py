@@ -21,6 +21,31 @@ class ChatRequest(BaseModel):
     message: str
     conversation_id: Optional[str] = None
     messages: Optional[List[ChatMessage]] = None
+    deep_thinking: Optional[bool] = False
+
+
+DEEP_THINKING_PROMPT = """You are a helpful assistant with deep reasoning capabilities.
+
+When responding to the user, please follow this exact format:
+1. First, wrap your step-by-step reasoning and analysis inside <think> tags
+2. Then, provide your final answer after the closing </think> tag
+
+The content inside <think> tags should show your detailed thought process, including:
+- Breaking down the problem
+- Considering different angles
+- Evaluating options
+- Reasoning step by step
+
+Example format:
+<think>
+Let me analyze this carefully...
+First, I need to consider...
+Then, looking at it from another angle...
+Based on this reasoning...
+</think>
+Your final, concise answer here.
+
+Important: Always include both <think> and </think> tags. Start with <think> and end the thinking section with </think> before giving your final answer."""
 
 
 def _sse_json(data: dict) -> str:
@@ -28,6 +53,41 @@ def _sse_json(data: dict) -> str:
 
 
 @router.post("")
+def _extract_thinking(text: str) -> str | None:
+    """从文本中提取 <think>...</think> 之间的内容，返回 None 表示标签不完整。"""
+    start = text.find("<think>")
+    end = text.find("</think>")
+    if start != -1 and end != -1 and end > start:
+        return text[start + len("<think>"):end].strip()
+    return None
+
+
+def _make_process(thinking_text: str) -> dict:
+    """构造兼容 studio.kxsz.net 的 process 数据结构。"""
+    if not thinking_text:
+        return {
+            "plan": {"status": "successful", "message": ""},
+            "step": {"status": "successful", "processes": [], "source": []},
+            "task_status": "successful",
+        }
+    return {
+        "plan": {"status": "successful", "message": ""},
+        "step": {
+            "status": "successful",
+            "processes": [
+                {
+                    "step_id": "deep_think",
+                    "status": "successful",
+                    "message": "",
+                    "description": thinking_text,
+                }
+            ],
+            "source": [],
+        },
+        "task_status": "successful",
+    }
+
+
 async def chat_message(req: ChatRequest):
     if not req.message.strip():
         raise HTTPException(400, "消息不能为空")
@@ -49,6 +109,8 @@ async def chat_message(req: ChatRequest):
     # 构建 LangChain 消息格式
     # 优先使用外部传入的 messages（由 Go 后端提供完整历史），否则从 memory 获取
     langchain_messages = []
+    if req.deep_thinking:
+        langchain_messages.append({"role": "system", "content": DEEP_THINKING_PROMPT})
     if req.messages:
         for msg in req.messages:
             langchain_messages.append({"role": msg.role, "content": msg.content})
@@ -61,6 +123,11 @@ async def chat_message(req: ChatRequest):
 
     async def event_generator():
         full_response = ""
+        raw_buffer = ""
+        thinking_detected = False
+        thinking_complete = False
+        thinking_content = ""
+
         try:
             # llm.stream 是同步生成器，放到线程池中执行避免阻塞 asyncio 事件循环
             sync_gen = llm.stream(langchain_messages)
@@ -76,16 +143,97 @@ async def chat_message(req: ChatRequest):
                 chunk = await loop.run_in_executor(None, next_chunk)
                 if chunk is None:
                     break
-                if chunk.content:
-                    full_response += chunk.content
-                    yield _sse_json({"content": chunk.content, "done": False})
-                    await asyncio.sleep(0.08)
+                if not chunk.content:
+                    continue
+
+                full_response += chunk.content
+                raw_buffer += chunk.content
+
+                # 深度思考模式：解析 <think> 标签
+                if req.deep_thinking:
+                    # 首次检测到 <think>，发送 processing 状态
+                    if not thinking_detected and "<think>" in raw_buffer:
+                        thinking_detected = True
+                        yield _sse_json(
+                            {
+                                "status": "processing",
+                                "process": {"plan": {"status": "processing", "message": ""}},
+                            }
+                        )
+
+                    # 已检测到 <think>，检查是否完整闭合
+                    if thinking_detected and not thinking_complete:
+                        extracted = _extract_thinking(raw_buffer)
+                        if extracted is not None:
+                            thinking_complete = True
+                            thinking_content = extracted
+
+                            # </think> 之后的内容才是正式答案
+                            end_pos = raw_buffer.find("</think>") + len("</think>")
+                            answer_so_far = raw_buffer[end_pos:].strip()
+
+                            yield _sse_json(
+                                {
+                                    "status": "stream_answer_content",
+                                    "answer": answer_so_far,
+                                    "process": _make_process(thinking_content),
+                                }
+                            )
+                        # 思考完成前，不发送答案内容（避免把思考文本混入答案）
+                        await asyncio.sleep(0.08)
+                        continue
+
+                    # 思考已完成，继续流式发送答案
+                    if thinking_complete:
+                        yield _sse_json(
+                            {
+                                "status": "stream_answer_content",
+                                "answer": chunk.content,
+                                "process": _make_process(thinking_content),
+                            }
+                        )
+                        await asyncio.sleep(0.08)
+                        continue
+
+                # 非深度思考模式：保持原有格式
+                yield _sse_json({"content": chunk.content, "done": False})
+                await asyncio.sleep(0.08)
 
             # 保存 AI 回复到 memory
             memory.add_message(conversation_id, "assistant", full_response)
-            yield _sse_json({"content": "", "done": True, "conversation_id": conversation_id})
+
+            if req.deep_thinking and thinking_detected:
+                yield _sse_json(
+                    {
+                        "status": "successful",
+                        "answer": full_response,
+                        "process": _make_process(thinking_content),
+                        "done": True,
+                    }
+                )
+            else:
+                yield _sse_json(
+                    {"content": "", "done": True, "conversation_id": conversation_id}
+                )
         except Exception as e:
-            yield _sse_json({"content": "", "done": True, "error": str(e)})
+            if req.deep_thinking and thinking_detected:
+                yield _sse_json(
+                    {
+                        "status": "failed",
+                        "answer": full_response,
+                        "process": _make_process(thinking_content)
+                        if thinking_complete
+                        else {
+                            "plan": {"status": "failed", "message": str(e)},
+                            "step": {"status": "failed", "processes": [], "source": []},
+                            "task_status": "failed",
+                        },
+                        "error": str(e),
+                        "done": True,
+                    }
+                )
+            else:
+                yield _sse_json({"content": "", "done": True, "error": str(e)})
 
     # 返回 SSE 流，同时在 header 中返回 conversation_id
     response = StreamingResponse(
