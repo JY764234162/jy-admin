@@ -1,5 +1,6 @@
 import asyncio
 import json
+import uuid
 from typing import Optional, List
 
 from fastapi import APIRouter, HTTPException, Header
@@ -7,7 +8,6 @@ from pydantic import BaseModel
 from starlette.responses import StreamingResponse
 
 from services.llm import llm
-from services.memory import memory
 
 router = APIRouter(prefix="/api/chat", tags=["chat"])
 
@@ -105,8 +105,7 @@ async def chat_vision(req: VisionRequest):
     if not req.image_base64.strip():
         raise HTTPException(400, "图片不能为空")
 
-    conversation_id = req.conversation_id or memory.create_conversation()
-    memory.add_message(conversation_id, "user", req.message)
+    conversation_id = req.conversation_id or uuid.uuid4().hex[:16]
 
     # 构造多模态消息（OpenAI 兼容格式）
     image_url = req.image_base64
@@ -146,7 +145,6 @@ async def chat_vision(req: VisionRequest):
                 yield _sse_json({"content": chunk.content, "done": False})
                 await asyncio.sleep(0.08)
 
-            memory.add_message(conversation_id, "assistant", full_response)
             yield _sse_json({"content": "", "done": True, "conversation_id": conversation_id})
         except Exception as e:
             yield _sse_json({"content": "", "done": True, "error": str(e)})
@@ -163,22 +161,10 @@ async def chat_message(req: ChatRequest):
     if not req.message.strip():
         raise HTTPException(400, "消息不能为空")
 
-    # 创建或复用对话
-    if not req.conversation_id:
-        conversation_id = memory.create_conversation()
-    else:
-        conversation_id = req.conversation_id
-        # 验证对话存在（仅当没有外部传入 messages 时才需要）
-        if not req.messages:
-            convs = memory.get_conversations()
-            if not any(c["id"] == conversation_id for c in convs):
-                raise HTTPException(404, f"对话 {conversation_id} 不存在")
-
-    # 添加用户消息到 memory（用于后续通过 history 接口查询）
-    memory.add_message(conversation_id, "user", req.message)
+    conversation_id = req.conversation_id or uuid.uuid4().hex[:16]
 
     # 构建 LangChain 消息格式
-    # 优先使用外部传入的 messages（由 Go 后端提供完整历史），否则从 memory 获取
+    # 优先使用外部传入的 messages（由 Go 后端提供完整历史）
     langchain_messages = []
     if req.deep_thinking:
         langchain_messages.append({"role": "system", "content": DEEP_THINKING_PROMPT})
@@ -188,9 +174,8 @@ async def chat_message(req: ChatRequest):
         # 追加当前消息
         langchain_messages.append({"role": "user", "content": req.message})
     else:
-        messages = memory.get_messages(conversation_id)
-        for msg in messages:
-            langchain_messages.append({"role": msg["role"], "content": msg["content"]})
+        # 无外部历史时仅使用当前消息
+        langchain_messages.append({"role": "user", "content": req.message})
 
     async def event_generator():
         full_response = ""
@@ -270,9 +255,6 @@ async def chat_message(req: ChatRequest):
                 yield _sse_json({"content": chunk.content, "done": False})
                 await asyncio.sleep(0.08)
 
-            # 保存 AI 回复到 memory
-            memory.add_message(conversation_id, "assistant", full_response)
-
             if req.deep_thinking and thinking_detected:
                 yield _sse_json(
                     {
@@ -315,22 +297,3 @@ async def chat_message(req: ChatRequest):
     return response
 
 
-@router.get("/{conversation_id}/history")
-async def get_chat_history(conversation_id: str):
-    messages = memory.get_messages(conversation_id)
-    if not messages:
-        raise HTTPException(404, f"对话 {conversation_id} 不存在或为空")
-    return {"conversation_id": conversation_id, "messages": messages}
-
-
-@router.delete("/{conversation_id}")
-async def delete_conversation(conversation_id: str):
-    ok = memory.delete_conversation(conversation_id)
-    if not ok:
-        raise HTTPException(404, f"对话 {conversation_id} 不存在")
-    return {"message": f"对话 {conversation_id} 已删除"}
-
-
-@router.get("/list")
-async def list_conversations():
-    return {"conversations": memory.get_conversations()}
