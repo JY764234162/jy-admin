@@ -69,14 +69,7 @@ func (a *Api) ChatMessage(c *gin.Context) {
 	if req.Attachments != "" {
 		userMessage.Attachments = req.Attachments
 	}
-	// MySQL JSON 列不接受空字符串，为空时 Omit 该字段
-	var createErr error
-	if userMessage.Attachments == "" {
-		createErr = global.JY_DB.Omit("attachments").Create(&userMessage).Error
-	} else {
-		createErr = global.JY_DB.Create(&userMessage).Error
-	}
-	if createErr != nil {
+	if err := global.JY_DB.Create(&userMessage).Error; err != nil {
 		common.FailWithMsg(c, "保存消息失败")
 		return
 	}

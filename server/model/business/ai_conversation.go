@@ -26,3 +26,11 @@ type AIMessage struct {
 	Status         string `json:"status" gorm:"default:'success';comment:状态: loading/success/error"`
 	Attachments    string `json:"attachments" gorm:"type:json;comment:附件JSON"`
 }
+
+// BeforeCreate MySQL JSON 列不接受空字符串，为空时写入合法空数组
+func (m *AIMessage) BeforeCreate(tx *gorm.DB) error {
+	if m.Attachments == "" {
+		m.Attachments = "[]"
+	}
+	return nil
+}
