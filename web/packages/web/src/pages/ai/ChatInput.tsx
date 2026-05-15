@@ -8,7 +8,7 @@ import type { ChatMode } from "./types";
 
 const Switch = Sender.Switch;
 
-type SendFromInput = (content: string, mode: ChatMode) => Promise<boolean>;
+type SendFromInput = (content: string, mode: ChatMode, targetConversationId?: number, resume?: boolean, deepThink?: boolean) => Promise<boolean>;
 
 interface ChatInputProps {
   loading: boolean;
@@ -85,7 +85,7 @@ export const ChatInput = ({ loading, sendMessage }: ChatInputProps) => {
     const text = value.trim();
     if (!text) return;
 
-    const ok = await sendMessage(text, mode);
+    const ok = await sendMessage(text, mode, undefined, false, deepThink);
     if (ok) {
       setValue("");
     }

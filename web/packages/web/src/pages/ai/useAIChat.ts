@@ -298,7 +298,8 @@ export function useAIChat(conversationId: number | null, options: UseAIChatOptio
       userContent: string,
       mode: ChatMode = "aiserver_chat",
       targetConversationId?: number,
-      resume = false
+      resume = false,
+      deepThink = false
     ): Promise<boolean> => {
       if (!userContent.trim() && !resume) {
         return false;
@@ -377,7 +378,7 @@ export function useAIChat(conversationId: number | null, options: UseAIChatOptio
 
       try {
         live.current.refreshSessionsAfterStream = true;
-        aiChatStreamClient.start(cid, content, mode);
+        aiChatStreamClient.start(cid, content, mode, false, deepThink);
         return true;
       } catch (error) {
         console.error("发送消息失败:", error);
@@ -475,12 +476,23 @@ export function useAIChat(conversationId: number | null, options: UseAIChatOptio
 
       const isStreamingPhase = snap.status === "streaming" || snap.status === "idle";
 
+      const hasThinking = snap.thinkingProcess || snap.thinkingStatus;
+
       if (snap.fullText && isStreamingPhase) {
         setMessages((prev) => {
           const idx = findTargetIdx(prev);
           if (idx !== -1) {
             const next = prev.slice();
-            next[idx] = { ...next[idx]!, content: snap.fullText };
+            next[idx] = {
+              ...next[idx]!,
+              content: snap.fullText,
+              ...(hasThinking
+                ? {
+                    thinkingProcess: snap.thinkingProcess,
+                    thinkingStatus: snap.thinkingStatus,
+                  }
+                : {}),
+            };
             return next;
           }
           return [
@@ -491,6 +503,12 @@ export function useAIChat(conversationId: number | null, options: UseAIChatOptio
               role: "ai",
               status: "loading",
               timestamp: Date.now(),
+              ...(hasThinking
+                ? {
+                    thinkingProcess: snap.thinkingProcess,
+                    thinkingStatus: snap.thinkingStatus,
+                  }
+                : {}),
             },
           ];
         });
@@ -505,11 +523,27 @@ export function useAIChat(conversationId: number | null, options: UseAIChatOptio
           const status: UiMessage["status"] =
             snap.status === "error" ? "error" : snap.status === "done" ? "success" : "loading";
           const nextContent = snap.fullText || existingMsg.content;
-          if (existingMsg.content === nextContent && existingMsg.status === status) {
+          const contentChanged = existingMsg.content !== nextContent;
+          const statusChanged = existingMsg.status !== status;
+          const thinkingChanged =
+            hasThinking &&
+            (existingMsg.thinkingProcess !== snap.thinkingProcess ||
+              existingMsg.thinkingStatus !== snap.thinkingStatus);
+          if (!contentChanged && !statusChanged && !thinkingChanged) {
             return prev;
           }
           const next = prev.slice();
-          next[idx] = { ...existingMsg, content: nextContent, status };
+          next[idx] = {
+            ...existingMsg,
+            content: nextContent,
+            status,
+            ...(hasThinking
+              ? {
+                  thinkingProcess: snap.thinkingProcess,
+                  thinkingStatus: snap.thinkingStatus,
+                }
+              : {}),
+          };
           return next;
         });
       });
