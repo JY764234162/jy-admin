@@ -8,7 +8,7 @@ type StartPayload = {
   conversationId: number;
   content: string;
   /** 调用模式：aiserver_chat=ai-server聊天，aiserver_knowledge=ai-server知识库问答，aiserver_vision=多模态视觉 */
-  mode?: "aiserver_chat" | "aiserver_knowledge" | "aiserver_vision";
+  mode?: "aiserver_chat" | "aiserver_knowledge" | "aiserver_vision" | "aiserver_attachment";
   /** 知识库问答配置 */
   knowledgeConfig?: { top_k?: number };
   /** 是否为恢复模式（刷新后重连，不重复保存用户消息） */
@@ -17,6 +17,10 @@ type StartPayload = {
   deepThinking?: boolean;
   /** 多模态图片 base64（仅 vision 模式使用） */
   imageBase64?: string;
+  /** 指定检索的文档 doc_ids（仅 knowledge 模式使用） */
+  docIds?: string[];
+  /** 用户消息携带的附件元数据 */
+  attachments?: { uid: string; filename: string; url?: string }[];
 };
 
 type StopPayload = {
@@ -193,6 +197,8 @@ async function startStream(p: StartPayload) {
             content: p.content,
             mode: p.mode ?? "aiserver_chat",
             deepThinking: p.deepThinking ?? false,
+            doc_ids: p.docIds,
+            attachments: p.attachments ? JSON.stringify(p.attachments) : undefined,
           };
 
     const resp = await fetch(p.url, {

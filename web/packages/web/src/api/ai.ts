@@ -21,6 +21,7 @@ export interface AIMessage {
   content: string;
   userId: number;
   status?: string;
+  attachments?: string;
   createdAt: string;
   updatedAt: string;
 }

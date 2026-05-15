@@ -91,13 +91,24 @@ export function useAIChat(conversationId: number | null, options: UseAIChatOptio
 
   const toDisplayOrder = useCallback(
     (list: AIMessage[]): UiMessage[] =>
-      [...list].reverse().map((msg) => ({
-        id: `msg-${msg.ID}`,
-        content: msg.content,
-        role: msg.role === "user" ? "user" : "ai",
-        status: (msg.status === "loading" ? "loading" : msg.status === "error" ? "error" : "success") as UiMessage["status"],
-        timestamp: new Date(msg.createdAt).getTime(),
-      })),
+      [...list].reverse().map((msg) => {
+        let parsedAttachments: UiMessage["attachments"];
+        if (msg.attachments) {
+          try {
+            parsedAttachments = JSON.parse(msg.attachments) as UiMessage["attachments"];
+          } catch {
+            parsedAttachments = undefined;
+          }
+        }
+        return {
+          id: `msg-${msg.ID}`,
+          content: msg.content,
+          role: msg.role === "user" ? "user" : "ai",
+          status: (msg.status === "loading" ? "loading" : msg.status === "error" ? "error" : "success") as UiMessage["status"],
+          timestamp: new Date(msg.createdAt).getTime(),
+          attachments: parsedAttachments,
+        };
+      }),
     []
   );
 
@@ -300,7 +311,9 @@ export function useAIChat(conversationId: number | null, options: UseAIChatOptio
       targetConversationId?: number,
       resume = false,
       deepThink = false,
-      imageBase64?: string
+      imageBase64?: string,
+      docIds?: string[],
+      attachments?: { uid: string; filename: string; url?: string }[]
     ): Promise<boolean> => {
       if (!userContent.trim() && !resume) {
         return false;
@@ -357,6 +370,7 @@ export function useAIChat(conversationId: number | null, options: UseAIChatOptio
         role: "user",
         status: "success",
         timestamp: Date.now(),
+        attachments,
       };
 
       const aiMsgId = `ai-${Date.now()}`;
@@ -379,7 +393,7 @@ export function useAIChat(conversationId: number | null, options: UseAIChatOptio
 
       try {
         live.current.refreshSessionsAfterStream = true;
-        aiChatStreamClient.start(cid, content, mode, false, deepThink, imageBase64);
+        aiChatStreamClient.start(cid, content, mode, false, deepThink, imageBase64, docIds, attachments);
         return true;
       } catch (error) {
         console.error("发送消息失败:", error);

@@ -38,10 +38,12 @@ func (a *Api) ChatMessage(c *gin.Context) {
 	userID := customClaims.ID
 
 	var req struct {
-		ConversationID uint   `json:"conversationId" binding:"required"`
-		Content        string `json:"content" binding:"required"`
-		Mode           string `json:"mode"`
-		DeepThinking   bool   `json:"deepThinking"`
+		ConversationID uint     `json:"conversationId" binding:"required"`
+		Content        string   `json:"content" binding:"required"`
+		Mode           string   `json:"mode"`
+		DeepThinking   bool     `json:"deepThinking"`
+		DocIDs         []string `json:"doc_ids"`
+		Attachments    string   `json:"attachments"`
 	}
 	if err := c.ShouldBindJSON(&req); err != nil {
 		common.FailWithMsg(c, "参数错误: "+err.Error())
@@ -64,7 +66,17 @@ func (a *Api) ChatMessage(c *gin.Context) {
 		Content:        req.Content,
 		UserID:         userID,
 	}
-	if err := global.JY_DB.Create(&userMessage).Error; err != nil {
+	if req.Attachments != "" {
+		userMessage.Attachments = req.Attachments
+	}
+	// MySQL JSON 列不接受空字符串，为空时 Omit 该字段
+	var createErr error
+	if userMessage.Attachments == "" {
+		createErr = global.JY_DB.Omit("attachments").Create(&userMessage).Error
+	} else {
+		createErr = global.JY_DB.Create(&userMessage).Error
+	}
+	if createErr != nil {
 		common.FailWithMsg(c, "保存消息失败")
 		return
 	}
@@ -86,7 +98,7 @@ func (a *Api) ChatMessage(c *gin.Context) {
 	task := startGenerationTask(req.ConversationID, assistantMessage.ID)
 
 	// 启动后台 goroutine 读取 ai-server 流
-	go a.runBackgroundGeneration(task, req.ConversationID, assistantMessage.ID, req.Content, req.Mode, req.DeepThinking, conversation, userID)
+	go a.runBackgroundGeneration(task, req.ConversationID, assistantMessage.ID, req.Content, req.Mode, req.DeepThinking, req.DocIDs, conversation, userID)
 
 	// 设置 SSE 并从头推送
 	a.serveSSE(c, task, 0)
@@ -162,7 +174,7 @@ type StreamChunk struct {
 //     避免长回复时因 TCP 背压让上游 chunk 间隔越来越大。
 //  2. DB 落库放到独立 goroutine，按时间窗口（dbSyncInterval）周期性写入。
 //     finish 前停止该 goroutine，并由主流程做最终一次落库。
-func (a *Api) runBackgroundGeneration(task *generationTask, conversationID, assistantMsgID uint, content, mode string, deepThinking bool, conversation business.AIConversation, userID uint) {
+func (a *Api) runBackgroundGeneration(task *generationTask, conversationID, assistantMsgID uint, content, mode string, deepThinking bool, docIDs []string, conversation business.AIConversation, userID uint) {
 	var streamErr error
 
 	streamCallback := func(chunk StreamChunk) {
@@ -189,8 +201,8 @@ func (a *Api) runBackgroundGeneration(task *generationTask, conversationID, assi
 		var messages []business.AIMessage
 		global.JY_DB.Where("conversation_id = ? AND id != ?", conversationID, assistantMsgID).Order("created_at ASC").Find(&messages)
 		streamErr = a.callAIServerChatStream(messages, content, conversationID, deepThinking, streamCallback)
-	case "aiserver_knowledge":
-		streamErr = a.callAIServerKnowledgeStream(content, fmt.Sprintf("%d", userID), streamCallback)
+	case "aiserver_knowledge", "aiserver_attachment":
+		streamErr = a.callAIServerKnowledgeStream(content, fmt.Sprintf("%d", userID), docIDs, mode, streamCallback)
 	default:
 		streamErr = fmt.Errorf("不支持的对话模式: %s", mode)
 	}
@@ -653,7 +665,7 @@ func (a *Api) callAIServerChatStream(messages []business.AIMessage, newContent s
 }
 
 // callAIServerKnowledgeStream 转发到 ai-server 知识库问答（SSE 透传）
-func (a *Api) callAIServerKnowledgeStream(question, userID string, callback StreamCallback) error {
+func (a *Api) callAIServerKnowledgeStream(question, userID string, docIDs []string, mode string, callback StreamCallback) error {
 	aiServerURL := global.JY_Config.AI.AIServerURL
 	if aiServerURL == "" {
 		aiServerURL = "http://localhost:8000"
@@ -664,6 +676,8 @@ func (a *Api) callAIServerKnowledgeStream(question, userID string, callback Stre
 		"top_k":      3,
 		"structured": false,
 		"user_id":    userID,
+		"doc_ids":    docIDs,
+		"mode":       mode,
 	}
 	body, err := json.Marshal(payload)
 	if err != nil {

@@ -1,4 +1,4 @@
-export type ChatMode = "aiserver_chat" | "aiserver_knowledge" | "aiserver_vision";
+export type ChatMode = "aiserver_chat" | "aiserver_knowledge" | "aiserver_vision" | "aiserver_attachment";
 
 export interface ProcessStep {
   step_id: string;
@@ -20,6 +20,12 @@ export interface ThinkingProcess {
   task_status: "processing" | "successful" | "failed";
 }
 
+export interface MessageAttachment {
+  uid: string;
+  filename: string;
+  url?: string;
+}
+
 export interface UiMessage {
   id: string;
   content: string;
@@ -32,4 +38,6 @@ export interface UiMessage {
   thinkingStatus?: "processing" | "successful" | "failed";
   /** 知识库检索/生成等阶段状态 */
   stepStatus?: string;
+  /** 用户消息携带的附件 */
+  attachments?: MessageAttachment[];
 }

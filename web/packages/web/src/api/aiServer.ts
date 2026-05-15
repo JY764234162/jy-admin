@@ -54,6 +54,8 @@ export interface UploadKnowledgeStreamResponse {
   task_id: string;
   filename: string;
   user_id: string;
+  doc_id?: string;
+  cos_url?: string;
 }
 
 /** 解析进度事件 */

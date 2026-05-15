@@ -1,6 +1,13 @@
 import { useState, useRef, useEffect, type ComponentRef } from "react";
 import { useSelector } from "react-redux";
-import { CloudUploadOutlined, LinkOutlined, BookOutlined, LoadingOutlined, CheckCircleFilled, CloseCircleFilled } from "@ant-design/icons";
+import {
+  CloudUploadOutlined,
+  LinkOutlined,
+  BookOutlined,
+  LoadingOutlined,
+  CheckCircleFilled,
+  CloseCircleFilled,
+} from "@ant-design/icons";
 import { Attachments, type AttachmentsProps, Sender } from "@ant-design/x";
 import { Badge, Button, Flex, Divider, Progress, message as antdMessage } from "antd";
 import { layoutSlice } from "@/store/slice/layout";
@@ -38,7 +45,16 @@ function fileToBase64(file: File): Promise<string> {
   });
 }
 
-type SendFromInput = (content: string, mode: ChatMode, targetConversationId?: number, resume?: boolean, deepThink?: boolean, imageBase64?: string) => Promise<boolean>;
+type SendFromInput = (
+  content: string,
+  mode: ChatMode,
+  targetConversationId?: number,
+  resume?: boolean,
+  deepThink?: boolean,
+  imageBase64?: string,
+  docIds?: string[],
+  attachments?: { uid: string; filename: string }[]
+) => Promise<boolean>;
 
 interface ChatInputProps {
   loading: boolean;
@@ -54,6 +70,7 @@ interface UploadingFile {
   message: string;
   progress: number;
   docId?: string;
+  cosUrl?: string;
   error?: string;
 }
 
@@ -98,15 +115,17 @@ export const ChatInput = ({ loading, sendMessage }: ChatInputProps) => {
     ]);
 
     let taskId: string;
+    let cosUrl: string | undefined;
     try {
       const res = await aiServerApi.uploadKnowledgeStream(file);
       taskId = res.task_id;
+      cosUrl = res.cos_url;
     } catch (e: any) {
       const errMsg = e?.message || "上传失败";
       setUploadingFiles((prev) => prev.map((f) => (f.uid === uid ? { ...f, stage: "failed", message: errMsg, error: errMsg, progress: 0 } : f)));
       throw e;
     }
-    setUploadingFiles((prev) => prev.map((f) => (f.uid === uid ? { ...f, taskId, stage: "parsing", message: "开始解析...", progress: 2 } : f)));
+    setUploadingFiles((prev) => prev.map((f) => (f.uid === uid ? { ...f, taskId, cosUrl, stage: "parsing", message: "开始解析...", progress: 2 } : f)));
 
     return new Promise<string>((resolve, reject) => {
       const sub = aiServerApi.subscribeKnowledgeProgress(
@@ -188,6 +207,17 @@ export const ChatInput = ({ loading, sendMessage }: ChatInputProps) => {
             return item;
           });
           setItems(updatedFileList);
+
+          // 新增文件时立即开始上传解析（不等点击发送）
+          if (file.status !== "removed" && file.originFileObj) {
+            const alreadyStarted = uploadingFiles.some((u) => u.uid === file.uid);
+            if (!alreadyStarted) {
+              uploadFileWithProgress(file.uid, file.originFileObj).catch(() => {
+                // 错误已在 uploadFileWithProgress 内部处理到 uploadingFiles 状态
+              });
+            }
+          }
+
           // 文件被移除时同步清理上传状态和订阅
           if (file.status === "removed") {
             const sub = abortMapRef.current.get(file.uid);
@@ -224,7 +254,12 @@ export const ChatInput = ({ loading, sendMessage }: ChatInputProps) => {
       const firstImage = imageItems[0]!.originFileObj as File;
       try {
         const base64 = await fileToBase64(firstImage);
-        const ok = await sendMessage(text, "aiserver_vision", undefined, false, deepThink, base64);
+        const imgAttachments = imageItems.map((it) => ({
+          uid: it.uid,
+          filename: it.originFileObj?.name || "未知图片",
+          url: it.url || "",
+        }));
+        const ok = await sendMessage(text, "aiserver_vision", undefined, false, deepThink, base64, undefined, imgAttachments);
         if (ok) {
           setValue("");
           items.forEach((it) => {
@@ -239,7 +274,7 @@ export const ChatInput = ({ loading, sendMessage }: ChatInputProps) => {
       return;
     }
 
-    // 有文档附件：先解析（向量化），再进入知识库问答
+    // 有文档附件：先解析（向量化），再进入附件问答（仅基于刚上传的文件回答，与知识库开关无关）
     if (docItems.length > 0) {
       // 检查是否有已失败的文件，有则提示并阻止发送
       const failedDocs = docItems.filter((it) => {
@@ -278,7 +313,31 @@ export const ChatInput = ({ loading, sendMessage }: ChatInputProps) => {
         return;
       }
 
-      const ok = await sendMessage(text, "aiserver_knowledge", undefined, false, deepThink);
+      // 收集本次已成功向量化的 doc_id，传给后端做精确检索
+      const docIds = docItems
+        .map((it) => uploadingFiles.find((u) => u.uid === it.uid)?.docId)
+        .filter((id): id is string => !!id);
+
+      const attachments = docItems.map((it) => {
+        const uploadInfo = uploadingFiles.find((u) => u.uid === it.uid);
+        return {
+          uid: it.uid,
+          filename: it.originFileObj?.name || "未知文件",
+          url: uploadInfo?.cosUrl || it.url || "",
+        };
+      });
+
+      // 附件和知识库开关独立：勾选了知识库就走 knowledge（会混合检索附件+知识库），否则只检索附件
+      const ok = await sendMessage(
+        text,
+        mode === "aiserver_knowledge" ? "aiserver_knowledge" : "aiserver_attachment",
+        undefined,
+        false,
+        deepThink,
+        undefined,
+        docIds,
+        attachments
+      );
       if (ok) {
         setValue("");
         items.forEach((it) => {

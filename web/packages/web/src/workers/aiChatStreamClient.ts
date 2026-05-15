@@ -94,7 +94,7 @@ function ensureWorker() {
   return workerSingleton;
 }
 
-function buildChatUrl(resume = false, mode?: "aiserver_chat" | "aiserver_knowledge" | "aiserver_vision") {
+function buildChatUrl(resume = false, mode?: "aiserver_chat" | "aiserver_knowledge" | "aiserver_vision" | "aiserver_attachment") {
   const API_PREFIX = import.meta.env.VITE_API_PREFIX || "/api";
   const VITE_API_BASE_URL = import.meta.env.VITE_API_BASE_URL || "";
   if (mode === "aiserver_vision") {
@@ -152,10 +152,12 @@ export const aiChatStreamClient = {
   start(
     conversationId: number,
     content: string,
-    mode: "aiserver_chat" | "aiserver_knowledge" | "aiserver_vision" = "aiserver_chat",
+    mode: "aiserver_chat" | "aiserver_knowledge" | "aiserver_vision" | "aiserver_attachment" = "aiserver_chat",
     resume = false,
     deepThinking = false,
-    imageBase64?: string
+    imageBase64?: string,
+    docIds?: string[],
+    attachments?: { uid: string; filename: string; url?: string }[]
   ) {
     const streamId = createStreamId();
     const token = localStg.get("token");
@@ -171,6 +173,8 @@ export const aiChatStreamClient = {
         resume,
         deepThinking,
         imageBase64,
+        docIds,
+        attachments,
       },
     });
     return streamId;

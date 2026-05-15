@@ -91,7 +91,7 @@ def _cleanup_old_tasks(max_age: float = 3600):
         del _parse_tasks[tid]
 
 
-async def _process_document_async(task: ParseTask, file_bytes: bytes, user_id: str = ""):
+async def _process_document_async(task: ParseTask, file_bytes: bytes, user_id: str = "", doc_id: str = ""):
     """后台协程：解析文档并实时推送进度"""
     try:
         # 1. 解析文件
@@ -109,7 +109,8 @@ async def _process_document_async(task: ParseTask, file_bytes: bytes, user_id: s
             return
 
         total = len(chunks)
-        doc_id = uuid.uuid4().hex[:12]
+        if not doc_id:
+            doc_id = uuid.uuid4().hex[:12]
 
         # 3. 向量化（分批次，每批推送进度）
         await task.emit("embedding", f"正在向量化(0/{total})...", 30, total=total)
@@ -162,6 +163,8 @@ class QueryRequest(BaseModel):
     top_k: int = 3
     structured: bool = False
     user_id: str = ""
+    doc_ids: List[str] = []
+    mode: str = "knowledge"  # "knowledge" | "attachment"
 
 
 # RAG Prompt 模板（通用问答）
@@ -258,8 +261,12 @@ async def upload_document(file: UploadFile = File(...)):
 async def upload_document_stream(
     file: UploadFile = File(...),
     user_id: str = Form(""),
+    doc_id: str = Form(""),
 ):
-    """上传文件并创建异步解析任务，返回 task_id 用于 SSE 进度监听"""
+    """上传文件并创建异步解析任务，返回 task_id 用于 SSE 进度监听
+
+    - doc_id: 可选，由上游（Go后端）传入的文档ID，用于与COS记录对齐
+    """
     if not file.filename:
         raise HTTPException(400, "文件名不能为空")
 
@@ -273,7 +280,7 @@ async def upload_document_stream(
     task = _create_parse_task(file.filename)
 
     # 启动后台处理协程
-    asyncio.create_task(_process_document_async(task, file_bytes, user_id))
+    asyncio.create_task(_process_document_async(task, file_bytes, user_id, doc_id))
 
     return {"task_id": task.task_id, "filename": file.filename}
 
@@ -376,23 +383,82 @@ async def query_knowledge(req: QueryRequest):
     if not docs:
         raise HTTPException(400, "知识库为空，请先上传文档")
 
-    # 检测用户是否引用了某个特定文件名
-    matched_doc_id = _extract_doc_id_from_query(req.question, docs)
-
-    # 如果匹配到文件名，直接获取该文件 chunks（带 user_id 隔离 + fallback 兼容旧数据）
+    # 如果前端指定了 doc_ids，优先检索附件文档
     manual_docs: List[Document] | None = None
-    if matched_doc_id:
-        doc_info = next((d for d in docs if d["doc_id"] == matched_doc_id), None)
-        chunk_count = doc_info.get("chunk_count", 0) if doc_info else 0
-        top_k = chunk_count if chunk_count <= 20 else req.top_k
-        results = vector_store.search_by_doc_id(req.question, matched_doc_id, top_k, req.user_id)
-        # fallback：兼容无 user_id 的旧数据
-        if req.user_id and not results:
-            results = vector_store.search_by_doc_id(req.question, matched_doc_id, top_k, "")
+    matched_doc_id: str | None = None
+    attachment_docs: List[Dict] = []
+    if req.doc_ids:
+        for doc_id in req.doc_ids:
+            results = vector_store.search_by_doc_id(req.question, doc_id, req.top_k, req.user_id)
+            if req.user_id and not results:
+                results = vector_store.search_by_doc_id(req.question, doc_id, req.top_k, "")
+            attachment_docs.extend(results)
+
+    # 附件模式：只查附件
+    # 知识库模式 + 有附件：附件 + 补充知识库
+    is_attachment = req.mode in ("attachment", "aiserver_attachment")
+    is_knowledge = req.mode in ("knowledge", "aiserver_knowledge")
+    if req.doc_ids and is_attachment:
+        seen = set()
+        deduped = []
+        for r in sorted(attachment_docs, key=lambda x: x.get("score", 0), reverse=True):
+            key = (r.get("doc_id", ""), r.get("content", ""))
+            if key not in seen:
+                seen.add(key)
+                deduped.append(r)
         manual_docs = [
             Document(page_content=r["content"], metadata={"source": r["source"], "doc_id": r["doc_id"]})
-            for r in results
+            for r in deduped[: req.top_k]
         ]
+    elif req.doc_ids and is_knowledge:
+        # 知识库模式 + 有附件：先取附件，再补充知识库
+        seen = set()
+        all_results = []
+        for r in sorted(attachment_docs, key=lambda x: x.get("score", 0), reverse=True):
+            key = (r.get("doc_id", ""), r.get("content", ""))
+            if key not in seen:
+                seen.add(key)
+                all_results.append(r)
+        # 补充知识库检索（排除已检索的 doc_ids）
+        if len(all_results) < req.top_k:
+            remaining = req.top_k - len(all_results)
+            store = vector_store.get_store()
+            search_kwargs = {"k": remaining}
+            if req.user_id:
+                search_kwargs["filter"] = {"user_id": req.user_id}
+            knowledge_results = store.similarity_search_with_score(req.question, **search_kwargs)
+            for doc, score in knowledge_results:
+                doc_id = doc.metadata.get("doc_id", "")
+                if doc_id in req.doc_ids:
+                    continue
+                key = (doc_id, doc.page_content)
+                if key not in seen:
+                    seen.add(key)
+                    all_results.append({
+                        "content": doc.page_content,
+                        "score": float(score),
+                        "source": doc.metadata.get("source", ""),
+                        "doc_id": doc_id,
+                    })
+        manual_docs = [
+            Document(page_content=r["content"], metadata={"source": r["source"], "doc_id": r["doc_id"]})
+            for r in all_results[: req.top_k]
+        ]
+    else:
+        # 检测用户是否引用了某个特定文件名
+        matched_doc_id = _extract_doc_id_from_query(req.question, docs)
+        if matched_doc_id:
+            doc_info = next((d for d in docs if d["doc_id"] == matched_doc_id), None)
+            chunk_count = doc_info.get("chunk_count", 0) if doc_info else 0
+            top_k = chunk_count if chunk_count <= 20 else req.top_k
+            results = vector_store.search_by_doc_id(req.question, matched_doc_id, top_k, req.user_id)
+            # fallback：兼容无 user_id 的旧数据
+            if req.user_id and not results:
+                results = vector_store.search_by_doc_id(req.question, matched_doc_id, top_k, "")
+            manual_docs = [
+                Document(page_content=r["content"], metadata={"source": r["source"], "doc_id": r["doc_id"]})
+                for r in results
+            ]
 
     # 构建上下文获取函数
     if manual_docs is not None:
@@ -405,8 +471,8 @@ async def query_knowledge(req: QueryRequest):
         retriever = store.as_retriever(search_kwargs=search_kwargs)
         context_fn = retriever | _format_docs
 
-    # 根据是否匹配到文件名选择 Prompt
-    active_prompt = SUMMARY_PROMPT if matched_doc_id else RAG_PROMPT
+    # 根据是否匹配到文件名或 doc_ids 选择 Prompt
+    active_prompt = SUMMARY_PROMPT if (matched_doc_id or req.doc_ids) else RAG_PROMPT
 
     if req.structured:
         # 结构化输出：Prompt 中要求返回 JSON，手动解析（兼容不支持 response_format 的模型）

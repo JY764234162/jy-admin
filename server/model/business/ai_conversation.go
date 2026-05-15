@@ -24,4 +24,5 @@ type AIMessage struct {
 	Content        string `json:"content" gorm:"type:text;comment:消息内容"`
 	UserID         uint   `json:"userId" gorm:"index;comment:用户ID"`
 	Status         string `json:"status" gorm:"default:'success';comment:状态: loading/success/error"`
+	Attachments    string `json:"attachments" gorm:"type:json;comment:附件JSON"`
 }

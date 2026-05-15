@@ -374,12 +374,57 @@ func (a *Api) UploadKnowledgeStream(c *gin.Context) {
 		return
 	}
 
+	// 1. 生成 doc_id
+	docID := uuid.New().String()[:12]
+	objectKey := fmt.Sprintf("ai-knowledge/%s_%s", docID, header.Filename)
+
+	// 2. 读取文件内容到内存（用于 COS 上传 + 转发 ai-server）
+	fileBytes, err := io.ReadAll(file)
+	if err != nil {
+		common.FailWithMsg(c, "读取文件失败")
+		return
+	}
+
+	// 3. 上传到 COS
+	oss, ok := global.JY_OSS.(upload.OSS)
+	if !ok {
+		common.FailWithMsg(c, "OSS未初始化")
+		return
+	}
+	cosUploader, isCos := oss.(*upload.TencentCOS)
+	var cosURL string
+	if isCos {
+		cosURL, _, err = cosUploader.UploadFileWithKey(objectKey, header)
+	} else {
+		cosURL, _, err = oss.UploadFile(header)
+	}
+	if err != nil {
+		common.FailWithMsg(c, fmt.Sprintf("上传文件到COS失败: %v", err))
+		return
+	}
+
+	// 4. 保存元数据到数据库（状态为 pending）
+	knowledgeFile := business.AIKnowledgeFile{
+		DocID:      docID,
+		Filename:   header.Filename,
+		CosURL:     cosURL,
+		CosKey:     objectKey,
+		ChunkCount: 0,
+		UserID:     userID,
+		FileType:   ext,
+		Status:     "pending",
+	}
+	if err := global.JY_DB.Create(&knowledgeFile).Error; err != nil {
+		common.FailWithMsg(c, "保存知识库文件记录失败")
+		return
+	}
+
+	// 5. 构造 multipart 转发给 ai-server（带上 doc_id，让 ai-server 使用该 ID 写入向量库）
 	aiServerURL := global.JY_Config.AI.AIServerURL
 	if aiServerURL == "" {
 		aiServerURL = "http://localhost:8000"
 	}
 
-	// 构造 multipart 转发给 ai-server
 	var buf bytes.Buffer
 	mw := multipart.NewWriter(&buf)
 	fw, err := mw.CreateFormFile("file", header.Filename)
@@ -387,11 +432,12 @@ func (a *Api) UploadKnowledgeStream(c *gin.Context) {
 		common.FailWithMsg(c, "构建上传请求失败")
 		return
 	}
-	if _, err := io.Copy(fw, file); err != nil {
-		common.FailWithMsg(c, "读取文件失败")
+	if _, err := fw.Write(fileBytes); err != nil {
+		common.FailWithMsg(c, "写入文件到请求失败")
 		return
 	}
 	_ = mw.WriteField("user_id", fmt.Sprintf("%d", userID))
+	_ = mw.WriteField("doc_id", docID)
 	mw.Close()
 
 	httpReq, err := http.NewRequest(http.MethodPost, aiServerURL+"/api/knowledge/upload-stream", &buf)
@@ -432,6 +478,8 @@ func (a *Api) UploadKnowledgeStream(c *gin.Context) {
 		"task_id":  aiResp.TaskID,
 		"filename": aiResp.Filename,
 		"user_id":  fmt.Sprintf("%d", userID),
+		"doc_id":   docID,
+		"cos_url":  cosURL,
 	})
 }
 
