@@ -49,6 +49,25 @@ export interface UploadKnowledgeResponse {
   cos_url?: string;
 }
 
+/** 流式上传响应（异步任务） */
+export interface UploadKnowledgeStreamResponse {
+  task_id: string;
+  filename: string;
+  user_id: string;
+}
+
+/** 解析进度事件 */
+export interface KnowledgeProgressEvent {
+  stage: "pending" | "parsing" | "splitting" | "embedding" | "storing" | "completed" | "failed";
+  message: string;
+  progress: number;
+  total?: number;
+  current?: number;
+  doc_id?: string;
+  chunk_count?: number;
+  error?: string;
+}
+
 /** 知识库问答结构化响应 */
 export interface KnowledgeQueryResponse {
   answer: string;
@@ -80,6 +99,80 @@ export const aiServerApi = {
       body: formData,
     });
     return unwrap<UploadKnowledgeResponse>(res, "上传失败");
+  },
+
+  /** 异步上传文档（返回 task_id，配合 subscribeKnowledgeProgress 监听进度） */
+  uploadKnowledgeStream: async (file: File): Promise<UploadKnowledgeStreamResponse> => {
+    const formData = new FormData();
+    formData.append("file", file);
+    const res = await fetch(`${BASE_URL}/ai/knowledge/upload-stream`, {
+      method: "POST",
+      headers: getHeaders(),
+      body: formData,
+    });
+    return unwrap<UploadKnowledgeStreamResponse>(res, "上传失败");
+  },
+
+  /**
+   * 监听文档解析进度（SSE）。
+   *
+   * 通过 fetch + ReadableStream 解析 text/event-stream（携带 token，无法用 EventSource）。
+   * 返回 { abort } 用于主动中止。
+   */
+  subscribeKnowledgeProgress: (
+    taskId: string,
+    onEvent: (event: KnowledgeProgressEvent) => void,
+    onError?: (err: Error) => void
+  ) => {
+    const controller = new AbortController();
+
+    void (async () => {
+      try {
+        const res = await fetch(`${BASE_URL}/ai/knowledge/progress/${taskId}`, {
+          method: "GET",
+          headers: getHeaders(),
+          signal: controller.signal,
+        });
+        if (!res.ok || !res.body) {
+          throw new Error(`HTTP ${res.status}`);
+        }
+        const reader = res.body.getReader();
+        const decoder = new TextDecoder("utf-8");
+        let buffer = "";
+        while (true) {
+          const { value, done } = await reader.read();
+          if (done) break;
+          buffer += decoder.decode(value, { stream: true });
+          let sepIndex: number;
+          while ((sepIndex = buffer.indexOf("\n\n")) !== -1) {
+            const rawEvent = buffer.slice(0, sepIndex);
+            buffer = buffer.slice(sepIndex + 2);
+            const lines = rawEvent.split("\n");
+            for (const line of lines) {
+              const trimmed = line.trim();
+              if (!trimmed.startsWith("data:")) continue;
+              const data = trimmed.replace(/^data:\s?/, "");
+              if (!data) continue;
+              try {
+                const parsed = JSON.parse(data) as KnowledgeProgressEvent;
+                onEvent(parsed);
+                if (parsed.stage === "completed" || parsed.stage === "failed") {
+                  controller.abort();
+                  return;
+                }
+              } catch {
+                continue;
+              }
+            }
+          }
+        }
+      } catch (e: any) {
+        if (e?.name === "AbortError") return;
+        onError?.(e instanceof Error ? e : new Error(String(e)));
+      }
+    })();
+
+    return { abort: () => controller.abort() };
   },
 
   /** 删除知识库文档（代理） */

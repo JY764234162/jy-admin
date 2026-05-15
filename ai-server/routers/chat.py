@@ -52,7 +52,6 @@ def _sse_json(data: dict) -> str:
     return f"data: {json.dumps(data, ensure_ascii=False)}\n\n"
 
 
-@router.post("")
 def _extract_thinking(text: str) -> str | None:
     """从文本中提取 <think>...</think> 之间的内容，返回 None 表示标签不完整。"""
     start = text.find("<think>")
@@ -88,6 +87,78 @@ def _make_process(thinking_text: str) -> dict:
     }
 
 
+class VisionRequest(BaseModel):
+    message: str
+    image_base64: str
+    conversation_id: Optional[str] = None
+
+
+@router.post("/vision")
+async def chat_vision(req: VisionRequest):
+    """多模态视觉对话（GLM-4V），接收 base64 图片 + 文字问题，SSE 流式返回"""
+    from services.llm import vision_llm
+
+    if not vision_llm:
+        raise HTTPException(503, "多模态模型未配置，请检查 GLM4V_API_KEY")
+    if not req.message.strip():
+        raise HTTPException(400, "消息不能为空")
+    if not req.image_base64.strip():
+        raise HTTPException(400, "图片不能为空")
+
+    conversation_id = req.conversation_id or memory.create_conversation()
+    memory.add_message(conversation_id, "user", req.message)
+
+    # 构造多模态消息（OpenAI 兼容格式）
+    image_url = req.image_base64
+    if not image_url.startswith("data:"):
+        # 如果前端只传了裸 base64，补全 data URI
+        image_url = f"data:image/jpeg;base64,{image_url}"
+
+    multimodal_messages = [
+        {
+            "role": "user",
+            "content": [
+                {"type": "text", "text": req.message},
+                {"type": "image_url", "image_url": {"url": image_url}},
+            ],
+        }
+    ]
+
+    async def event_generator():
+        full_response = ""
+        try:
+            sync_gen = vision_llm.stream(multimodal_messages)
+            loop = asyncio.get_event_loop()
+
+            def next_chunk():
+                try:
+                    return next(sync_gen)
+                except StopIteration:
+                    return None
+
+            while True:
+                chunk = await loop.run_in_executor(None, next_chunk)
+                if chunk is None:
+                    break
+                if not chunk.content:
+                    continue
+                full_response += chunk.content
+                yield _sse_json({"content": chunk.content, "done": False})
+                await asyncio.sleep(0.08)
+
+            memory.add_message(conversation_id, "assistant", full_response)
+            yield _sse_json({"content": "", "done": True, "conversation_id": conversation_id})
+        except Exception as e:
+            yield _sse_json({"content": "", "done": True, "error": str(e)})
+
+    return StreamingResponse(
+        event_generator(),
+        media_type="text/event-stream",
+        headers={"X-Conversation-Id": conversation_id},
+    )
+
+
+@router.post("")
 async def chat_message(req: ChatRequest):
     if not req.message.strip():
         raise HTTPException(400, "消息不能为空")

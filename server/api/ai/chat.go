@@ -86,7 +86,7 @@ func (a *Api) ChatMessage(c *gin.Context) {
 	task := startGenerationTask(req.ConversationID, assistantMessage.ID)
 
 	// 启动后台 goroutine 读取 ai-server 流
-	go a.runBackgroundGeneration(task, req.ConversationID, assistantMessage.ID, req.Content, req.Mode, req.DeepThinking, conversation)
+	go a.runBackgroundGeneration(task, req.ConversationID, assistantMessage.ID, req.Content, req.Mode, req.DeepThinking, conversation, userID)
 
 	// 设置 SSE 并从头推送
 	a.serveSSE(c, task, 0)
@@ -162,7 +162,7 @@ type StreamChunk struct {
 //     避免长回复时因 TCP 背压让上游 chunk 间隔越来越大。
 //  2. DB 落库放到独立 goroutine，按时间窗口（dbSyncInterval）周期性写入。
 //     finish 前停止该 goroutine，并由主流程做最终一次落库。
-func (a *Api) runBackgroundGeneration(task *generationTask, conversationID, assistantMsgID uint, content, mode string, deepThinking bool, conversation business.AIConversation) {
+func (a *Api) runBackgroundGeneration(task *generationTask, conversationID, assistantMsgID uint, content, mode string, deepThinking bool, conversation business.AIConversation, userID uint) {
 	var streamErr error
 
 	streamCallback := func(chunk StreamChunk) {
@@ -190,7 +190,7 @@ func (a *Api) runBackgroundGeneration(task *generationTask, conversationID, assi
 		global.JY_DB.Where("conversation_id = ? AND id != ?", conversationID, assistantMsgID).Order("created_at ASC").Find(&messages)
 		streamErr = a.callAIServerChatStream(messages, content, conversationID, deepThinking, streamCallback)
 	case "aiserver_knowledge":
-		streamErr = a.callAIServerKnowledgeStream(content, streamCallback)
+		streamErr = a.callAIServerKnowledgeStream(content, fmt.Sprintf("%d", userID), streamCallback)
 	default:
 		streamErr = fmt.Errorf("不支持的对话模式: %s", mode)
 	}
@@ -379,6 +379,187 @@ func newSSEClient() *http.Client {
 	}
 }
 
+// ChatVision 多模态视觉对话（GLM-4V）
+// @Summary      视觉对话（多模态）
+// @Description  接收图片 base64 + 文字，调用 ai-server GLM-4V 模型，SSE 流式返回
+// @Security     ApiKeyAuth
+// @Tags         AI
+// @Accept       json
+// @Produce      text/event-stream
+// @Param        data  body      object{message=string,image_base64=string}  true  "消息及图片 base64"
+// @Success      200   {string}  text/event-stream  "流式返回"
+// @Router       /ai/chat/vision [post]
+func (a *Api) ChatVision(c *gin.Context) {
+	claims, exists := c.Get("claims")
+	if !exists {
+		common.FailWithMsg(c, "未登录")
+		return
+	}
+	customClaims := claims.(*utils.CustomClaims)
+	userID := customClaims.ID
+
+	var req struct {
+		Message      string `json:"message" binding:"required"`
+		ImageBase64  string `json:"image_base64" binding:"required"`
+		ConversationID uint `json:"conversationId"`
+	}
+	if err := c.ShouldBindJSON(&req); err != nil {
+		common.FailWithMsg(c, "参数错误: "+err.Error())
+		return
+	}
+
+	// 验证会话
+	var conversation business.AIConversation
+	if req.ConversationID > 0 {
+		if err := global.JY_DB.Where("id = ? AND user_id = ?", req.ConversationID, userID).First(&conversation).Error; err != nil {
+			common.FailWithMsg(c, "会话不存在或无权限")
+			return
+		}
+	}
+
+	// 保存用户消息
+	userMessage := business.AIMessage{
+		ConversationID: req.ConversationID,
+		Role:           "user",
+		Content:        req.Message,
+		UserID:         userID,
+	}
+	if err := global.JY_DB.Create(&userMessage).Error; err != nil {
+		common.FailWithMsg(c, "保存消息失败")
+		return
+	}
+
+	// 插入 AI 占位消息
+	assistantMessage := business.AIMessage{
+		ConversationID: req.ConversationID,
+		Role:           "assistant",
+		Content:        "",
+		UserID:         userID,
+		Status:         "loading",
+	}
+	if err := global.JY_DB.Create(&assistantMessage).Error; err != nil {
+		common.FailWithMsg(c, "保存助手消息失败")
+		return
+	}
+
+	// 创建后台生成任务
+	task := startGenerationTask(req.ConversationID, assistantMessage.ID)
+
+	// 启动后台 goroutine 读取 ai-server vision 流
+	go a.runBackgroundVision(task, req.ConversationID, assistantMessage.ID, req.Message, req.ImageBase64)
+
+	// 设置 SSE 并从头推送
+	a.serveSSE(c, task, 0)
+}
+
+// runBackgroundVision 后台 goroutine：读取 ai-server vision 流，保存到 DB
+func (a *Api) runBackgroundVision(task *generationTask, conversationID, assistantMsgID uint, message, imageBase64 string) {
+	streamCallback := func(chunk StreamChunk) {
+		if chunk.Content != "" {
+			task.append(chunk.Content)
+		}
+	}
+
+	dbSyncStop := make(chan struct{})
+	dbSyncDone := make(chan struct{})
+	go a.runDBSyncLoop(task, assistantMsgID, dbSyncStop, dbSyncDone)
+
+	streamErr := a.callAIServerVisionStream(message, imageBase64, streamCallback)
+
+	close(dbSyncStop)
+	<-dbSyncDone
+
+	finalContent := task.getContent()
+	if streamErr != nil {
+		global.JY_DB.Model(&business.AIMessage{}).Where("id = ?", assistantMsgID).Updates(map[string]interface{}{
+			"status":  "error",
+			"content": finalContent,
+		})
+	} else {
+		global.JY_DB.Model(&business.AIMessage{}).Where("id = ?", assistantMsgID).Updates(map[string]interface{}{
+			"status":  "success",
+			"content": finalContent,
+		})
+	}
+
+	// 更新会话
+	userLastMsg := message
+	if len(userLastMsg) > 100 {
+		userLastMsg = userLastMsg[:100]
+	}
+	global.JY_DB.Model(&business.AIConversation{}).Where("id = ?", conversationID).Updates(map[string]interface{}{
+		"last_msg": userLastMsg,
+	})
+
+	task.finish(streamErr)
+}
+
+// callAIServerVisionStream 转发到 ai-server 视觉对话（SSE 透传）
+func (a *Api) callAIServerVisionStream(message, imageBase64 string, callback StreamCallback) error {
+	aiServerURL := global.JY_Config.AI.AIServerURL
+	if aiServerURL == "" {
+		aiServerURL = "http://localhost:8000"
+	}
+
+	payload := map[string]interface{}{
+		"message":      message,
+		"image_base64": imageBase64,
+	}
+	body, err := json.Marshal(payload)
+	if err != nil {
+		return fmt.Errorf("marshal ai-server vision payload error: %w", err)
+	}
+
+	req, err := http.NewRequest(http.MethodPost, aiServerURL+"/api/chat/vision", bytes.NewReader(body))
+	if err != nil {
+		return fmt.Errorf("create ai-server vision request error: %w", err)
+	}
+	req.Header.Set("Content-Type", "application/json")
+
+	client := newSSEClient()
+	resp, err := client.Do(req)
+	if err != nil {
+		return fmt.Errorf("call ai-server vision error: %w", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		return fmt.Errorf("ai-server vision status: %d", resp.StatusCode)
+	}
+
+	scanner := bufio.NewScanner(resp.Body)
+	for scanner.Scan() {
+		line := scanner.Text()
+		if !strings.HasPrefix(line, "data:") {
+			continue
+		}
+		data := strings.TrimSpace(strings.TrimPrefix(line, "data:"))
+		if data == "" {
+			continue
+		}
+		var parsed struct {
+			Content string `json:"content"`
+			Done    bool   `json:"done"`
+			Error   string `json:"error"`
+		}
+		if err := json.Unmarshal([]byte(data), &parsed); err != nil {
+			continue
+		}
+		if parsed.Error != "" {
+			return fmt.Errorf("ai-server vision error: %s", parsed.Error)
+		}
+		if parsed.Done {
+			break
+		}
+
+		callback(StreamChunk{Content: parsed.Content, Done: parsed.Done, Error: parsed.Error})
+	}
+	if err := scanner.Err(); err != nil {
+		return fmt.Errorf("read ai-server vision stream error: %w", err)
+	}
+	return nil
+}
+
 // callAIServerChatStream 转发到 ai-server 基础对话（SSE 透传）
 func (a *Api) callAIServerChatStream(messages []business.AIMessage, newContent string, conversationID uint, deepThinking bool, callback StreamCallback) error {
 	aiServerURL := global.JY_Config.AI.AIServerURL
@@ -472,7 +653,7 @@ func (a *Api) callAIServerChatStream(messages []business.AIMessage, newContent s
 }
 
 // callAIServerKnowledgeStream 转发到 ai-server 知识库问答（SSE 透传）
-func (a *Api) callAIServerKnowledgeStream(question string, callback StreamCallback) error {
+func (a *Api) callAIServerKnowledgeStream(question, userID string, callback StreamCallback) error {
 	aiServerURL := global.JY_Config.AI.AIServerURL
 	if aiServerURL == "" {
 		aiServerURL = "http://localhost:8000"
@@ -482,6 +663,7 @@ func (a *Api) callAIServerKnowledgeStream(question string, callback StreamCallba
 		"question":   question,
 		"top_k":      3,
 		"structured": false,
+		"user_id":    userID,
 	}
 	body, err := json.Marshal(payload)
 	if err != nil {

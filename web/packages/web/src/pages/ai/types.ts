@@ -1,4 +1,4 @@
-export type ChatMode = "aiserver_chat" | "aiserver_knowledge";
+export type ChatMode = "aiserver_chat" | "aiserver_knowledge" | "aiserver_vision";
 
 export interface ProcessStep {
   step_id: string;
@@ -30,4 +30,6 @@ export interface UiMessage {
   thinkingProcess?: ThinkingProcess;
   /** 思考过程状态 */
   thinkingStatus?: "processing" | "successful" | "failed";
+  /** 知识库检索/生成等阶段状态 */
+  stepStatus?: string;
 }

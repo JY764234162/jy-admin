@@ -7,14 +7,16 @@ type StartPayload = {
   token?: string | null;
   conversationId: number;
   content: string;
-  /** 调用模式：aiserver_chat=ai-server聊天，aiserver_knowledge=ai-server知识库问答 */
-  mode?: "aiserver_chat" | "aiserver_knowledge";
+  /** 调用模式：aiserver_chat=ai-server聊天，aiserver_knowledge=ai-server知识库问答，aiserver_vision=多模态视觉 */
+  mode?: "aiserver_chat" | "aiserver_knowledge" | "aiserver_vision";
   /** 知识库问答配置 */
   knowledgeConfig?: { top_k?: number };
   /** 是否为恢复模式（刷新后重连，不重复保存用户消息） */
   resume?: boolean;
   /** 是否启用深度思考 */
   deepThinking?: boolean;
+  /** 多模态图片 base64（仅 vision 模式使用） */
+  imageBase64?: string;
 };
 
 type StopPayload = {
@@ -58,6 +60,7 @@ type WorkerOutMessage =
         error?: string;
         thinkingProcess?: ThinkingProcess;
         thinkingStatus?: "processing" | "successful" | "failed";
+        stepStatus?: string;
       };
     }
   | {
@@ -69,6 +72,7 @@ type WorkerOutMessage =
         updatedAt: number;
         thinkingProcess?: ThinkingProcess;
         thinkingStatus?: "processing" | "successful" | "failed";
+        stepStatus?: string;
       };
     };
 
@@ -79,6 +83,7 @@ type ConversationState = {
   activeStreamId?: string;
   thinkingProcess?: ThinkingProcess;
   thinkingStatus?: "processing" | "successful" | "failed";
+  stepStatus?: string; // 知识库检索/生成等阶段状态
 };
 
 const conversationState = new Map<number, ConversationState>();
@@ -109,6 +114,7 @@ function updateConv(conversationId: number, patch: Partial<ConversationState>) {
       updatedAt: next.updatedAt,
       thinkingProcess: next.thinkingProcess,
       thinkingStatus: next.thinkingStatus,
+      stepStatus: next.stepStatus,
     },
   });
 }
@@ -121,11 +127,12 @@ function emitUpdate(
   done: boolean,
   error?: string,
   thinkingProcess?: ThinkingProcess,
-  thinkingStatus?: "processing" | "successful" | "failed"
+  thinkingStatus?: "processing" | "successful" | "failed",
+  stepStatus?: string
 ) {
   post({
     type: "UPDATE",
-    payload: { streamId, conversationId, delta, fullText, done, error, thinkingProcess, thinkingStatus },
+    payload: { streamId, conversationId, delta, fullText, done, error, thinkingProcess, thinkingStatus, stepStatus },
   });
 }
 
@@ -172,15 +179,21 @@ async function startStream(p: StartPayload) {
       headers.Authorization = `Bearer ${p.token}`;
     }
 
-    // resume 模式走 /ai/chat/resume，仅传 conversationId；正常聊天走 /ai/chat
+    // resume 模式走 /ai/chat/resume，仅传 conversationId；正常聊天走 /ai/chat；vision 走 /ai/chat/vision
     const body: Record<string, unknown> = p.resume
       ? { conversationId: p.conversationId }
-      : {
-          conversationId: p.conversationId,
-          content: p.content,
-          mode: p.mode ?? "aiserver_chat",
-          deepThinking: p.deepThinking ?? false,
-        };
+      : p.mode === "aiserver_vision"
+        ? {
+            conversationId: p.conversationId,
+            message: p.content,
+            image_base64: p.imageBase64 ?? "",
+          }
+        : {
+            conversationId: p.conversationId,
+            content: p.content,
+            mode: p.mode ?? "aiserver_chat",
+            deepThinking: p.deepThinking ?? false,
+          };
 
     const resp = await fetch(p.url, {
       method: "POST",
@@ -249,6 +262,7 @@ async function startStream(p: StartPayload) {
             const cur = getOrInitConv(p.conversationId);
             let nextThinkingProcess = cur.thinkingProcess;
             let nextThinkingStatus = cur.thinkingStatus;
+            let nextStepStatus = cur.stepStatus;
 
             if (parsed.status === "processing") {
               nextThinkingStatus = "processing";
@@ -259,18 +273,26 @@ async function startStream(p: StartPayload) {
             } else if (parsed.status === "stream_answer_content" && parsed.process) {
               // ai-server 开始流式回答且已携带 process，说明思考完成
               nextThinkingStatus = "successful";
+            } else if (parsed.status) {
+              // 其他状态（retrieving、generating 等）作为 stepStatus 透传
+              nextStepStatus = parsed.status;
             }
 
             if (parsed.process) {
               nextThinkingProcess = parsed.process;
             }
 
-            // 更新 thinking 状态到 conversationState
-            if (nextThinkingProcess !== cur.thinkingProcess || nextThinkingStatus !== cur.thinkingStatus) {
+            // 更新 thinking/step 状态到 conversationState
+            if (
+              nextThinkingProcess !== cur.thinkingProcess ||
+              nextThinkingStatus !== cur.thinkingStatus ||
+              nextStepStatus !== cur.stepStatus
+            ) {
               conversationState.set(p.conversationId, {
                 ...cur,
                 thinkingProcess: nextThinkingProcess,
                 thinkingStatus: nextThinkingStatus,
+                stepStatus: nextStepStatus,
                 updatedAt: Date.now(),
               });
             }
@@ -287,6 +309,7 @@ async function startStream(p: StartPayload) {
                 activeStreamId: p.streamId,
                 thinkingProcess: nextThinkingProcess,
                 thinkingStatus: nextThinkingStatus,
+                stepStatus: nextStepStatus,
               });
               emitUpdate(
                 p.streamId,
@@ -296,7 +319,8 @@ async function startStream(p: StartPayload) {
                 false,
                 undefined,
                 nextThinkingProcess,
-                nextThinkingStatus
+                nextThinkingStatus,
+                nextStepStatus
               );
             } else if (parsed.process || parsed.status) {
               // 只有 process/status 变化但没有内容增量时，也发一次 update
@@ -308,7 +332,8 @@ async function startStream(p: StartPayload) {
                 false,
                 undefined,
                 nextThinkingProcess,
-                nextThinkingStatus
+                nextThinkingStatus,
+                nextStepStatus
               );
             }
 
@@ -319,6 +344,7 @@ async function startStream(p: StartPayload) {
                 activeStreamId: undefined,
                 thinkingProcess: finalConv.thinkingProcess,
                 thinkingStatus: finalConv.thinkingStatus,
+                stepStatus: undefined,
               });
               emitUpdate(
                 p.streamId,
@@ -328,7 +354,8 @@ async function startStream(p: StartPayload) {
                 true,
                 undefined,
                 finalConv.thinkingProcess,
-                finalConv.thinkingStatus
+                finalConv.thinkingStatus,
+                undefined
               );
               stopStream(p.streamId);
               return;

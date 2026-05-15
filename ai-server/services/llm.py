@@ -13,6 +13,15 @@ llm = ChatOpenAI(
     streaming=True,
 )
 
+# GLM-4V 多模态实例（智谱 AI，OpenAI 兼容接口）
+vision_llm = ChatOpenAI(
+    model=config.GLM4V_MODEL,
+    openai_api_key=config.GLM4V_API_KEY,
+    openai_api_base=config.GLM4V_BASE_URL,
+    streaming=True,
+    temperature=0.7,
+) if config.GLM4V_API_KEY else None
+
 
 # ========== 基础对话接口 ==========
 

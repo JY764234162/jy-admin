@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"mime/multipart"
 	"net/http"
 	"path/filepath"
 	"strings"
@@ -335,6 +336,180 @@ func (a *Api) QueryKnowledge(c *gin.Context) {
 	if err := scanner.Err(); err != nil {
 		fmt.Fprintf(c.Writer, "data: %s\n\n", fmt.Sprintf(`{"error":"%s","done":true}`, err.Error()))
 		flusher.Flush()
+	}
+}
+
+// UploadKnowledgeStream 流式上传文档（带实时进度反馈）
+// @Summary      上传知识库文档（异步流式）
+// @Description  转发到 ai-server /api/knowledge/upload-stream，返回 task_id 用于 SSE 进度监听
+// @Security     ApiKeyAuth
+// @Tags         AI
+// @Accept       multipart/form-data
+// @Produce      json
+// @Param        file  formData  file  true  "文档文件"
+// @Success      200   {object}  common.Response{data=object{task_id=string,filename=string,doc_id=string},msg=string}
+// @Router       /ai/knowledge/upload-stream [post]
+func (a *Api) UploadKnowledgeStream(c *gin.Context) {
+	claims, exists := c.Get("claims")
+	if !exists {
+		common.FailWithMsg(c, "未登录")
+		return
+	}
+	userID := claims.(*utils.CustomClaims).ID
+
+	file, header, err := c.Request.FormFile("file")
+	if err != nil {
+		common.FailWithMsg(c, "获取文件失败")
+		return
+	}
+	defer file.Close()
+
+	ext := strings.ToLower(filepath.Ext(header.Filename))
+	supported := map[string]bool{
+		".pdf": true, ".txt": true, ".md": true,
+		".docx": true, ".xlsx": true, ".xls": true, ".csv": true,
+	}
+	if !supported[ext] {
+		common.FailWithMsg(c, fmt.Sprintf("不支持的文件格式: %s", ext))
+		return
+	}
+
+	aiServerURL := global.JY_Config.AI.AIServerURL
+	if aiServerURL == "" {
+		aiServerURL = "http://localhost:8000"
+	}
+
+	// 构造 multipart 转发给 ai-server
+	var buf bytes.Buffer
+	mw := multipart.NewWriter(&buf)
+	fw, err := mw.CreateFormFile("file", header.Filename)
+	if err != nil {
+		common.FailWithMsg(c, "构建上传请求失败")
+		return
+	}
+	if _, err := io.Copy(fw, file); err != nil {
+		common.FailWithMsg(c, "读取文件失败")
+		return
+	}
+	_ = mw.WriteField("user_id", fmt.Sprintf("%d", userID))
+	mw.Close()
+
+	httpReq, err := http.NewRequest(http.MethodPost, aiServerURL+"/api/knowledge/upload-stream", &buf)
+	if err != nil {
+		common.FailWithMsg(c, "创建请求失败")
+		return
+	}
+	httpReq.Header.Set("Content-Type", mw.FormDataContentType())
+
+	client := &http.Client{Timeout: 60 * time.Second}
+	resp, err := client.Do(httpReq)
+	if err != nil {
+		common.FailWithMsg(c, fmt.Sprintf("转发到 ai-server 失败: %v", err))
+		return
+	}
+	defer resp.Body.Close()
+
+	respBody, err := io.ReadAll(resp.Body)
+	if err != nil {
+		common.FailWithMsg(c, "读取 ai-server 响应失败")
+		return
+	}
+	if resp.StatusCode != http.StatusOK {
+		common.FailWithMsg(c, fmt.Sprintf("ai-server 返回状态: %d, %s", resp.StatusCode, string(respBody)))
+		return
+	}
+
+	var aiResp struct {
+		TaskID   string `json:"task_id"`
+		Filename string `json:"filename"`
+	}
+	if err := json.Unmarshal(respBody, &aiResp); err != nil {
+		common.FailWithMsg(c, "解析 ai-server 响应失败")
+		return
+	}
+
+	common.OkWithData(c, gin.H{
+		"task_id":  aiResp.TaskID,
+		"filename": aiResp.Filename,
+		"user_id":  fmt.Sprintf("%d", userID),
+	})
+}
+
+// KnowledgeProgress SSE 流式推送文档解析进度
+// @Summary      获取文档解析进度（SSE）
+// @Description  透传 ai-server /api/knowledge/progress/{task_id} 的 SSE 进度流
+// @Security     ApiKeyAuth
+// @Tags         AI
+// @Produce      text/event-stream
+// @Param        taskId  path      string  true  "任务ID"
+// @Success      200     {string}  text/event-stream  "流式返回"
+// @Router       /ai/knowledge/progress/{taskId} [get]
+func (a *Api) KnowledgeProgress(c *gin.Context) {
+	taskID := c.Param("taskId")
+	if taskID == "" {
+		common.FailWithMsg(c, "任务ID不能为空")
+		return
+	}
+
+	aiServerURL := global.JY_Config.AI.AIServerURL
+	if aiServerURL == "" {
+		aiServerURL = "http://localhost:8000"
+	}
+
+	c.Header("Content-Type", "text/event-stream")
+	c.Header("Cache-Control", "no-cache")
+	c.Header("Connection", "keep-alive")
+	c.Header("X-Accel-Buffering", "no")
+	c.Status(http.StatusOK)
+
+	flusher, ok := c.Writer.(http.Flusher)
+	if !ok {
+		common.FailWithMsg(c, "流式响应不支持")
+		return
+	}
+
+	httpReq, err := http.NewRequestWithContext(c.Request.Context(), http.MethodGet, aiServerURL+"/api/knowledge/progress/"+taskID, nil)
+	if err != nil {
+		fmt.Fprintf(c.Writer, "data: %s\n\n", `{"stage":"failed","message":"创建请求失败","error":"new request failed"}`)
+		flusher.Flush()
+		return
+	}
+
+	// 不限制读取总时间，仅设置连接握手超时
+	client := newSSEClient()
+	resp, err := client.Do(httpReq)
+	if err != nil {
+		fmt.Fprintf(c.Writer, "data: %s\n\n", fmt.Sprintf(`{"stage":"failed","message":"连接 ai-server 失败","error":"%s"}`, err.Error()))
+		flusher.Flush()
+		return
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		fmt.Fprintf(c.Writer, "data: %s\n\n", fmt.Sprintf(`{"stage":"failed","message":"ai-server 返回状态: %d","error":"bad status"}`, resp.StatusCode))
+		flusher.Flush()
+		return
+	}
+
+	// 逐 chunk 透传
+	reader := bufio.NewReader(resp.Body)
+	for {
+		line, err := reader.ReadString('\n')
+		if len(line) > 0 {
+			if _, werr := fmt.Fprint(c.Writer, line); werr != nil {
+				return
+			}
+			// SSE 事件以空行分隔，遇到空行就 flush
+			if line == "\n" || line == "\r\n" {
+				flusher.Flush()
+			}
+		}
+		if err != nil {
+			if err == io.EOF {
+				flusher.Flush()
+			}
+			return
+		}
 	}
 }
 

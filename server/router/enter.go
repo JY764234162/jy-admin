@@ -141,11 +141,14 @@ func registerRouter(Router *gin.Engine) *gin.Engine {
 		privateGroup.PUT("/ai/conversation/:id/title", apiGroup.AIApi.UpdateConversationTitle)
 		privateGroup.POST("/ai/chat", apiGroup.AIApi.ChatMessage)
 		privateGroup.POST("/ai/chat/resume", apiGroup.AIApi.ResumeChat)
+		privateGroup.POST("/ai/chat/vision", apiGroup.AIApi.ChatVision)
 	}
 	//AI知识库（代理到 ai-server）
 	{
 		privateGroup.GET("/ai/knowledge/list", apiGroup.AIApi.GetKnowledgeList)
 		privateGroup.POST("/ai/knowledge/upload", apiGroup.AIApi.UploadKnowledge)
+		privateGroup.POST("/ai/knowledge/upload-stream", apiGroup.AIApi.UploadKnowledgeStream)
+		privateGroup.GET("/ai/knowledge/progress/:taskId", apiGroup.AIApi.KnowledgeProgress)
 		privateGroup.DELETE("/ai/knowledge/:docId", apiGroup.AIApi.DeleteKnowledge)
 		privateGroup.POST("/ai/knowledge/:docId/retry", apiGroup.AIApi.RetryKnowledge)
 		privateGroup.POST("/ai/knowledge/query", apiGroup.AIApi.QueryKnowledge)

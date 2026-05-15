@@ -21,6 +21,7 @@ type UpdateMsg = {
     error?: string;
     thinkingProcess?: ThinkingProcess;
     thinkingStatus?: "processing" | "successful" | "failed";
+    stepStatus?: string;
   };
 };
 
@@ -33,12 +34,14 @@ type SnapshotMsg = {
     updatedAt: number;
     thinkingProcess?: ThinkingProcess;
     thinkingStatus?: "processing" | "successful" | "failed";
+    stepStatus?: string;
   };
 };
 
 type WorkerOut = UpdateMsg | SnapshotMsg;
 
 export type AiChatStreamSnapshot = SnapshotMsg["payload"];
+
 
 type Subscriber = (snapshot: AiChatStreamSnapshot) => void;
 
@@ -82,6 +85,7 @@ function ensureWorker() {
         updatedAt: Date.now(),
         thinkingProcess: msg.payload.thinkingProcess,
         thinkingStatus: msg.payload.thinkingStatus,
+        stepStatus: msg.payload.stepStatus,
       };
       dispatchSnapshot(snap);
       return;
@@ -90,9 +94,12 @@ function ensureWorker() {
   return workerSingleton;
 }
 
-function buildChatUrl(resume = false) {
+function buildChatUrl(resume = false, mode?: "aiserver_chat" | "aiserver_knowledge" | "aiserver_vision") {
   const API_PREFIX = import.meta.env.VITE_API_PREFIX || "/api";
   const VITE_API_BASE_URL = import.meta.env.VITE_API_BASE_URL || "";
+  if (mode === "aiserver_vision") {
+    return `${VITE_API_BASE_URL}${API_PREFIX}/ai/chat/vision`;
+  }
   return `${VITE_API_BASE_URL}${API_PREFIX}/ai/chat${resume ? "/resume" : ""}`;
 }
 
@@ -145,9 +152,10 @@ export const aiChatStreamClient = {
   start(
     conversationId: number,
     content: string,
-    mode: "aiserver_chat" | "aiserver_knowledge" = "aiserver_chat",
+    mode: "aiserver_chat" | "aiserver_knowledge" | "aiserver_vision" = "aiserver_chat",
     resume = false,
-    deepThinking = false
+    deepThinking = false,
+    imageBase64?: string
   ) {
     const streamId = createStreamId();
     const token = localStg.get("token");
@@ -155,13 +163,14 @@ export const aiChatStreamClient = {
       type: "START",
       payload: {
         streamId,
-        url: buildChatUrl(resume),
+        url: buildChatUrl(resume, mode),
         token,
         conversationId,
         content,
         mode,
         resume,
         deepThinking,
+        imageBase64,
       },
     });
     return streamId;

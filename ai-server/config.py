@@ -38,6 +38,11 @@ UPLOAD_DIR.mkdir(exist_ok=True)
 VECTOR_DIR = BASE_DIR / os.getenv("VECTOR_DIR", "vector_data")
 VECTOR_DIR.mkdir(exist_ok=True)
 
+# 多模态配置（GLM-4V）
+GLM4V_API_KEY = os.getenv("GLM4V_API_KEY", "")
+GLM4V_BASE_URL = os.getenv("GLM4V_BASE_URL", "https://open.bigmodel.cn/api/paas/v4")
+GLM4V_MODEL = os.getenv("GLM4V_MODEL", "glm-4v-plus")
+
 # 文档拆分
 CHUNK_SIZE = int(os.getenv("CHUNK_SIZE", "500"))
 CHUNK_OVERLAP = int(os.getenv("CHUNK_OVERLAP", "50"))

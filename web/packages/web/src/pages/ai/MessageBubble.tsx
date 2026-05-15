@@ -98,24 +98,40 @@ const ThinkingPanel: React.FC<{ msg: UiMessage }> = ({ msg }) => {
 };
 
 const MessageBubbleInner: React.FC<MessageBubbleProps> = ({ msg }) => {
-  // AI 正在生成且暂无内容时展示 loading 动画
-  if (msg.role === "ai" && msg.status === "loading" && !msg.content) {
-    return (
-      <span
-        style={{
-          display: "inline-flex",
-          alignItems: "center",
-          gap: 8,
-        }}
-      >
-        <span className={styles.loadingDots}>
-          <span className={styles.dot} style={{ animationDelay: "0s" }} />
-          <span className={styles.dot} style={{ animationDelay: "0.15s" }} />
-          <span className={styles.dot} style={{ animationDelay: "0.3s" }} />
-        </span>
-        <span style={{ opacity: 0.8, fontSize: 12 }}>AI 正在思考…</span>
+  const renderLoading = (text: string) => (
+    <span
+      style={{
+        display: "inline-flex",
+        alignItems: "center",
+        gap: 8,
+      }}
+    >
+      <span className={styles.loadingDots}>
+        <span className={styles.dot} style={{ animationDelay: "0s" }} />
+        <span className={styles.dot} style={{ animationDelay: "0.15s" }} />
+        <span className={styles.dot} style={{ animationDelay: "0.3s" }} />
       </span>
-    );
+      <span style={{ opacity: 0.8, fontSize: 12 }}>{text}</span>
+    </span>
+  );
+
+  // AI 正在生成且暂无内容时展示 loading 动画（优先用 stepStatus）
+  if (msg.role === "ai" && msg.status === "loading" && !msg.content) {
+    const stepText =
+      msg.stepStatus === "retrieving"
+        ? "正在检索相关内容…"
+        : msg.stepStatus === "generating"
+          ? "正在生成答案…"
+          : msg.stepStatus === "parsing"
+            ? "正在解析文档…"
+            : msg.stepStatus === "splitting"
+              ? "正在切片…"
+              : msg.stepStatus === "embedding"
+                ? "正在向量化…"
+                : msg.stepStatus === "storing"
+                  ? "正在写入向量库…"
+                  : "AI 正在思考…";
+    return renderLoading(stepText);
   }
 
   // AI 消息：流式期间按块切分 + memo + content-visibility 优化；
@@ -163,6 +179,7 @@ export const MessageBubble = memo(
     prev.msg.content === next.msg.content &&
     prev.msg.status === next.msg.status &&
     prev.msg.role === next.msg.role &&
+    prev.msg.stepStatus === next.msg.stepStatus &&
     prev.msg.thinkingStatus === next.msg.thinkingStatus &&
     JSON.stringify(prev.msg.thinkingProcess) === JSON.stringify(next.msg.thinkingProcess)
 );

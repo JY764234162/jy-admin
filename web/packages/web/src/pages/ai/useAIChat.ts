@@ -299,7 +299,8 @@ export function useAIChat(conversationId: number | null, options: UseAIChatOptio
       mode: ChatMode = "aiserver_chat",
       targetConversationId?: number,
       resume = false,
-      deepThink = false
+      deepThink = false,
+      imageBase64?: string
     ): Promise<boolean> => {
       if (!userContent.trim() && !resume) {
         return false;
@@ -378,7 +379,7 @@ export function useAIChat(conversationId: number | null, options: UseAIChatOptio
 
       try {
         live.current.refreshSessionsAfterStream = true;
-        aiChatStreamClient.start(cid, content, mode, false, deepThink);
+        aiChatStreamClient.start(cid, content, mode, false, deepThink, imageBase64);
         return true;
       } catch (error) {
         console.error("发送消息失败:", error);
@@ -477,6 +478,7 @@ export function useAIChat(conversationId: number | null, options: UseAIChatOptio
       const isStreamingPhase = snap.status === "streaming" || snap.status === "idle";
 
       const hasThinking = snap.thinkingProcess || snap.thinkingStatus;
+      const hasStep = snap.stepStatus != null;
 
       if (snap.fullText && isStreamingPhase) {
         setMessages((prev) => {
@@ -486,6 +488,7 @@ export function useAIChat(conversationId: number | null, options: UseAIChatOptio
             next[idx] = {
               ...next[idx]!,
               content: snap.fullText,
+              stepStatus: snap.stepStatus,
               ...(hasThinking
                 ? {
                     thinkingProcess: snap.thinkingProcess,
@@ -503,6 +506,7 @@ export function useAIChat(conversationId: number | null, options: UseAIChatOptio
               role: "ai",
               status: "loading",
               timestamp: Date.now(),
+              stepStatus: snap.stepStatus,
               ...(hasThinking
                 ? {
                     thinkingProcess: snap.thinkingProcess,
@@ -529,7 +533,8 @@ export function useAIChat(conversationId: number | null, options: UseAIChatOptio
             hasThinking &&
             (existingMsg.thinkingProcess !== snap.thinkingProcess ||
               existingMsg.thinkingStatus !== snap.thinkingStatus);
-          if (!contentChanged && !statusChanged && !thinkingChanged) {
+          const stepChanged = hasStep && existingMsg.stepStatus !== snap.stepStatus;
+          if (!contentChanged && !statusChanged && !thinkingChanged && !stepChanged) {
             return prev;
           }
           const next = prev.slice();
@@ -537,6 +542,7 @@ export function useAIChat(conversationId: number | null, options: UseAIChatOptio
             ...existingMsg,
             content: nextContent,
             status,
+            stepStatus: snap.stepStatus,
             ...(hasThinking
               ? {
                   thinkingProcess: snap.thinkingProcess,

@@ -1,8 +1,10 @@
 import asyncio
 import json
+import time
 import uuid
+from dataclasses import dataclass, field
 from pathlib import Path
-from typing import List
+from typing import Dict, List
 
 from fastapi import APIRouter, UploadFile, File, Form, HTTPException, Query
 from pydantic import BaseModel
@@ -13,10 +15,146 @@ from langchain_core.runnables import RunnablePassthrough
 from langchain_core.output_parsers import StrOutputParser
 
 import config
-from services import document, vector_store
+from services import document, vector_store, embedding
 from services.llm import llm
 
 router = APIRouter(prefix="/api/knowledge", tags=["knowledge"])
+
+
+# ========== 异步文档解析任务管理 ==========
+
+@dataclass
+class ParseTask:
+    task_id: str
+    filename: str
+    stage: str = "pending"           # pending / parsing / splitting / embedding / storing / completed / failed
+    message: str = "等待处理..."
+    progress: int = 0                # 0~100
+    total_chunks: int = 0
+    doc_id: str = ""
+    error: str = ""
+    done: bool = False
+    created_at: float = field(default_factory=time.time)
+    _queue: asyncio.Queue = field(default_factory=asyncio.Queue)
+
+    async def emit(self, stage: str, message: str, progress: int, **extra):
+        self.stage = stage
+        self.message = message
+        self.progress = progress
+        payload = {"stage": stage, "message": message, "progress": progress, **extra}
+        await self._queue.put(payload)
+
+    async def finish(self, doc_id: str = "", chunk_count: int = 0, error: str = ""):
+        self.done = True
+        self.doc_id = doc_id
+        self.total_chunks = chunk_count
+        if error:
+            self.stage = "failed"
+            self.message = error
+            self.progress = 0
+        else:
+            self.stage = "completed"
+            self.message = "文档已就绪"
+            self.progress = 100
+        payload = {
+            "stage": self.stage,
+            "message": self.message,
+            "progress": self.progress,
+            "doc_id": doc_id,
+            "chunk_count": chunk_count,
+        }
+        if error:
+            payload["error"] = error
+        await self._queue.put(payload)
+
+
+# 内存任务存储（生产环境建议用 Redis）
+_parse_tasks: Dict[str, ParseTask] = {}
+
+
+def _create_parse_task(filename: str) -> ParseTask:
+    task_id = uuid.uuid4().hex[:16]
+    task = ParseTask(task_id=task_id, filename=filename)
+    _parse_tasks[task_id] = task
+    return task
+
+
+def _get_parse_task(task_id: str) -> ParseTask | None:
+    return _parse_tasks.get(task_id)
+
+
+def _cleanup_old_tasks(max_age: float = 3600):
+    """清理超过 max_age 秒的已完成任务"""
+    now = time.time()
+    expired = [tid for tid, t in _parse_tasks.items() if t.done and (now - t.created_at) > max_age]
+    for tid in expired:
+        del _parse_tasks[tid]
+
+
+async def _process_document_async(task: ParseTask, file_bytes: bytes, user_id: str = ""):
+    """后台协程：解析文档并实时推送进度"""
+    try:
+        # 1. 解析文件
+        await task.emit("parsing", "正在解析文档...", 5)
+        text = document.parse_file(task.filename, file_bytes)
+        if not text.strip():
+            await task.finish(error="文件内容为空或无法提取文字")
+            return
+
+        # 2. 切片
+        await task.emit("splitting", "正在切片...", 20)
+        chunks = document.split_text(text)
+        if not chunks:
+            await task.finish(error="文档拆分结果为空")
+            return
+
+        total = len(chunks)
+        doc_id = uuid.uuid4().hex[:12]
+
+        # 3. 向量化（分批次，每批推送进度）
+        await task.emit("embedding", f"正在向量化(0/{total})...", 30, total=total)
+
+        embed_fn = embedding.get_embeddings()
+        batch_size = 8
+        all_embeddings: List[List[float]] = []
+
+        for i in range(0, total, batch_size):
+            batch = chunks[i:i + batch_size]
+            batch_embs = embed_fn.embed_documents(batch)
+            all_embeddings.extend(batch_embs)
+
+            current = min(i + batch_size, total)
+            progress = 30 + int(current / total * 50)
+            await task.emit(
+                "embedding",
+                f"正在向量化({current}/{total})...",
+                progress,
+                current=current,
+                total=total,
+            )
+
+        # 4. 写入向量库
+        await task.emit("storing", "正在写入向量库...", 85)
+        documents = [
+            Document(
+                page_content=chunks[i],
+                metadata={"doc_id": doc_id, "source": task.filename, "user_id": user_id or "", "chunk_idx": i},
+            )
+            for i in range(total)
+        ]
+        # 使用自定义写入方式（带 embedding）
+        store = vector_store.get_store()
+        store.add_documents(documents)
+
+        # 保存原始文件
+        save_path = config.UPLOAD_DIR / f"{doc_id}_{task.filename}"
+        save_path.write_bytes(file_bytes)
+
+        # 5. 完成
+        await task.finish(doc_id=doc_id, chunk_count=total)
+
+    except Exception as e:
+        await task.finish(error=str(e))
 
 
 class QueryRequest(BaseModel):
@@ -114,6 +252,74 @@ async def upload_document(file: UploadFile = File(...)):
     save_path.write_bytes(file_bytes)
 
     return {"knowledge_id": doc_id, "filename": file.filename, "chunks": len(chunks)}
+
+
+@router.post("/upload-stream")
+async def upload_document_stream(
+    file: UploadFile = File(...),
+    user_id: str = Form(""),
+):
+    """上传文件并创建异步解析任务，返回 task_id 用于 SSE 进度监听"""
+    if not file.filename:
+        raise HTTPException(400, "文件名不能为空")
+
+    ext = Path(file.filename).suffix.lower()
+    if ext not in document.PARSERS:
+        raise HTTPException(400, f"不支持的格式: {ext}，支持: {list(document.PARSERS.keys())}")
+
+    file_bytes = await file.read()
+
+    # 创建异步任务
+    task = _create_parse_task(file.filename)
+
+    # 启动后台处理协程
+    asyncio.create_task(_process_document_async(task, file_bytes, user_id))
+
+    return {"task_id": task.task_id, "filename": file.filename}
+
+
+@router.get("/progress/{task_id}")
+async def get_document_progress(task_id: str):
+    """SSE 流式推送文档解析进度"""
+    task = _get_parse_task(task_id)
+    if not task:
+        raise HTTPException(404, "任务不存在或已过期")
+
+    async def event_generator():
+        # 立即推送当前状态
+        yield _sse_json({
+            "stage": task.stage,
+            "message": task.message,
+            "progress": task.progress,
+            "total": task.total_chunks,
+        })
+
+        # 持续监听新事件
+        while not task.done:
+            try:
+                event = await asyncio.wait_for(task._queue.get(), timeout=30.0)
+                yield _sse_json(event)
+                if event.get("stage") in ("completed", "failed"):
+                    break
+            except asyncio.TimeoutError:
+                # 30 秒无新事件则发送心跳保持连接
+                yield _sse_json({"stage": task.stage, "message": task.message, "progress": task.progress})
+
+        # 任务已完成，再推一次最终状态确保前端收到
+        final_event = {
+            "stage": task.stage,
+            "message": task.message,
+            "progress": task.progress,
+        }
+        if task.doc_id:
+            final_event["doc_id"] = task.doc_id
+        if task.total_chunks:
+            final_event["chunk_count"] = task.total_chunks
+        if task.error:
+            final_event["error"] = task.error
+        yield _sse_json(final_event)
+
+    return StreamingResponse(event_generator(), media_type="text/event-stream")
 
 
 @router.post("/parse")
@@ -258,6 +464,9 @@ async def query_knowledge(req: QueryRequest):
     else:
         # 流式输出：使用 LCEL 链 + StrOutputParser
         async def event_generator():
+            # 先推送一个 retrieving 事件，让前端知道正在检索
+            yield _sse_json({"content": "", "status": "retrieving", "message": "正在检索相关内容...", "done": False})
+
             rag_chain = (
                 {
                     "context": context_fn,
@@ -270,12 +479,19 @@ async def query_knowledge(req: QueryRequest):
 
             # 优先使用异步流，回退到同步流
             try:
+                first_chunk = True
                 if hasattr(rag_chain, "astream"):
                     async for chunk in rag_chain.astream(req.question):
+                        if first_chunk:
+                            yield _sse_json({"content": "", "status": "generating", "message": "正在生成答案...", "done": False})
+                            first_chunk = False
                         yield _sse_json({"content": chunk, "done": False})
                         await asyncio.sleep(0.08)
                 else:
                     for chunk in rag_chain.stream(req.question):
+                        if first_chunk:
+                            yield _sse_json({"content": "", "status": "generating", "message": "正在生成答案...", "done": False})
+                            first_chunk = False
                         yield _sse_json({"content": chunk, "done": False})
                         await asyncio.sleep(0.08)
                 yield _sse_json({"content": "", "done": True})
