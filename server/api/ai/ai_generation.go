@@ -14,6 +14,8 @@ type generationTask struct {
 	conversationID uint
 	assistantMsgID uint
 	content        []byte        // 当前已累积的完整内容（用 []byte 让 append 摊销 O(1)，避免 string += 的 O(n²)）
+	process        []byte        // 当前最新的 thinking process JSON（来自 ai-server 的 process 字段）
+	status         string        // 当前 ai-server 返回的 status（processing / stream_answer_content / successful / failed）
 	done           bool          // 是否已完成
 	err            error         // 完成时的错误（如果有）
 	signal         chan struct{} // close+recreate 广播 "有新内容" 或 "已完成"
@@ -52,6 +54,46 @@ func (t *generationTask) append(chunk string) {
 	old := t.signal
 	t.signal = make(chan struct{})
 	close(old)
+}
+
+// appendProcess 追加/更新 thinking process JSON 并广播
+func (t *generationTask) appendProcess(processJSON string) {
+	t.mu.Lock()
+	defer t.mu.Unlock()
+	if t.done {
+		return
+	}
+	t.process = []byte(processJSON)
+	old := t.signal
+	t.signal = make(chan struct{})
+	close(old)
+}
+
+// getProcess 读取当前最新的 process JSON
+func (t *generationTask) getProcess() string {
+	t.mu.Lock()
+	defer t.mu.Unlock()
+	return string(t.process)
+}
+
+// appendStatus 更新 ai-server 返回的 status 并广播
+func (t *generationTask) appendStatus(s string) {
+	t.mu.Lock()
+	defer t.mu.Unlock()
+	if t.done {
+		return
+	}
+	t.status = s
+	old := t.signal
+	t.signal = make(chan struct{})
+	close(old)
+}
+
+// getStatus 读取当前 status
+func (t *generationTask) getStatus() string {
+	t.mu.Lock()
+	defer t.mu.Unlock()
+	return t.status
 }
 
 // finish 标记任务完成，广播通知，并从全局 map 中移除

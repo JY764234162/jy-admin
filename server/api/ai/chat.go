@@ -41,6 +41,7 @@ func (a *Api) ChatMessage(c *gin.Context) {
 		ConversationID uint   `json:"conversationId" binding:"required"`
 		Content        string `json:"content" binding:"required"`
 		Mode           string `json:"mode"`
+		DeepThinking   bool   `json:"deepThinking"`
 	}
 	if err := c.ShouldBindJSON(&req); err != nil {
 		common.FailWithMsg(c, "参数错误: "+err.Error())
@@ -85,7 +86,7 @@ func (a *Api) ChatMessage(c *gin.Context) {
 	task := startGenerationTask(req.ConversationID, assistantMessage.ID)
 
 	// 启动后台 goroutine 读取 ai-server 流
-	go a.runBackgroundGeneration(task, req.ConversationID, assistantMessage.ID, req.Content, req.Mode, conversation)
+	go a.runBackgroundGeneration(task, req.ConversationID, assistantMessage.ID, req.Content, req.Mode, req.DeepThinking, conversation)
 
 	// 设置 SSE 并从头推送
 	a.serveSSE(c, task, 0)
@@ -144,6 +145,16 @@ func (a *Api) ResumeChat(c *gin.Context) {
 	a.serveCompletedMessage(c, lastLoading)
 }
 
+// StreamChunk 代表 ai-server 返回的单个流式块（含 content / process / status）
+type StreamChunk struct {
+	Content string `json:"content"`
+	Answer  string `json:"answer"`
+	Process string `json:"process"` // JSON string，由 ai-server 的 process 字段序列化而来
+	Status  string `json:"status"`
+	Done    bool   `json:"done"`
+	Error   string `json:"error"`
+}
+
 // runBackgroundGeneration 后台 goroutine：读取 ai-server 流，保存到 DB，通知等待者
 //
 // 设计要点：
@@ -151,11 +162,21 @@ func (a *Api) ResumeChat(c *gin.Context) {
 //     避免长回复时因 TCP 背压让上游 chunk 间隔越来越大。
 //  2. DB 落库放到独立 goroutine，按时间窗口（dbSyncInterval）周期性写入。
 //     finish 前停止该 goroutine，并由主流程做最终一次落库。
-func (a *Api) runBackgroundGeneration(task *generationTask, conversationID, assistantMsgID uint, content, mode string, conversation business.AIConversation) {
+func (a *Api) runBackgroundGeneration(task *generationTask, conversationID, assistantMsgID uint, content, mode string, deepThinking bool, conversation business.AIConversation) {
 	var streamErr error
 
-	streamCallback := func(chunk string) {
-		task.append(chunk)
+	streamCallback := func(chunk StreamChunk) {
+		if chunk.Answer != "" {
+			task.append(chunk.Answer)
+		} else if chunk.Content != "" {
+			task.append(chunk.Content)
+		}
+		if chunk.Process != "" {
+			task.appendProcess(chunk.Process)
+		}
+		if chunk.Status != "" {
+			task.appendStatus(chunk.Status)
+		}
 	}
 
 	// 启动独立的 DB 同步 goroutine，从热路径解耦
@@ -167,7 +188,7 @@ func (a *Api) runBackgroundGeneration(task *generationTask, conversationID, assi
 	case "aiserver_chat":
 		var messages []business.AIMessage
 		global.JY_DB.Where("conversation_id = ? AND id != ?", conversationID, assistantMsgID).Order("created_at ASC").Find(&messages)
-		streamErr = a.callAIServerChatStream(messages, content, conversationID, streamCallback)
+		streamErr = a.callAIServerChatStream(messages, content, conversationID, deepThinking, streamCallback)
 	case "aiserver_knowledge":
 		streamErr = a.callAIServerKnowledgeStream(content, streamCallback)
 	default:
@@ -252,6 +273,8 @@ func (a *Api) serveSSE(c *gin.Context, task *generationTask, startPos int) {
 	}
 
 	pos := startPos
+	lastProcess := ""
+	lastStatus := ""
 	for {
 		// 读取当前最新内容（pos 与 task.content 都按字节计，避免 UTF-8 多字节字符被截断）
 		task.mu.Lock()
@@ -259,13 +282,27 @@ func (a *Api) serveSSE(c *gin.Context, task *generationTask, startPos int) {
 		if pos < len(task.content) {
 			newContent = string(task.content[pos:])
 		}
+		process := string(task.process)
+		status := task.status
 		isDone := task.done
 		err := task.err
 		task.mu.Unlock()
 
-		// 发送新内容
-		if newContent != "" {
-			writeSSE(c.Writer, flusher, map[string]interface{}{"content": newContent, "done": false})
+		processChanged := process != "" && process != lastProcess
+		statusChanged := status != "" && status != lastStatus
+
+		// 发送新内容（如有 process/status 变化也一并带上）
+		if newContent != "" || processChanged || statusChanged {
+			payload := map[string]interface{}{"content": newContent, "done": false}
+			if process != "" {
+				payload["process"] = process
+				lastProcess = process
+			}
+			if status != "" {
+				payload["status"] = status
+				lastStatus = status
+			}
+			writeSSE(c.Writer, flusher, payload)
 			pos += len(newContent)
 		}
 
@@ -274,7 +311,14 @@ func (a *Api) serveSSE(c *gin.Context, task *generationTask, startPos int) {
 			if err != nil {
 				writeSSE(c.Writer, flusher, map[string]interface{}{"error": err.Error(), "done": true})
 			} else {
-				writeSSE(c.Writer, flusher, map[string]interface{}{"content": "", "done": true})
+				payload := map[string]interface{}{"content": "", "done": true}
+				if process != "" {
+					payload["process"] = process
+				}
+				if status != "" {
+					payload["status"] = status
+				}
+				writeSSE(c.Writer, flusher, payload)
 			}
 			return
 		}
@@ -319,7 +363,7 @@ func writeSSE(w gin.ResponseWriter, flusher http.Flusher, data map[string]interf
 }
 
 // StreamCallback 流式回调函数类型
-type StreamCallback func(chunk string)
+type StreamCallback func(chunk StreamChunk)
 
 // newSSEClient 创建适合 SSE 流式请求的 HTTP Client
 // 连接/握手/等响应头有单独超时，但不限制读取响应体的总时间
@@ -336,7 +380,7 @@ func newSSEClient() *http.Client {
 }
 
 // callAIServerChatStream 转发到 ai-server 基础对话（SSE 透传）
-func (a *Api) callAIServerChatStream(messages []business.AIMessage, newContent string, conversationID uint, callback StreamCallback) error {
+func (a *Api) callAIServerChatStream(messages []business.AIMessage, newContent string, conversationID uint, deepThinking bool, callback StreamCallback) error {
 	aiServerURL := global.JY_Config.AI.AIServerURL
 	if aiServerURL == "" {
 		aiServerURL = "http://localhost:8000"
@@ -355,8 +399,9 @@ func (a *Api) callAIServerChatStream(messages []business.AIMessage, newContent s
 	}
 
 	payload := map[string]interface{}{
-		"message":  newContent,
-		"messages": history,
+		"message":      newContent,
+		"messages":     history,
+		"deep_thinking": deepThinking,
 	}
 	body, err := json.Marshal(payload)
 	if err != nil {
@@ -391,9 +436,12 @@ func (a *Api) callAIServerChatStream(messages []business.AIMessage, newContent s
 			continue
 		}
 		var parsed struct {
-			Content string `json:"content"`
-			Done    bool   `json:"done"`
-			Error   string `json:"error"`
+			Content string          `json:"content"`
+			Answer  string          `json:"answer"`
+			Status  string          `json:"status"`
+			Process json.RawMessage `json:"process"`
+			Done    bool            `json:"done"`
+			Error   string          `json:"error"`
 		}
 		if err := json.Unmarshal([]byte(data), &parsed); err != nil {
 			continue
@@ -404,9 +452,18 @@ func (a *Api) callAIServerChatStream(messages []business.AIMessage, newContent s
 		if parsed.Done {
 			break
 		}
-		if parsed.Content != "" {
-			callback(parsed.Content)
+
+		chunk := StreamChunk{
+			Content: parsed.Content,
+			Answer:  parsed.Answer,
+			Status:  parsed.Status,
+			Done:    parsed.Done,
+			Error:   parsed.Error,
 		}
+		if len(parsed.Process) > 0 {
+			chunk.Process = string(parsed.Process)
+		}
+		callback(chunk)
 	}
 	if err := scanner.Err(); err != nil {
 		return fmt.Errorf("read ai-server stream error: %w", err)
@@ -459,9 +516,12 @@ func (a *Api) callAIServerKnowledgeStream(question string, callback StreamCallba
 			continue
 		}
 		var parsed struct {
-			Content string `json:"content"`
-			Done    bool   `json:"done"`
-			Error   string `json:"error"`
+			Content string          `json:"content"`
+			Answer  string          `json:"answer"`
+			Status  string          `json:"status"`
+			Process json.RawMessage `json:"process"`
+			Done    bool            `json:"done"`
+			Error   string          `json:"error"`
 		}
 		if err := json.Unmarshal([]byte(data), &parsed); err != nil {
 			continue
@@ -472,9 +532,18 @@ func (a *Api) callAIServerKnowledgeStream(question string, callback StreamCallba
 		if parsed.Done {
 			break
 		}
-		if parsed.Content != "" {
-			callback(parsed.Content)
+
+		chunk := StreamChunk{
+			Content: parsed.Content,
+			Answer:  parsed.Answer,
+			Status:  parsed.Status,
+			Done:    parsed.Done,
+			Error:   parsed.Error,
 		}
+		if len(parsed.Process) > 0 {
+			chunk.Process = string(parsed.Process)
+		}
+		callback(chunk)
 	}
 	if err := scanner.Err(); err != nil {
 		return fmt.Errorf("read ai-server stream error: %w", err)
