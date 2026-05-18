@@ -9,9 +9,11 @@ from starlette.responses import StreamingResponse
 from langchain_core.prompts import ChatPromptTemplate, MessagesPlaceholder
 from langchain_core.runnables.history import RunnableWithMessageHistory
 from langchain_core.messages import HumanMessage, AIMessage
+from langchain.agents import create_agent
 
 from services.llm import llm
 from services.semantic_memory import VectorChatMessageHistory, SemanticMemory
+from services.agent_tools import get_tools
 
 router = APIRouter(prefix="/api/chat", tags=["chat"])
 
@@ -73,63 +75,32 @@ class ChatRequest(BaseModel):
     user_id: Optional[str] = ""  # 用于语义记忆隔离
 
 
-DEEP_THINKING_PROMPT = """You are a helpful assistant with deep reasoning capabilities.
+AGENT_SYSTEM_PROMPT = """你是一个智能助手，擅长通过调用工具来解决问题。
 
-When responding to the user, please follow this exact format:
-1. First, wrap your step-by-step reasoning and analysis inside <think> tags
-2. Then, provide your final answer after the closing </think> tag
+在回答用户问题之前，请先分析是否需要调用工具。如果需要，请按以下步骤执行：
+1. 分析用户需求，确定需要调用哪些工具
+2. 调用工具获取信息
+3. 基于工具返回的结果进行推理
+4. 给出完整、准确的回答
 
-The content inside <think> tags should show your detailed thought process, including:
-- Breaking down the problem
-- Considering different angles
-- Evaluating options
-- Reasoning step by step
+可用的工具包括：
+- search_knowledge: 搜索知识库，获取已上传文档中的相关信息
+- calculator: 计算数学表达式
 
-Example format:
-<think>
-Let me analyze this carefully...
-First, I need to consider...
-Then, looking at it from another angle...
-Based on this reasoning...
-</think>
-Your final, concise answer here.
-
-Important: Always include both <think> and </think> tags. Start with <think> and end the thinking section with </think> before giving your final answer."""
+请用中文思考和回答。"""
 
 
 def _sse_json(data: dict) -> str:
     return f"data: {json.dumps(data, ensure_ascii=False)}\n\n"
 
 
-def _extract_thinking(text: str) -> str | None:
-    """从文本中提取 <think>...</think> 之间的内容，返回 None 表示标签不完整。"""
-    start = text.find("<think>")
-    end = text.find("</think>")
-    if start != -1 and end != -1 and end > start:
-        return text[start + len("<think>"):end].strip()
-    return None
-
-
-def _make_process(thinking_text: str) -> dict:
-    """构造兼容 studio.kxsz.net 的 process 数据结构。"""
-    if not thinking_text:
-        return {
-            "plan": {"status": "successful", "message": ""},
-            "step": {"status": "successful", "processes": [], "source": []},
-            "task_status": "successful",
-        }
+def _make_process_with_steps(steps: list[dict]) -> dict:
+    """从步骤列表构造兼容 studio.kxsz.net 的 process 数据结构。"""
     return {
         "plan": {"status": "successful", "message": ""},
         "step": {
             "status": "successful",
-            "processes": [
-                {
-                    "step_id": "deep_think",
-                    "status": "successful",
-                    "message": "",
-                    "description": thinking_text,
-                }
-            ],
+            "processes": steps,
             "source": [],
         },
         "task_status": "successful",
@@ -205,6 +176,108 @@ async def chat_vision(req: VisionRequest):
     )
 
 
+async def _run_agent_stream(
+    req: ChatRequest,
+    conversation_id: str,
+    user_id: str,
+    session_key: str,
+):
+    """Agent 深度思考流式输出 generator。
+
+    使用 LangChain create_agent（CompiledStateGraph），通过 astream 实时捕获
+    agent / tools 节点的输出，推送 SSE 事件展示思考过程。
+    """
+    # 语义检索：跨会话召回与当前问题相关的长期记忆
+    memory_context = semantic_memory.format_memory_context(req.message, user_id)
+
+    # 获取当前会话的短期记忆（最近 N 条）
+    history = get_session_history(session_key)
+    past_messages = history.messages
+
+    # 组装 Agent system prompt
+    system_prompt = AGENT_SYSTEM_PROMPT
+    if memory_context:
+        system_prompt += f"\n\n{memory_context}"
+
+    # 工具
+    tools = get_tools(user_id)
+
+    # 创建 Agent（CompiledStateGraph）
+    agent = create_agent(llm, tools=tools, prompt=system_prompt)
+
+    messages = past_messages + [HumanMessage(content=req.message)]
+
+    # 初始分析步骤
+    yield _sse_json({
+        "status": "processing",
+        "process": _make_process_with_steps([{
+            "step_id": "analysis",
+            "status": "processing",
+            "message": "",
+            "description": "正在分析问题，准备调用工具...",
+        }]),
+    })
+    await asyncio.sleep(0.08)
+
+    steps: list[dict] = []
+    final_output = ""
+
+    # 流式执行 Agent，stream_mode="updates" 获取每个节点的增量输出
+    async for chunk in agent.astream(
+        {"messages": messages}, stream_mode="updates"
+    ):
+        for node_name, node_output in chunk.items():
+            if node_name == "agent":
+                for msg in node_output.get("messages", []):
+                    # 工具调用决策
+                    tool_calls = getattr(msg, "tool_calls", None)
+                    if tool_calls:
+                        for tc in tool_calls:
+                            tool_name = tc.get("name", "unknown")
+                            steps.append({
+                                "step_id": tool_name,
+                                "status": "processing",
+                                "message": "",
+                                "description": f"正在调用工具：{tool_name}...",
+                            })
+                    # 纯文本回答（无工具调用）——可能是最终答案
+                    elif msg.content and not tool_calls:
+                        final_output = msg.content
+
+            elif node_name == "tools":
+                for msg in node_output.get("messages", []):
+                    if getattr(msg, "type", "") == "tool":
+                        # 更新最后一步为 successful，并记录工具返回
+                        if steps:
+                            steps[-1]["status"] = "successful"
+                            steps[-1]["description"] = f"工具返回：{str(msg.content)[:300]}"
+
+        # 有步骤更新时实时推送
+        if steps:
+            yield _sse_json({
+                "status": "processing",
+                "process": _make_process_with_steps(steps),
+            })
+            await asyncio.sleep(0.08)
+
+    # 推送最终答案
+    if final_output:
+        yield _sse_json({
+            "status": "stream_answer_content",
+            "answer": final_output,
+            "process": _make_process_with_steps(steps),
+        })
+        await asyncio.sleep(0.08)
+
+    # 完成
+    yield _sse_json({
+        "status": "successful",
+        "answer": final_output,
+        "process": _make_process_with_steps(steps),
+        "done": True,
+    })
+
+
 @router.post("")
 async def chat_message(req: ChatRequest):
     if not req.message.strip():
@@ -231,125 +304,51 @@ async def chat_message(req: ChatRequest):
     # 语义检索：跨会话召回与当前问题相关的长期记忆
     memory_context = semantic_memory.format_memory_context(req.message, user_id)
 
-    # 组装 system prompt
-    if req.deep_thinking:
-        system_content = DEEP_THINKING_PROMPT
-    else:
-        system_content = "你是一个有用的助手。"
+    # 组装 system prompt（仅普通聊天模式使用）
+    system_content = "你是一个有用的助手。"
     if memory_context:
         system_content += f"\n\n{memory_context}"
 
     async def event_generator():
         full_response = ""
-        raw_buffer = ""
-        thinking_detected = False
-        thinking_complete = False
-        thinking_content = ""
+        session_key = f"{user_id}:{conversation_id}" if user_id else conversation_id
 
         try:
-            # 使用 RunnableWithMessageHistory 的异步流式输出
-            # input 为字符串时，RunnableWithMessageHistory 会自动转换为 HumanMessage
-            # 并注入历史消息到 MessagesPlaceholder
-            # session_id 编码 user_id 用于隔离不同用户的记忆
-            session_key = f"{user_id}:{conversation_id}" if user_id else conversation_id
-            async for chunk in chain_with_history.astream(
-                {"input": req.message, "system_content": system_content},
-                config={"configurable": {"session_id": session_key}},
-            ):
-                if not chunk.content:
-                    continue
-
-                full_response += chunk.content
-                raw_buffer += chunk.content
-
-                # 深度思考模式：解析 <think> 标签
-                if req.deep_thinking:
-                    # 首次检测到 <think>，发送 processing 状态
-                    if not thinking_detected and "<think>" in raw_buffer:
-                        thinking_detected = True
-                        yield _sse_json(
-                            {
-                                "status": "processing",
-                                "process": {"plan": {"status": "processing", "message": ""}},
-                            }
-                        )
-
-                    # 已检测到 <think>，检查是否完整闭合
-                    if thinking_detected and not thinking_complete:
-                        extracted = _extract_thinking(raw_buffer)
-                        if extracted is not None:
-                            thinking_complete = True
-                            thinking_content = extracted
-
-                            # </think> 之后的内容才是正式答案
-                            end_pos = raw_buffer.find("</think>") + len("</think>")
-                            answer_so_far = raw_buffer[end_pos:].strip()
-
-                            yield _sse_json(
-                                {
-                                    "status": "stream_answer_content",
-                                    "answer": answer_so_far,
-                                    "process": _make_process(thinking_content),
-                                }
-                            )
-                        # 思考完成前，不发送答案内容（避免把思考文本混入答案）
-                        await asyncio.sleep(0.08)
+            if req.deep_thinking:
+                # Agent 深度思考流程：真正的 ReAct Agent，调用工具并展示步骤
+                async for event in _run_agent_stream(req, conversation_id, user_id, session_key):
+                    # 从 SSE 事件中提取最终答案，用于保存语义记忆
+                    data_str = event.removeprefix("data: ").strip()
+                    try:
+                        data = json.loads(data_str)
+                        if data.get("answer"):
+                            full_response = data["answer"]
+                    except Exception:
+                        pass
+                    yield event
+            else:
+                # 普通聊天流程：RunnableWithMessageHistory + 短期记忆窗口
+                async for chunk in chain_with_history.astream(
+                    {"input": req.message, "system_content": system_content},
+                    config={"configurable": {"session_id": session_key}},
+                ):
+                    if not chunk.content:
                         continue
+                    full_response += chunk.content
+                    yield _sse_json({"content": chunk.content, "done": False})
+                    await asyncio.sleep(0.08)
 
-                    # 思考已完成，继续流式发送答案
-                    if thinking_complete:
-                        yield _sse_json(
-                            {
-                                "status": "stream_answer_content",
-                                "answer": chunk.content,
-                                "process": _make_process(thinking_content),
-                            }
-                        )
-                        await asyncio.sleep(0.08)
-                        continue
-
-                # 非深度思考模式：保持原有格式
-                yield _sse_json({"content": chunk.content, "done": False})
-                await asyncio.sleep(0.08)
+                yield _sse_json(
+                    {"content": "", "done": True, "conversation_id": conversation_id}
+                )
 
             # 流式结束后，保存本轮交互到语义记忆（长期记忆）
             if full_response.strip():
                 semantic_memory.save_interaction(
                     req.message, full_response, conversation_id, user_id
                 )
-
-            if req.deep_thinking and thinking_detected:
-                yield _sse_json(
-                    {
-                        "status": "successful",
-                        "answer": full_response,
-                        "process": _make_process(thinking_content),
-                        "done": True,
-                    }
-                )
-            else:
-                yield _sse_json(
-                    {"content": "", "done": True, "conversation_id": conversation_id}
-                )
         except Exception as e:
-            if req.deep_thinking and thinking_detected:
-                yield _sse_json(
-                    {
-                        "status": "failed",
-                        "answer": full_response,
-                        "process": _make_process(thinking_content)
-                        if thinking_complete
-                        else {
-                            "plan": {"status": "failed", "message": str(e)},
-                            "step": {"status": "failed", "processes": [], "source": []},
-                            "task_status": "failed",
-                        },
-                        "error": str(e),
-                        "done": True,
-                    }
-                )
-            else:
-                yield _sse_json({"content": "", "done": True, "error": str(e)})
+            yield _sse_json({"content": "", "done": True, "error": str(e)})
 
     # 返回 SSE 流，同时在 header 中返回 conversation_id
     response = StreamingResponse(
