@@ -12,9 +12,9 @@ import { message as antdMessage } from "antd";
 import { aiApi, type AIConversation, type AIMessage } from "@/api/ai";
 import { aiChatStreamClient } from "@/workers/aiChatStreamClient";
 import { conversationTitleFromFirstMessage } from "./conversationTitle";
-import type { ChatMode, UiMessage } from "./types";
+import type { ChatMode, UiMessage, SendOptions } from "./types";
 
-export type { ChatMode, UiMessage } from "./types";
+export type { ChatMode, UiMessage, SendOptions } from "./types";
 
 interface UseAIChatOptions {
   pageSize?: number;
@@ -128,7 +128,7 @@ export function useAIChat(conversationId: number | null, options: UseAIChatOptio
       markConversationStreaming(cid);
       try {
         live.current.refreshSessionsAfterStream = true;
-        aiChatStreamClient.start(cid, resumeContent, mode, true);
+        aiChatStreamClient.start(cid, { content: resumeContent, mode, resume: true });
       } catch (error) {
         console.error("恢复流式输出失败:", error);
         antdMessage.error("恢复流式输出失败");
@@ -305,16 +305,29 @@ export function useAIChat(conversationId: number | null, options: UseAIChatOptio
   );
 
   const sendMessage = useCallback(
-    async (
-      userContent: string,
-      mode: ChatMode = "aiserver_chat",
-      targetConversationId?: number,
-      resume = false,
-      deepThink = false,
-      imageBase64?: string,
-      docIds?: string[],
-      attachments?: { uid: string; filename: string; url?: string }[]
-    ): Promise<boolean> => {
+    async (options: SendOptions): Promise<boolean> => {
+      const {
+        content: userContent,
+        useKnowledge,
+        deepThink,
+        targetConversationId,
+        resume,
+        imageBase64,
+        docIds,
+        attachments,
+      } = options;
+
+      // 根据附件类型和知识库开关推导最终 mode
+      const mode: ChatMode = imageBase64
+        ? "aiserver_vision"
+        : docIds && docIds.length > 0
+          ? useKnowledge
+            ? "aiserver_knowledge"
+            : "aiserver_attachment"
+          : useKnowledge
+            ? "aiserver_knowledge"
+            : "aiserver_chat";
+
       if (!userContent.trim() && !resume) {
         return false;
       }
@@ -393,7 +406,7 @@ export function useAIChat(conversationId: number | null, options: UseAIChatOptio
 
       try {
         live.current.refreshSessionsAfterStream = true;
-        aiChatStreamClient.start(cid, content, mode, false, deepThink, imageBase64, docIds, attachments);
+        aiChatStreamClient.start(cid, { content, mode, deepThinking: deepThink, imageBase64, docIds, attachments });
         return true;
       } catch (error) {
         console.error("发送消息失败:", error);

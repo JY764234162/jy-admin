@@ -9,7 +9,7 @@ import { MobileSessionBar } from "./MobileSessionBar";
 import { MessageList } from "./MessageList";
 import { ChatInput } from "./ChatInput";
 import { NewChatWelcome } from "./NewChatWelcome";
-import type { ChatMode } from "./types";
+import type { SendOptions } from "./types";
 
 function parseConversationId(raw: string | null): number | null {
   if (raw == null || raw === "") return null;
@@ -29,7 +29,7 @@ export const Component = () => {
   const chat = useAIChat(conversationId, { pageSize: 10 });
 
   const sendFromInput = useCallback(
-    async (content: string, mode: ChatMode) => chat.sendMessage(content, mode),
+    (options: SendOptions) => chat.sendMessage(options),
     [chat.sendMessage]
   );
 
@@ -98,7 +98,7 @@ export const Component = () => {
               <NewChatWelcome
                 isMobile={isMobile}
                 loading={chat.loading}
-                onPickPrompt={(text) => sendFromInput(text, "aiserver_chat")}
+                onPickPrompt={(text) => sendFromInput({ content: text })}
               />
             ) : (
               <MessageList

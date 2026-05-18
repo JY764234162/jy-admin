@@ -151,14 +151,25 @@ export const aiChatStreamClient = {
   /** 启动流式聊天，统一走 Go 后端，通过 mode 区分目标服务 */
   start(
     conversationId: number,
-    content: string,
-    mode: "aiserver_chat" | "aiserver_knowledge" | "aiserver_vision" | "aiserver_attachment" = "aiserver_chat",
-    resume = false,
-    deepThinking = false,
-    imageBase64?: string,
-    docIds?: string[],
-    attachments?: { uid: string; filename: string; url?: string }[]
+    options: {
+      content: string;
+      mode?: "aiserver_chat" | "aiserver_knowledge" | "aiserver_vision" | "aiserver_attachment";
+      resume?: boolean;
+      deepThinking?: boolean;
+      imageBase64?: string;
+      docIds?: string[];
+      attachments?: { uid: string; filename: string; url?: string }[];
+    }
   ) {
+    const {
+      content,
+      mode = "aiserver_chat",
+      resume = false,
+      deepThinking = false,
+      imageBase64,
+      docIds,
+      attachments,
+    } = options;
     const streamId = createStreamId();
     const token = localStg.get("token");
     ensureWorker().postMessage({
@@ -182,12 +193,12 @@ export const aiChatStreamClient = {
 
   /** 兼容旧调用：启动 ai-server 基础对话流式聊天 */
   startAiServerChat(conversationId: number, content: string) {
-    return this.start(conversationId, content, "aiserver_chat");
+    return this.start(conversationId, { content, mode: "aiserver_chat" });
   },
 
   /** 兼容旧调用：启动 ai-server 知识库问答流式查询 */
   startAiServerKnowledge(conversationId: number, content: string, _top_k = 3) {
-    return this.start(conversationId, content, "aiserver_knowledge");
+    return this.start(conversationId, { content, mode: "aiserver_knowledge" });
   },
 
   /** 停止某个 stream */

@@ -12,8 +12,6 @@ import { Attachments, type AttachmentsProps, Sender } from "@ant-design/x";
 import { Badge, Button, Flex, Divider, Progress, message as antdMessage } from "antd";
 import { layoutSlice } from "@/store/slice/layout";
 import { aiServerApi, type KnowledgeProgressEvent } from "@/api/aiServer";
-import type { ChatMode } from "./types";
-
 const Switch = Sender.Switch;
 
 const SUPPORTED_DOC_EXTS = new Set([".pdf", ".txt", ".md", ".docx", ".xlsx", ".xls", ".csv"]);
@@ -45,16 +43,14 @@ function fileToBase64(file: File): Promise<string> {
   });
 }
 
-type SendFromInput = (
-  content: string,
-  mode: ChatMode,
-  targetConversationId?: number,
-  resume?: boolean,
-  deepThink?: boolean,
-  imageBase64?: string,
-  docIds?: string[],
-  attachments?: { uid: string; filename: string }[]
-) => Promise<boolean>;
+type SendFromInput = (options: {
+  content: string;
+  useKnowledge?: boolean;
+  deepThink?: boolean;
+  imageBase64?: string;
+  docIds?: string[];
+  attachments?: { uid: string; filename: string }[];
+}) => Promise<boolean>;
 
 interface ChatInputProps {
   loading: boolean;
@@ -87,7 +83,7 @@ const STAGE_LABEL: Record<UploadingFile["stage"], string> = {
 export const ChatInput = ({ loading, sendMessage }: ChatInputProps) => {
   const isMobile = useSelector(layoutSlice.selectors.getIsMobile);
   const [value, setValue] = useState("");
-  const [mode, setMode] = useState<ChatMode>("aiserver_chat");
+  const [useKnowledge, setUseKnowledge] = useState(false);
   const [open, setOpen] = useState(false);
   const [items, setItems] = useState<NonNullable<AttachmentsProps["items"]>>([]);
   const [deepThink, setDeepThink] = useState(false);
@@ -259,7 +255,12 @@ export const ChatInput = ({ loading, sendMessage }: ChatInputProps) => {
           filename: it.originFileObj?.name || "未知图片",
           url: it.url || "",
         }));
-        const ok = await sendMessage(text, "aiserver_vision", undefined, false, deepThink, base64, undefined, imgAttachments);
+        const ok = await sendMessage({
+          content: text,
+          deepThink,
+          imageBase64: base64,
+          attachments: imgAttachments,
+        });
         if (ok) {
           setValue("");
           items.forEach((it) => {
@@ -328,16 +329,13 @@ export const ChatInput = ({ loading, sendMessage }: ChatInputProps) => {
       });
 
       // 附件和知识库开关独立：勾选了知识库就走 knowledge（会混合检索附件+知识库），否则只检索附件
-      const ok = await sendMessage(
-        text,
-        mode === "aiserver_knowledge" ? "aiserver_knowledge" : "aiserver_attachment",
-        undefined,
-        false,
+      const ok = await sendMessage({
+        content: text,
+        useKnowledge,
         deepThink,
-        undefined,
         docIds,
-        attachments
-      );
+        attachments,
+      });
       if (ok) {
         setValue("");
         items.forEach((it) => {
@@ -350,7 +348,7 @@ export const ChatInput = ({ loading, sendMessage }: ChatInputProps) => {
     }
 
     // 无附件：正常聊天
-    const ok = await sendMessage(text, mode, undefined, false, deepThink);
+    const ok = await sendMessage({ content: text, useKnowledge, deepThink });
     if (ok) {
       setValue("");
     }
@@ -358,7 +356,7 @@ export const ChatInput = ({ loading, sendMessage }: ChatInputProps) => {
   };
 
   const handleKnowledgeChange = (checked: boolean) => {
-    setMode(checked ? "aiserver_knowledge" : "aiserver_chat");
+    setUseKnowledge(checked);
   };
 
   const renderUploadProgressList = () => {
@@ -443,7 +441,7 @@ export const ChatInput = ({ loading, sendMessage }: ChatInputProps) => {
         placeholder={
           items.length > 0
             ? "提问与已上传文件相关的问题..."
-            : mode === "aiserver_knowledge"
+            : useKnowledge
               ? "输入问题，基于知识库内容回答..."
               : "输入消息与 AI 对话..."
         }
@@ -452,9 +450,9 @@ export const ChatInput = ({ loading, sendMessage }: ChatInputProps) => {
         footer={(actionNode) => (
           <Flex justify="space-between" align="center">
             <Flex gap="small" align="center">
-              <Switch checked={deepThink} checkedChildren="深度思考" unCheckedChildren="深度思考" onChange={setDeepThink} />
+              <Switch value={deepThink} checkedChildren="深度思考" unCheckedChildren="深度思考" onChange={setDeepThink} />
               <Switch
-                value={mode === "aiserver_knowledge"}
+                value={useKnowledge}
                 checkedChildren="知识库"
                 unCheckedChildren="知识库"
                 onChange={handleKnowledgeChange}
