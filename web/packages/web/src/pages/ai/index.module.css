@@ -33,7 +33,7 @@
 
 /* 行内 code：默认可断行；pre code 由下一组规则覆盖 */
 .markdown :global(.wmde-markdown code) {
-  display: block;
+  /* display: block; */
   min-width: 100%;
   box-sizing: border-box;
   word-break: break-word;
