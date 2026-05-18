@@ -195,7 +195,7 @@ func (a *Api) runBackgroundGeneration(task *generationTask, conversationID, assi
 		global.JY_DB.Where("conversation_id = ? AND id != ?", conversationID, assistantMsgID).Order("created_at ASC").Find(&messages)
 		streamErr = a.callAIServerChatStream(messages, content, conversationID, deepThinking, streamCallback)
 	case "aiserver_knowledge", "aiserver_attachment":
-		streamErr = a.callAIServerKnowledgeStream(content, fmt.Sprintf("%d", userID), docIDs, mode, streamCallback)
+		streamErr = a.callAIServerKnowledgeStream(content, fmt.Sprintf("%d", userID), docIDs, mode, deepThinking, streamCallback)
 	default:
 		streamErr = fmt.Errorf("不支持的对话模式: %s", mode)
 	}
@@ -658,7 +658,7 @@ func (a *Api) callAIServerChatStream(messages []business.AIMessage, newContent s
 }
 
 // callAIServerKnowledgeStream 转发到 ai-server 知识库问答（SSE 透传）
-func (a *Api) callAIServerKnowledgeStream(question, userID string, docIDs []string, mode string, callback StreamCallback) error {
+func (a *Api) callAIServerKnowledgeStream(question, userID string, docIDs []string, mode string, deepThinking bool, callback StreamCallback) error {
 	aiServerURL := global.JY_Config.AI.AIServerURL
 	if aiServerURL == "" {
 		aiServerURL = "http://localhost:8000"
@@ -670,12 +670,13 @@ func (a *Api) callAIServerKnowledgeStream(question, userID string, docIDs []stri
 	}
 
 	payload := map[string]interface{}{
-		"question":   question,
-		"top_k":      3,
-		"structured": false,
-		"user_id":    userID,
-		"doc_ids":    docIDs,
-		"mode":       mode,
+		"question":     question,
+		"top_k":        3,
+		"structured":   false,
+		"user_id":      userID,
+		"doc_ids":      docIDs,
+		"mode":         mode,
+		"deep_thinking": deepThinking,
 	}
 	body, err := json.Marshal(payload)
 	if err != nil {

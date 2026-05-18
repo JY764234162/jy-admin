@@ -452,7 +452,7 @@ export const ChatInput = ({ loading, sendMessage }: ChatInputProps) => {
         footer={(actionNode) => (
           <Flex justify="space-between" align="center">
             <Flex gap="small" align="center">
-              <Switch value={deepThink} checkedChildren="深度思考" unCheckedChildren="深度思考" onChange={setDeepThink} />
+              <Switch checked={deepThink} checkedChildren="深度思考" unCheckedChildren="深度思考" onChange={setDeepThink} />
               <Switch
                 value={mode === "aiserver_knowledge"}
                 checkedChildren="知识库"

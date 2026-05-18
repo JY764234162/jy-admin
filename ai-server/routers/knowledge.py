@@ -159,6 +159,7 @@ class QueryRequest(BaseModel):
     user_id: str = ""
     doc_ids: Optional[List[str]] = []
     mode: str = "knowledge"  # "knowledge" | "attachment"
+    deep_thinking: bool = False
 
 
 # RAG Prompt 模板（通用问答）
