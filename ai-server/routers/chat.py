@@ -6,11 +6,59 @@ from typing import Optional, List
 from fastapi import APIRouter, HTTPException, Header
 from pydantic import BaseModel
 from starlette.responses import StreamingResponse
+from langchain_core.prompts import ChatPromptTemplate, MessagesPlaceholder
+from langchain_core.runnables.history import RunnableWithMessageHistory
+from langchain_core.messages import HumanMessage, AIMessage
 
 from services.llm import llm
+from services.semantic_memory import VectorChatMessageHistory, SemanticMemory
 
 router = APIRouter(prefix="/api/chat", tags=["chat"])
 
+# ========== 语义记忆全局实例 ==========
+semantic_memory = SemanticMemory(top_k=5)
+
+# session_id -> VectorChatMessageHistory 的内存缓存（进程内缓存，重启清空）
+_session_histories: dict[str, VectorChatMessageHistory] = {}
+
+
+def get_session_history(session_id: str) -> VectorChatMessageHistory:
+    """获取或创建指定会话的 VectorChatMessageHistory（短期记忆窗口）。
+
+    session_id 格式: "{user_id}:{conversation_id}" 或 "{conversation_id}"
+    """
+    if ":" in session_id:
+        user_id, conv_id = session_id.split(":", 1)
+    else:
+        user_id, conv_id = "", session_id
+
+    if session_id not in _session_histories:
+        _session_histories[session_id] = VectorChatMessageHistory(
+            session_id=conv_id, user_id=user_id, max_messages=10
+        )
+    return _session_histories[session_id]
+
+
+# ========== Prompt & Chain ==========
+# 使用 MessagesPlaceholder 承载历史消息，避免 input 重复渲染
+# RunnableWithMessageHistory 会自动将 input 转换为 HumanMessage 并注入 history
+_chat_prompt = ChatPromptTemplate.from_messages([
+    ("system", "{system_content}"),
+    MessagesPlaceholder(variable_name="history"),
+])
+
+_chat_chain = _chat_prompt | llm
+
+# 带消息历史的 chain：短期记忆窗口（最近 N 条）
+chain_with_history = RunnableWithMessageHistory(
+    _chat_chain,
+    get_session_history,
+    input_messages_key="input",
+    history_messages_key="history",
+)
+
+
+# ========== 请求模型 ==========
 
 class ChatMessage(BaseModel):
     role: str
@@ -22,6 +70,7 @@ class ChatRequest(BaseModel):
     conversation_id: Optional[str] = None
     messages: Optional[List[ChatMessage]] = None
     deep_thinking: Optional[bool] = False
+    user_id: Optional[str] = ""  # 用于语义记忆隔离
 
 
 DEEP_THINKING_PROMPT = """You are a helpful assistant with deep reasoning capabilities.
@@ -111,7 +160,7 @@ async def chat_vision(req: VisionRequest):
     image_url = req.image_base64
     if not image_url.startswith("data:"):
         # 如果前端只传了裸 base64，补全 data URI
-        image_url = f"data:image/jpeg;base64,{image_url}"
+        image_url = f"data:image/jpeg;base64,{req.image_base64}"
 
     multimodal_messages = [
         {
@@ -162,20 +211,33 @@ async def chat_message(req: ChatRequest):
         raise HTTPException(400, "消息不能为空")
 
     conversation_id = req.conversation_id or uuid.uuid4().hex[:16]
+    user_id = req.user_id or ""
 
-    # 构建 LangChain 消息格式
-    # 优先使用外部传入的 messages（由 Go 后端提供完整历史）
-    langchain_messages = []
-    if req.deep_thinking:
-        langchain_messages.append({"role": "system", "content": DEEP_THINKING_PROMPT})
-    if req.messages:
+    # 获取当前会话的短期记忆
+    history = get_session_history(conversation_id, user_id)
+
+    # 首次调用且外部传了 messages：将外部历史导入到 VectorChatMessageHistory
+    # 这样 ai-server 自己也能管理历史，后续不再依赖外部传入
+    if req.messages and not history.messages:
+        lc_messages = []
         for msg in req.messages:
-            langchain_messages.append({"role": msg.role, "content": msg.content})
-        # 追加当前消息
-        langchain_messages.append({"role": "user", "content": req.message})
+            if msg.role == "user":
+                lc_messages.append(HumanMessage(content=msg.content))
+            elif msg.role == "assistant":
+                lc_messages.append(AIMessage(content=msg.content))
+        if lc_messages:
+            history.add_messages(lc_messages)
+
+    # 语义检索：跨会话召回与当前问题相关的长期记忆
+    memory_context = semantic_memory.format_memory_context(req.message, user_id)
+
+    # 组装 system prompt
+    if req.deep_thinking:
+        system_content = DEEP_THINKING_PROMPT
     else:
-        # 无外部历史时仅使用当前消息
-        langchain_messages.append({"role": "user", "content": req.message})
+        system_content = "你是一个有用的助手。"
+    if memory_context:
+        system_content += f"\n\n{memory_context}"
 
     async def event_generator():
         full_response = ""
@@ -185,20 +247,15 @@ async def chat_message(req: ChatRequest):
         thinking_content = ""
 
         try:
-            # llm.stream 是同步生成器，放到线程池中执行避免阻塞 asyncio 事件循环
-            sync_gen = llm.stream(langchain_messages)
-            loop = asyncio.get_event_loop()
-
-            def next_chunk():
-                try:
-                    return next(sync_gen)
-                except StopIteration:
-                    return None
-
-            while True:
-                chunk = await loop.run_in_executor(None, next_chunk)
-                if chunk is None:
-                    break
+            # 使用 RunnableWithMessageHistory 的异步流式输出
+            # input 为字符串时，RunnableWithMessageHistory 会自动转换为 HumanMessage
+            # 并注入历史消息到 MessagesPlaceholder
+            # session_id 编码 user_id 用于隔离不同用户的记忆
+            session_key = f"{user_id}:{conversation_id}" if user_id else conversation_id
+            async for chunk in chain_with_history.astream(
+                {"input": req.message, "system_content": system_content},
+                config={"configurable": {"session_id": session_key}},
+            ):
                 if not chunk.content:
                     continue
 
@@ -255,6 +312,12 @@ async def chat_message(req: ChatRequest):
                 yield _sse_json({"content": chunk.content, "done": False})
                 await asyncio.sleep(0.08)
 
+            # 流式结束后，保存本轮交互到语义记忆（长期记忆）
+            if full_response.strip():
+                semantic_memory.save_interaction(
+                    req.message, full_response, conversation_id, user_id
+                )
+
             if req.deep_thinking and thinking_detected:
                 yield _sse_json(
                     {
@@ -295,5 +358,3 @@ async def chat_message(req: ChatRequest):
         headers={"X-Conversation-Id": conversation_id},
     )
     return response
-
-

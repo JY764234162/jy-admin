@@ -4,7 +4,7 @@ import time
 import uuid
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Dict, List
+from typing import Dict, List, Optional
 
 from fastapi import APIRouter, UploadFile, File, Form, HTTPException, Query
 from pydantic import BaseModel
@@ -83,12 +83,6 @@ def _get_parse_task(task_id: str) -> ParseTask | None:
     return _parse_tasks.get(task_id)
 
 
-def _cleanup_old_tasks(max_age: float = 3600):
-    """清理超过 max_age 秒的已完成任务"""
-    now = time.time()
-    expired = [tid for tid, t in _parse_tasks.items() if t.done and (now - t.created_at) > max_age]
-    for tid in expired:
-        del _parse_tasks[tid]
 
 
 async def _process_document_async(task: ParseTask, file_bytes: bytes, user_id: str = "", doc_id: str = ""):
@@ -163,7 +157,7 @@ class QueryRequest(BaseModel):
     top_k: int = 3
     structured: bool = False
     user_id: str = ""
-    doc_ids: List[str] = []
+    doc_ids: Optional[List[str]] = []
     mode: str = "knowledge"  # "knowledge" | "attachment"
 
 
@@ -463,13 +457,17 @@ async def query_knowledge(req: QueryRequest):
     # 构建上下文获取函数
     if manual_docs is not None:
         context_fn = lambda _: _format_docs(manual_docs)
-    else:
+    elif is_knowledge:
+        # 知识库模式（且未匹配到文件名或 doc_ids）：全文检索知识库
         search_kwargs = {"k": req.top_k}
         if req.user_id:
             search_kwargs["filter"] = {"user_id": req.user_id}
         store = vector_store.get_store()
         retriever = store.as_retriever(search_kwargs=search_kwargs)
         context_fn = retriever | _format_docs
+    else:
+        # 附件模式但 doc_ids 为空：不提供任何上下文，让 LLM 基于自身知识回答
+        context_fn = lambda _: ""
 
     # 根据是否匹配到文件名或 doc_ids 选择 Prompt
     active_prompt = SUMMARY_PROMPT if (matched_doc_id or req.doc_ids) else RAG_PROMPT

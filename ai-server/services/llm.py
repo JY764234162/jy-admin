@@ -23,18 +23,6 @@ vision_llm = ChatOpenAI(
 ) if config.GLM4V_API_KEY else None
 
 
-# ========== 基础对话接口 ==========
-
-
-def chat(messages: list[dict], stream: bool = False):
-    resp = llm.invoke(messages)
-    return resp.content
-
-
-def chat_stream(messages: list[dict]):
-    return llm.stream(messages)
-
-
 # ========== 结构化输出 ==========
 
 

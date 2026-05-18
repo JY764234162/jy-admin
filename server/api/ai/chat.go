@@ -664,6 +664,11 @@ func (a *Api) callAIServerKnowledgeStream(question, userID string, docIDs []stri
 		aiServerURL = "http://localhost:8000"
 	}
 
+	// 避免 nil slice 被序列化为 null，导致 ai-server Pydantic 验证失败
+	if docIDs == nil {
+		docIDs = []string{}
+	}
+
 	payload := map[string]interface{}{
 		"question":   question,
 		"top_k":      3,
