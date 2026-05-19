@@ -97,24 +97,24 @@ if ! docker compose version &> /dev/null; then
     COMPOSE_CMD="docker-compose"
 fi
 
-# 明确构建 ai-server 并拉取 pgvector 镜像
-echo -e "${BLUE}构建 ai-server 镜像...${NC}"
-$COMPOSE_CMD build ai-server
-
+# 拉取 pgvector 镜像
 echo -e "${BLUE}拉取 pgvector 镜像...${NC}"
 $COMPOSE_CMD pull postgres-vector
 
+# 每次都默认重建 ai-server
+echo -e "${BLUE}重建 ai-server...${NC}"
+$COMPOSE_CMD up -d --build --force-recreate ai-server
+
+# 前端单独处理：只在需要时重建或跳过
 FRONTEND_RUNNING=$(docker ps --format '{{.Names}}' | grep -c '^jy-admin-frontend$' || true)
 if [ "$FRONTEND_RUNNING" -eq 0 ]; then
-    echo -e "${YELLOW}服务未运行，构建并启动所有服务...${NC}"
-    $COMPOSE_CMD up -d --build
+    echo -e "${YELLOW}前端服务未运行，构建并启动前端...${NC}"
+    $COMPOSE_CMD up -d --build frontend
 elif [ -z "$SKIP_BUILD" ]; then
-    echo -e "${YELLOW}前端已重新构建，重建前端镜像...${NC}"
+    echo -e "${YELLOW}前端已重新构建，重建前端...${NC}"
     $COMPOSE_CMD up -d --build --force-recreate frontend
 else
-    # 前端未重新构建，默认重建后端
-    echo -e "${YELLOW}重建后端镜像并启动所有服务...${NC}"
-    $COMPOSE_CMD up -d --build
+    echo -e "${YELLOW}跳过前端重建${NC}"
 fi
 
 echo -e "\n${GREEN}✓ 本地部署完成！${NC}\n"

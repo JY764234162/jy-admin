@@ -374,6 +374,22 @@ async def query_knowledge(req: QueryRequest):
     if not req.question.strip():
         raise HTTPException(400, "问题不能为空")
 
+    # 深度思考模式：复用 chat 模块的 ReAct Agent 流程
+    if req.deep_thinking:
+        from routers.chat import _run_agent_stream, ChatRequest
+
+        chat_req = ChatRequest(
+            message=req.question,
+            user_id=req.user_id,
+            deep_thinking=True,
+        )
+        temp_session = uuid.uuid4().hex[:16]
+
+        return StreamingResponse(
+            _run_agent_stream(chat_req, temp_session, req.user_id, temp_session),
+            media_type="text/event-stream",
+        )
+
     docs = vector_store.list_documents(user_id=req.user_id)
     if not docs:
         raise HTTPException(400, "知识库为空，请先上传文档")

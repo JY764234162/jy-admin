@@ -203,7 +203,7 @@ async def _run_agent_stream(
     tools = get_tools(user_id)
 
     # 创建 Agent（CompiledStateGraph）
-    agent = create_agent(llm, tools=tools, prompt=system_prompt)
+    agent = create_agent(llm, tools=tools, system_prompt=system_prompt)
 
     messages = past_messages + [HumanMessage(content=req.message)]
 
@@ -227,7 +227,7 @@ async def _run_agent_stream(
         {"messages": messages}, stream_mode="updates"
     ):
         for node_name, node_output in chunk.items():
-            if node_name == "agent":
+            if node_name == "model":
                 for msg in node_output.get("messages", []):
                     # 工具调用决策
                     tool_calls = getattr(msg, "tool_calls", None)
@@ -287,7 +287,8 @@ async def chat_message(req: ChatRequest):
     user_id = req.user_id or ""
 
     # 获取当前会话的短期记忆
-    history = get_session_history(conversation_id, user_id)
+    session_key = f"{user_id}:{conversation_id}" if user_id else conversation_id
+    history = get_session_history(session_key)
 
     # 首次调用且外部传了 messages：将外部历史导入到 VectorChatMessageHistory
     # 这样 ai-server 自己也能管理历史，后续不再依赖外部传入
@@ -311,7 +312,6 @@ async def chat_message(req: ChatRequest):
 
     async def event_generator():
         full_response = ""
-        session_key = f"{user_id}:{conversation_id}" if user_id else conversation_id
 
         try:
             if req.deep_thinking:
