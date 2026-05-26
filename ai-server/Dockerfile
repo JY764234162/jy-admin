@@ -12,7 +12,7 @@ WORKDIR /app
 ENV UV_COMPILE_BYTECODE=1
 
 # 可选：使用国内 PyPI 镜像
-# ENV UV_INDEX_URL=https://pypi.tuna.tsinghua.edu.cn/simple
+ENV UV_INDEX_URL=https://pypi.tuna.tsinghua.edu.cn/simple
 
 # 临时关闭代理、更换国内 apt 源（Debian）并安装系统依赖
 RUN export HTTP_PROXY="" HTTPS_PROXY="" http_proxy="" https_proxy="" \
