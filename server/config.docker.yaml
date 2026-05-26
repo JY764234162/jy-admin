@@ -72,7 +72,3 @@ log:
   max-age: 90
   compress: true
 
-ai:
-  # AI-Server 服务地址（Docker 内网使用服务名）
-  ai-server-url: "http://ai-server:8000"
-

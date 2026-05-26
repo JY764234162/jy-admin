@@ -1,7 +1,6 @@
 package api
 
 import (
-	"jiangyi.com/api/ai"
 	"jiangyi.com/api/authority"
 	"jiangyi.com/api/customer"
 	"jiangyi.com/api/login"
@@ -19,5 +18,4 @@ type Api struct {
 	LoginApi     login.Api
 	AuthorityApi authority.Api
 	MenuApi      menu.Api
-	AIApi        ai.Api
 }

@@ -125,8 +125,6 @@ func RegisterTables() {
 		system.ExaFileUploadAndDownload{},
 		system.JwtBlacklist{},
 		business.Customer{},
-		business.AIConversation{},
-		business.AIMessage{},
 	)
 
 	if err != nil {

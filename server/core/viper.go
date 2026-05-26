@@ -95,12 +95,6 @@ func InitViper() {
 		fmt.Println("已从环境变量 COS_SECRET_KEY 读取 COS SecretKey")
 	}
 
-	// 支持从 AI_SERVER_URL 环境变量读取 AI-Server 地址（优先级最高）
-	if aiServerURL := os.Getenv("AI_SERVER_URL"); aiServerURL != "" {
-		global.JY_Config.AI.AIServerURL = aiServerURL
-		fmt.Println("已从环境变量 AI_SERVER_URL 读取 AI-Server 地址")
-	}
-
 	fmt.Printf("读取配置成功: %s.yaml (GIN_MODE: %s, 环境: %s, 配置: %v)\n", configName, ginMode, env, global.JY_Config)
 	global.JY_Viper = v
 }

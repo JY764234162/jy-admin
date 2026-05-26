@@ -132,27 +132,6 @@ func registerRouter(Router *gin.Engine) *gin.Engine {
 		privateGroup.PUT("/menu", apiGroup.MenuApi.UpdateMenu)
 		privateGroup.DELETE("/menu/:id", apiGroup.MenuApi.DeleteMenu)
 	}
-	//AI对话管理
-	{
-		privateGroup.POST("/ai/conversation", apiGroup.AIApi.CreateConversation)
-		privateGroup.GET("/ai/conversation/list", apiGroup.AIApi.GetConversationList)
-		privateGroup.GET("/ai/conversation/:id/messages", apiGroup.AIApi.GetMessageList)
-		privateGroup.DELETE("/ai/conversation/:id", apiGroup.AIApi.DeleteConversation)
-		privateGroup.PUT("/ai/conversation/:id/title", apiGroup.AIApi.UpdateConversationTitle)
-		privateGroup.POST("/ai/chat", apiGroup.AIApi.ChatMessage)
-		privateGroup.POST("/ai/chat/resume", apiGroup.AIApi.ResumeChat)
-		privateGroup.POST("/ai/chat/vision", apiGroup.AIApi.ChatVision)
-	}
-	//AI知识库（代理到 ai-server）
-	{
-		privateGroup.GET("/ai/knowledge/list", apiGroup.AIApi.GetKnowledgeList)
-		privateGroup.POST("/ai/knowledge/upload", apiGroup.AIApi.UploadKnowledge)
-		privateGroup.POST("/ai/knowledge/upload-stream", apiGroup.AIApi.UploadKnowledgeStream)
-		privateGroup.GET("/ai/knowledge/progress/:taskId", apiGroup.AIApi.KnowledgeProgress)
-		privateGroup.DELETE("/ai/knowledge/:docId", apiGroup.AIApi.DeleteKnowledge)
-		privateGroup.POST("/ai/knowledge/:docId/retry", apiGroup.AIApi.RetryKnowledge)
-		privateGroup.POST("/ai/knowledge/query", apiGroup.AIApi.QueryKnowledge)
-	}
 
 	Router.GET("/swagger/*any", ginSwagger.WrapHandler(swaggerFiles.Handler))
 
