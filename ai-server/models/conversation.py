@@ -27,6 +27,8 @@ class Conversation(Base):
     title = Column(String(255), nullable=False, default="")
     last_msg = Column(Text, nullable=False, default="")
     message_count = Column(Integer, nullable=False, default=0)
+    latest_status = Column(String(50), nullable=False, default="success")
+    latest_attachments = Column(Text, nullable=False, default="[]")
     created_at = Column(DateTime, nullable=False, default=datetime.utcnow)
     updated_at = Column(
         DateTime,
@@ -75,6 +77,27 @@ SessionLocal = sessionmaker(bind=_engine, expire_on_commit=False)
 def init_db():
     """初始化数据库表（如果不存在则创建）"""
     Base.metadata.create_all(bind=_engine)
+    _migrate_conversations_table()
+
+
+def _migrate_conversations_table():
+    """迁移 conversations 表：添加 checkpoint 兼容所需的元数据字段。"""
+    from sqlalchemy import inspect, text
+
+    inspector = inspect(_engine)
+    columns = [c["name"] for c in inspector.get_columns("conversations")]
+
+    with _engine.begin() as conn:
+        if "latest_status" not in columns:
+            conn.execute(
+                text("ALTER TABLE conversations ADD COLUMN latest_status VARCHAR(50) NOT NULL DEFAULT 'success'")
+            )
+            print("[migrate] Added conversations.latest_status")
+        if "latest_attachments" not in columns:
+            conn.execute(
+                text("ALTER TABLE conversations ADD COLUMN latest_attachments TEXT NOT NULL DEFAULT '[]'")
+            )
+            print("[migrate] Added conversations.latest_attachments")
 
 
 def get_db():
