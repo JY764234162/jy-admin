@@ -143,7 +143,7 @@ services:
       AI_API_KEY: ${AI_API_KEY}
       AI_BASE_URL: ${AI_BASE_URL}
       AI_MODEL: ${AI_MODEL}
-      EMBEDDING_MODEL: ${EMBEDDING_MODEL}
+      EMBEDDING_MODEL: ${EMBEDDING_MODEL:-BAAI/bge-small-zh}
       HF_ENDPOINT: https://hf-mirror.com
       PG_HOST: postgres-vector
       PG_PORT: 5432
