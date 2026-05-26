@@ -5,7 +5,12 @@ from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
 from models.conversation import Conversation, Message, get_db
-from services.auth import get_current_user, UserContext
+from services.middleware import get_current_user, UserContext
+from services.storage import (
+    get_thread_messages,
+    thread_exists,
+    delete_thread,
+)
 
 router = APIRouter(prefix="/api/ai/conversation", tags=["conversation"])
 
@@ -81,6 +86,36 @@ def _msg_to_dict(m: Message) -> dict:
     }
 
 
+def _messages_from_checkpoint(conv_id: int, user_id: int, conv: Conversation) -> list[dict]:
+    """从 Checkpoint 读取消息并转换为前端格式。"""
+    thread_id = f"{user_id}:{conv_id}"
+    raw_messages = get_thread_messages(thread_id)
+
+    result = []
+    for i, msg in enumerate(raw_messages):
+        role = "assistant"
+        if msg.type == "human":
+            role = "user"
+        elif msg.type == "assistant" or msg.type == "ai":
+            role = "assistant"
+        else:
+            # system / tool 消息不展示在前端
+            continue
+
+        result.append({
+            "ID": i + 1,
+            "conversationId": conv_id,
+            "role": role,
+            "content": msg.content,
+            "userId": user_id,
+            "status": conv.latest_status,
+            "attachments": conv.latest_attachments,
+            "createdAt": "",
+        })
+
+    return result
+
+
 # ========== API 端点 ==========
 
 @router.post("")
@@ -140,7 +175,7 @@ async def delete_conversation(
     user: UserContext = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
-    """删除会话及其所有消息"""
+    """删除会话及其 checkpoint 数据"""
     if not user:
         raise HTTPException(401, "未登录")
 
@@ -154,6 +189,13 @@ async def delete_conversation(
 
     db.delete(conv)
     db.commit()
+
+    # 同时删除 checkpoint thread
+    thread_id = f"{user.id}:{conv_id}"
+    try:
+        delete_thread(thread_id)
+    except Exception as e:
+        print(f"[conversation] 删除 checkpoint 失败: {e}")
 
     return {"code": 0, "msg": "删除成功"}
 
@@ -195,7 +237,10 @@ async def get_message_list(
     user: UserContext = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
-    """获取会话消息列表（按时间倒序，最新的在前）"""
+    """获取会话消息列表。
+
+    优先从 Checkpoint 读取；若 Checkpoint 中无数据，降级到 messages 表（兼容旧数据）。
+    """
     if not user:
         raise HTTPException(401, "未登录")
 
@@ -207,6 +252,29 @@ async def get_message_list(
     if not conv:
         raise HTTPException(404, "会话不存在或无权限")
 
+    # 优先从 Checkpoint 读取
+    thread_id = f"{user.id}:{conv_id}"
+    if thread_exists(thread_id):
+        items = _messages_from_checkpoint(conv_id, user.id, conv)
+        # 倒序（最新的在前），内存分页
+        items.reverse()
+        total = len(items)
+        start = (page - 1) * page_size
+        end = start + page_size
+        page_items = items[start:end]
+
+        return {
+            "code": 0,
+            "data": {
+                "list": page_items,
+                "total": total,
+                "page": page,
+                "pageSize": page_size,
+            },
+            "msg": "获取成功",
+        }
+
+    # 降级：从 messages 表读取（旧数据兼容）
     query = db.query(Message).filter(Message.conversation_id == conv_id)
     total = query.count()
 
