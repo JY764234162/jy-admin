@@ -96,11 +96,19 @@ function ensureWorker() {
 
 function buildChatUrl(resume = false, mode?: "aiserver_chat" | "aiserver_knowledge" | "aiserver_vision" | "aiserver_attachment") {
   const AI_SERVER_URL = import.meta.env.VITE_AI_SERVER_URL || "";
-  const base = AI_SERVER_URL || `${import.meta.env.VITE_API_BASE_URL || ""}${import.meta.env.VITE_API_PREFIX || "/api"}`;
-  if (mode === "aiserver_vision") {
-    return `${base}/api/ai/chat/vision`;
+  if (AI_SERVER_URL) {
+    // 直连 ai-server（开发环境）
+    if (mode === "aiserver_vision") {
+      return `${AI_SERVER_URL}/api/ai/chat/vision`;
+    }
+    return `${AI_SERVER_URL}/api/ai/chat${resume ? "/resume" : ""}`;
   }
-  return `${base}/api/ai/chat${resume ? "/resume" : ""}`;
+  // 通过 Nginx 代理（生产环境，与 Go 后端同域名）
+  const base = `${import.meta.env.VITE_API_BASE_URL || ""}${import.meta.env.VITE_API_PREFIX || "/api"}`;
+  if (mode === "aiserver_vision") {
+    return `${base}/ai/chat/vision`;
+  }
+  return `${base}/ai/chat${resume ? "/resume" : ""}`;
 }
 
 function createStreamId() {
