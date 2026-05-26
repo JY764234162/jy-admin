@@ -38,6 +38,13 @@ UPLOAD_DIR.mkdir(exist_ok=True)
 VECTOR_DIR = BASE_DIR / os.getenv("VECTOR_DIR", "vector_data")
 VECTOR_DIR.mkdir(exist_ok=True)
 
+# HuggingFace 镜像（国内访问）
+HF_ENDPOINT = os.getenv("HF_ENDPOINT", "https://hf-mirror.com")
+os.environ.setdefault("HF_ENDPOINT", HF_ENDPOINT)
+
+# Tavily 搜索
+TAVILY_API_KEY = os.getenv("TAVILY_API_KEY", "")
+
 # 多模态配置（GLM-4V）
 GLM4V_API_KEY = os.getenv("GLM4V_API_KEY", "")
 GLM4V_BASE_URL = os.getenv("GLM4V_BASE_URL", "https://open.bigmodel.cn/api/paas/v4")
@@ -46,3 +53,6 @@ GLM4V_MODEL = os.getenv("GLM4V_MODEL", "glm-4v-plus")
 # 文档拆分
 CHUNK_SIZE = int(os.getenv("CHUNK_SIZE", "500"))
 CHUNK_OVERLAP = int(os.getenv("CHUNK_OVERLAP", "50"))
+
+# JWT 配置（与 Go 后端共用同一个签名密钥）
+JWT_SIGNING_KEY = os.getenv("JWT_SIGNING_KEY", "")

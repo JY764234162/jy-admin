@@ -3,19 +3,22 @@ import json
 import uuid
 from typing import Optional, List
 
-from fastapi import APIRouter, HTTPException, Header
+from fastapi import APIRouter, HTTPException, Header, Depends
 from pydantic import BaseModel
 from starlette.responses import StreamingResponse
 from langchain_core.prompts import ChatPromptTemplate, MessagesPlaceholder
 from langchain_core.runnables.history import RunnableWithMessageHistory
 from langchain_core.messages import HumanMessage, AIMessage
 from langchain.agents import create_agent
+from sqlalchemy.orm import Session
 
 from services.llm import llm
 from services.semantic_memory import VectorChatMessageHistory, SemanticMemory
 from services.agent_tools import get_tools
+from services.auth import get_current_user, UserContext
+from models.conversation import Conversation, Message, get_db
 
-router = APIRouter(prefix="/api/chat", tags=["chat"])
+router = APIRouter(prefix="/api/ai/chat", tags=["chat"])
 
 # ========== 语义记忆全局实例 ==========
 semantic_memory = SemanticMemory(top_k=5)
@@ -72,7 +75,8 @@ class ChatRequest(BaseModel):
     conversation_id: Optional[str] = None
     messages: Optional[List[ChatMessage]] = None
     deep_thinking: Optional[bool] = False
-    user_id: Optional[str] = ""  # 用于语义记忆隔离
+    user_id: Optional[str] = ""  # 用于语义记忆隔离（向后兼容）
+    attachments: Optional[str] = "[]"  # JSON 字符串，附件信息
 
 
 AGENT_SYSTEM_PROMPT = """你是一个智能助手，擅长通过调用工具来解决问题。
@@ -92,6 +96,36 @@ AGENT_SYSTEM_PROMPT = """你是一个智能助手，擅长通过调用工具来�
 
 def _sse_json(data: dict) -> str:
     return f"data: {json.dumps(data, ensure_ascii=False)}\n\n"
+
+
+# ========== 数据库持久化辅助函数 ==========
+
+def _persist_chat_result(ai_msg_id: int, conv_id: int, content: str, status: str, user_msg: str):
+    """在独立 Session 中更新 AI 消息状态和会话元数据。
+
+    供 event_generator 的 finally 块调用，避免生成器内直接操作已关闭的 Session。
+    """
+    from models.conversation import SessionLocal
+    db = SessionLocal()
+    try:
+        # 更新 AI 消息
+        ai_msg = db.query(Message).filter(Message.id == ai_msg_id).first()
+        if ai_msg:
+            ai_msg.content = content
+            ai_msg.status = status
+            db.commit()
+
+        # 更新会话
+        conv = db.query(Conversation).filter(Conversation.id == conv_id).first()
+        if conv:
+            last = user_msg[:100] if len(user_msg) > 100 else user_msg
+            conv.last_msg = last
+            conv.message_count += 2
+            db.commit()
+    except Exception as e:
+        print(f"[chat] 持久化失败: {e}")
+    finally:
+        db.close()
 
 
 def _make_process_with_steps(steps: list[dict]) -> dict:
@@ -114,7 +148,11 @@ class VisionRequest(BaseModel):
 
 
 @router.post("/vision")
-async def chat_vision(req: VisionRequest):
+async def chat_vision(
+    req: VisionRequest,
+    user: UserContext = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
     """多模态视觉对话（GLM-4V），接收 base64 图片 + 文字问题，SSE 流式返回"""
     from services.llm import vision_llm
 
@@ -125,12 +163,51 @@ async def chat_vision(req: VisionRequest):
     if not req.image_base64.strip():
         raise HTTPException(400, "图片不能为空")
 
+    user_id = user.id if user else 0
+    if not user_id:
+        raise HTTPException(401, "未登录")
+
     conversation_id = req.conversation_id or uuid.uuid4().hex[:16]
+
+    # 验证会话
+    conv_db_id = None
+    ai_msg_id = None
+    if req.conversation_id:
+        try:
+            conv_id_int = int(req.conversation_id)
+            conv = db.query(Conversation).filter(
+                Conversation.id == conv_id_int,
+                Conversation.user_id == user_id,
+            ).first()
+            if conv:
+                conv_db_id = conv.id
+                # 保存用户消息
+                user_msg = Message(
+                    conversation_id=conv_db_id,
+                    role="user",
+                    content=req.message.strip(),
+                    user_id=user_id,
+                )
+                db.add(user_msg)
+                db.commit()
+                # AI 占位
+                ai_msg = Message(
+                    conversation_id=conv_db_id,
+                    role="assistant",
+                    content="",
+                    user_id=user_id,
+                    status="loading",
+                )
+                db.add(ai_msg)
+                db.commit()
+                db.refresh(ai_msg)
+                ai_msg_id = ai_msg.id
+        except ValueError:
+            pass
 
     # 构造多模态消息（OpenAI 兼容格式）
     image_url = req.image_base64
     if not image_url.startswith("data:"):
-        # 如果前端只传了裸 base64，补全 data URI
         image_url = f"data:image/jpeg;base64,{req.image_base64}"
 
     multimodal_messages = [
@@ -145,6 +222,7 @@ async def chat_vision(req: VisionRequest):
 
     async def event_generator():
         full_response = ""
+        error_msg = None
         try:
             sync_gen = vision_llm.stream(multimodal_messages)
             loop = asyncio.get_event_loop()
@@ -167,7 +245,21 @@ async def chat_vision(req: VisionRequest):
 
             yield _sse_json({"content": "", "done": True, "conversation_id": conversation_id})
         except Exception as e:
-            yield _sse_json({"content": "", "done": True, "error": str(e)})
+            error_msg = str(e)
+            yield _sse_json({"content": "", "done": True, "error": error_msg})
+        finally:
+            if ai_msg_id and conv_db_id:
+                status = "error" if error_msg else "success"
+                loop = asyncio.get_event_loop()
+                await loop.run_in_executor(
+                    None,
+                    _persist_chat_result,
+                    ai_msg_id,
+                    conv_db_id,
+                    full_response,
+                    status,
+                    req.message.strip(),
+                )
 
     return StreamingResponse(
         event_generator(),
@@ -279,19 +371,71 @@ async def _run_agent_stream(
 
 
 @router.post("")
-async def chat_message(req: ChatRequest):
+async def chat_message(
+    req: ChatRequest,
+    user: UserContext = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
     if not req.message.strip():
         raise HTTPException(400, "消息不能为空")
 
+    # user_id 优先从 JWT 获取，fallback 到请求体（向后兼容）
+    user_id = user.id if user else (req.user_id or "")
+    if not user_id:
+        raise HTTPException(401, "未登录")
+
     conversation_id = req.conversation_id or uuid.uuid4().hex[:16]
-    user_id = req.user_id or ""
+
+    # 验证会话存在且属于当前用户
+    conv = None
+    if req.conversation_id:
+        try:
+            conv_id_int = int(req.conversation_id)
+            conv = db.query(Conversation).filter(
+                Conversation.id == conv_id_int,
+                Conversation.user_id == user_id,
+            ).first()
+        except ValueError:
+            pass
+
+    if req.conversation_id and not conv:
+        raise HTTPException(404, "会话不存在或无权限")
+
+    # 会话数据库 ID（用于保存消息）
+    conv_db_id = conv.id if conv else None
+
+    # 保存用户消息
+    if conv_db_id:
+        user_msg = Message(
+            conversation_id=conv_db_id,
+            role="user",
+            content=req.message.strip(),
+            user_id=user_id,
+            attachments=req.attachments or "[]",
+        )
+        db.add(user_msg)
+        db.commit()
+
+        # 插入 AI 占位消息（loading）
+        ai_msg = Message(
+            conversation_id=conv_db_id,
+            role="assistant",
+            content="",
+            user_id=user_id,
+            status="loading",
+        )
+        db.add(ai_msg)
+        db.commit()
+        db.refresh(ai_msg)
+        ai_msg_id = ai_msg.id
+    else:
+        ai_msg_id = None
 
     # 获取当前会话的短期记忆
     session_key = f"{user_id}:{conversation_id}" if user_id else conversation_id
     history = get_session_history(session_key)
 
     # 首次调用且外部传了 messages：将外部历史导入到 VectorChatMessageHistory
-    # 这样 ai-server 自己也能管理历史，后续不再依赖外部传入
     if req.messages and not history.messages:
         lc_messages = []
         for msg in req.messages:
@@ -303,7 +447,7 @@ async def chat_message(req: ChatRequest):
             history.add_messages(lc_messages)
 
     # 语义检索：跨会话召回与当前问题相关的长期记忆
-    memory_context = semantic_memory.format_memory_context(req.message, user_id)
+    memory_context = semantic_memory.format_memory_context(req.message, str(user_id))
 
     # 组装 system prompt（仅普通聊天模式使用）
     system_content = "你是一个有用的助手。"
@@ -312,12 +456,12 @@ async def chat_message(req: ChatRequest):
 
     async def event_generator():
         full_response = ""
+        error_msg = None
 
         try:
             if req.deep_thinking:
                 # Agent 深度思考流程：真正的 ReAct Agent，调用工具并展示步骤
-                async for event in _run_agent_stream(req, conversation_id, user_id, session_key):
-                    # 从 SSE 事件中提取最终答案，用于保存语义记忆
+                async for event in _run_agent_stream(req, conversation_id, str(user_id), session_key):
                     data_str = event.removeprefix("data: ").strip()
                     try:
                         data = json.loads(data_str)
@@ -345,10 +489,25 @@ async def chat_message(req: ChatRequest):
             # 流式结束后，保存本轮交互到语义记忆（长期记忆）
             if full_response.strip():
                 semantic_memory.save_interaction(
-                    req.message, full_response, conversation_id, user_id
+                    req.message, full_response, conversation_id, str(user_id)
                 )
         except Exception as e:
-            yield _sse_json({"content": "", "done": True, "error": str(e)})
+            error_msg = str(e)
+            yield _sse_json({"content": "", "done": True, "error": error_msg})
+        finally:
+            # 持久化 AI 消息状态和会话元数据
+            if ai_msg_id and conv_db_id:
+                status = "error" if error_msg else "success"
+                loop = asyncio.get_event_loop()
+                await loop.run_in_executor(
+                    None,
+                    _persist_chat_result,
+                    ai_msg_id,
+                    conv_db_id,
+                    full_response,
+                    status,
+                    req.message.strip(),
+                )
 
     # 返回 SSE 流，同时在 header 中返回 conversation_id
     response = StreamingResponse(

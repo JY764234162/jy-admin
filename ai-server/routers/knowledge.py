@@ -18,7 +18,7 @@ import config
 from services import document, vector_store, embedding
 from services.llm import llm
 
-router = APIRouter(prefix="/api/knowledge", tags=["knowledge"])
+router = APIRouter(prefix="/api/ai/knowledge", tags=["knowledge"])
 
 
 # ========== 异步文档解析任务管理 ==========
@@ -597,3 +597,25 @@ async def delete_knowledge(doc_id: str, user_id: str = Query("")):
         f.unlink()
 
     return {"message": f"文档 {doc_id} 已删除"}
+
+
+@router.post("/{doc_id}/retry")
+async def retry_knowledge(doc_id: str, user_id: str = Query("")):
+    """重试失败的文档解析：删除旧向量，重新解析并入库"""
+    # 查找原始文件
+    files = list(config.UPLOAD_DIR.glob(f"{doc_id}_*"))
+    if not files:
+        raise HTTPException(404, f"未找到文档 {doc_id} 的原始文件")
+
+    file_path = files[0]
+    filename = file_path.name[len(doc_id) + 1:]  # 去掉前缀 "{doc_id}_"
+    file_bytes = file_path.read_bytes()
+
+    # 删除旧的向量数据
+    vector_store.delete_document(doc_id, user_id=user_id)
+
+    # 创建新的异步解析任务
+    task = _create_parse_task(filename)
+    asyncio.create_task(_process_document_async(task, file_bytes, user_id, doc_id))
+
+    return {"task_id": task.task_id, "filename": filename, "doc_id": doc_id}
