@@ -12,7 +12,7 @@ ENV/
 env/
 
 # UV
-uv.lock
+# uv.lock 需要参与 Docker 构建（uv sync --frozen 依赖它）
 
 # IDE
 .vscode/
