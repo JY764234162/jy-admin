@@ -11,7 +11,7 @@ import {
 import { Attachments, type AttachmentsProps, Sender } from "@ant-design/x";
 import { Badge, Button, Flex, Divider, Progress, message as antdMessage } from "antd";
 import { layoutSlice } from "@/store/slice/layout";
-import { aiServerApi, type KnowledgeProgressEvent } from "@/api/aiServer";
+import { aiServerApi, type KnowledgeProgressEvent } from "@/api/aiDirect";
 const Switch = Sender.Switch;
 
 const SUPPORTED_DOC_EXTS = new Set([".pdf", ".txt", ".md", ".docx", ".xlsx", ".xls", ".csv"]);

@@ -1,7 +1,7 @@
 import { Conversations, type ConversationsProps } from "@ant-design/x";
 import { MessageOutlined, DeleteOutlined, EditOutlined } from "@ant-design/icons";
 import { Input, Modal, Flex } from "antd";
-import type { AIConversation } from "@/api/ai";
+import type { AIConversation } from "@/api/aiDirect";
 import { getConversationTimeGroupKey } from "./conversationTimeGroup";
 
 interface ChatSidebarProps {

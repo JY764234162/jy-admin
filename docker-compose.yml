@@ -150,10 +150,9 @@ services:
       PG_DB: ai_vectors
       PG_USER: ai_admin
       PG_PASSWORD: ${PG_PASSWORD:-ai123456}
-    # 不暴露端口到宿主机，仅 Docker 内网访问（Go 后端通过 http://ai-server:8000 调用）
-    # 如需临时调试 ai-server，取消下面注释
-    # ports:
-    #   - "8000:8000"
+    # 暴露端口到宿主机（前端开发环境直连 + Nginx 代理）
+    ports:
+      - "8000:8000"
     volumes:
       - ai_uploads:/app/uploads
     depends_on:

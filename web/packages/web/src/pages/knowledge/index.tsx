@@ -32,7 +32,7 @@ import {
   MoreOutlined,
 } from "@ant-design/icons";
 import type { ColumnsType } from "antd/es/table";
-import { aiServerApi, type KnowledgeDocument } from "@/api/aiServer";
+import { aiServerApi, type KnowledgeDocument } from "@/api/aiDirect";
 import { layoutSlice } from "@/store/slice/layout";
 
 export const Component = () => {

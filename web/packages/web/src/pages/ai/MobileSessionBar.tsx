@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { MenuOutlined } from "@ant-design/icons";
 import { Button, Drawer, Flex, Typography } from "antd";
-import type { AIConversation } from "@/api/ai";
+import type { AIConversation } from "@/api/aiDirect";
 import { ChatSidebar } from "./ChatSidebar";
 
 interface MobileSessionBarProps {
