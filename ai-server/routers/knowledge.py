@@ -15,7 +15,8 @@ from langchain_core.runnables import RunnablePassthrough
 from langchain_core.output_parsers import StrOutputParser
 
 import config
-from services import document, vector_store, embedding
+from services.rag import document, embedding
+from services.storage import vector_store
 from services.llm import llm
 
 router = APIRouter(prefix="/api/ai/knowledge", tags=["knowledge"])

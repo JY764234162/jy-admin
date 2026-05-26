@@ -5,7 +5,7 @@ from langchain_core.documents import Document
 from sqlalchemy import create_engine, text
 
 import config
-from services import embedding
+from services.rag import embedding
 
 _connection_string = config.PG_CONNECTION_STRING
 _collection_name = "jy_admin_knowledge"
