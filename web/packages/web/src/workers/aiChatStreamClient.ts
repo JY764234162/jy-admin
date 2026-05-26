@@ -155,7 +155,6 @@ export const aiChatStreamClient = {
       content: string;
       mode?: "aiserver_chat" | "aiserver_knowledge" | "aiserver_vision" | "aiserver_attachment";
       resume?: boolean;
-      deepThinking?: boolean;
       imageBase64?: string;
       docIds?: string[];
       attachments?: { uid: string; filename: string; url?: string }[];
@@ -165,7 +164,6 @@ export const aiChatStreamClient = {
       content,
       mode = "aiserver_chat",
       resume = false,
-      deepThinking = false,
       imageBase64,
       docIds,
       attachments,
@@ -182,7 +180,6 @@ export const aiChatStreamClient = {
         content,
         mode,
         resume,
-        deepThinking,
         imageBase64,
         docIds,
         attachments,

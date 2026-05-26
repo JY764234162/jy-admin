@@ -76,7 +76,6 @@ export interface ChatMessageRequest {
   conversationId: number;
   content: string;
   mode?: string;
-  deepThinking?: boolean;
   docIds?: string[];
   attachments?: string;
 }

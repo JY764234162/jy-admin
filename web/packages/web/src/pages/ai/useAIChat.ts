@@ -309,7 +309,6 @@ export function useAIChat(conversationId: number | null, options: UseAIChatOptio
       const {
         content: userContent,
         useKnowledge,
-        deepThink,
         targetConversationId,
         resume,
         imageBase64,
@@ -406,7 +405,7 @@ export function useAIChat(conversationId: number | null, options: UseAIChatOptio
 
       try {
         live.current.refreshSessionsAfterStream = true;
-        aiChatStreamClient.start(cid, { content, mode, deepThinking: deepThink, imageBase64, docIds, attachments });
+        aiChatStreamClient.start(cid, { content, mode, imageBase64, docIds, attachments });
         return true;
       } catch (error) {
         console.error("发送消息失败:", error);

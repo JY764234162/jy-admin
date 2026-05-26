@@ -46,7 +46,6 @@ function fileToBase64(file: File): Promise<string> {
 type SendFromInput = (options: {
   content: string;
   useKnowledge?: boolean;
-  deepThink?: boolean;
   imageBase64?: string;
   docIds?: string[];
   attachments?: { uid: string; filename: string }[];
@@ -86,7 +85,6 @@ export const ChatInput = ({ loading, sendMessage }: ChatInputProps) => {
   const [useKnowledge, setUseKnowledge] = useState(false);
   const [open, setOpen] = useState(false);
   const [items, setItems] = useState<NonNullable<AttachmentsProps["items"]>>([]);
-  const [deepThink, setDeepThink] = useState(false);
   const [uploadingFiles, setUploadingFiles] = useState<UploadingFile[]>([]);
   const senderRef = useRef<ComponentRef<typeof Sender>>(null);
   const abortMapRef = useRef<Map<string, { abort: () => void }>>(new Map());
@@ -257,7 +255,6 @@ export const ChatInput = ({ loading, sendMessage }: ChatInputProps) => {
         }));
         const ok = await sendMessage({
           content: text,
-          deepThink,
           imageBase64: base64,
           attachments: imgAttachments,
         });
@@ -332,7 +329,6 @@ export const ChatInput = ({ loading, sendMessage }: ChatInputProps) => {
       const ok = await sendMessage({
         content: text,
         useKnowledge,
-        deepThink,
         docIds,
         attachments,
       });
@@ -348,7 +344,7 @@ export const ChatInput = ({ loading, sendMessage }: ChatInputProps) => {
     }
 
     // 无附件：正常聊天
-    const ok = await sendMessage({ content: text, useKnowledge, deepThink });
+    const ok = await sendMessage({ content: text, useKnowledge });
     if (ok) {
       setValue("");
     }
@@ -450,7 +446,6 @@ export const ChatInput = ({ loading, sendMessage }: ChatInputProps) => {
         footer={(actionNode) => (
           <Flex justify="space-between" align="center">
             <Flex gap="small" align="center">
-              <Switch value={deepThink} checkedChildren="深度思考" unCheckedChildren="深度思考" onChange={setDeepThink} />
               <Switch
                 value={useKnowledge}
                 checkedChildren="知识库"

@@ -12,8 +12,9 @@ from langchain_core.tools import tool
 from langgraph.prebuilt import create_react_agent
 
 from services.storage.checkpoint_store import get_saver, get_thread_messages
+from services.tools.image_tools import image_understand_tool
+from services.tools.knowledge_tools import make_search_knowledge_tool
 from .llm import llm
-from services.storage import vector_store
 
 AGENT_SYSTEM_PROMPT = """你是一个智能助手，擅长通过调用工具来解决问题。
 
@@ -21,11 +22,14 @@ AGENT_SYSTEM_PROMPT = """你是一个智能助手，擅长通过调用工具来�
 1. 分析用户需求，确定需要调用哪些工具
 2. 调用工具获取信息
 3. 基于工具返回的结果进行推理
-4. 给出完整、准确的回答
+4. 给出完整、准确的回答，并在引用知识库内容时标注来源
 
 可用的工具包括：
-- search_knowledge: 搜索知识库，获取已上传文档中的相关信息
+- search_knowledge: 搜索知识库，获取已上传文档中的相关信息。当用户询问文档内容、需要查询特定知识或验证某个事实时，请调用此工具。搜索结果会附带来源文件名，请在回答中引用。
 - calculator: 计算数学表达式
+- image_understand: 理解图片内容，当用户上传图片或询问图片相关问题时使用
+
+引用规范：当你使用 search_knowledge 获取到资料时，请在回答末尾或相关段落标注引用来源，格式为【来源：文件名】。
 
 请用中文思考和回答。"""
 
@@ -50,26 +54,10 @@ def _make_process_with_steps(steps: list[dict]) -> dict:
     }
 
 
-def make_tools(user_id: str):
-    """创建已绑定 user_id 的工具列表。"""
+def make_tools(user_id: str = "", doc_ids: str = ""):
+    """创建已绑定 user_id 和 doc_ids 的工具列表。"""
 
-    @tool
-    def search_knowledge(query: str) -> str:
-        """搜索知识库，返回与查询最相关的文档片段。
-
-        当你需要查询已上传的文档、获取特定知识、或验证某个事实时，请使用此工具。
-        输入应为清晰、具体的问题或关键词。
-        """
-        results = vector_store.search(query, top_k=3, user_id=user_id)
-        if not results:
-            return "知识库中没有找到相关信息。"
-
-        parts = []
-        for i, r in enumerate(results, 1):
-            source = r.get("source", "未知文件")
-            parts.append(f"【来源：{source}】\n{r['content']}")
-
-        return "\n\n---\n\n".join(parts)
+    search_knowledge = make_search_knowledge_tool(user_id=user_id, doc_ids=doc_ids)
 
     @tool
     def calculator(expression: str) -> str:
@@ -93,12 +81,12 @@ def make_tools(user_id: str):
         except Exception as e:
             return f"计算错误：{str(e)}，请检查表达式格式。"
 
-    return [search_knowledge, calculator]
+    return [search_knowledge, calculator, image_understand_tool]
 
 
-def build_agent_graph(system_prompt: str = "", user_id: str = ""):
+def build_agent_graph(system_prompt: str = "", user_id: str = "", doc_ids: str = ""):
     """构建并编译 ReAct Agent 图。"""
-    tools = make_tools(user_id)
+    tools = make_tools(user_id=user_id, doc_ids=doc_ids)
     prompt = system_prompt or AGENT_SYSTEM_PROMPT
     return create_react_agent(
         llm,
@@ -113,17 +101,26 @@ async def stream_agent(
     thread_id: str,
     user_id: str = "",
     memory_context: str = "",
+    image_url: str = "",
+    doc_ids: str = "",
 ) -> AsyncIterator[str]:
     """Agent 深度思考的流式 SSE 输出。
 
     捕获 agent / tools 节点输出，实时推送思考过程。
     """
-    graph = build_agent_graph(memory_context, user_id)
+    graph = build_agent_graph(memory_context, user_id, doc_ids)
     config = {"configurable": {"thread_id": thread_id}}
 
     # 获取历史消息并追加当前输入
     past_messages = get_thread_messages(thread_id)
-    messages = past_messages + [HumanMessage(content=message)]
+
+    # 如果有图片 URL，在消息中嵌入图片信息，便于 Agent 调用 image_understand 工具
+    if image_url:
+        content = f"用户上传了一张图片，图片地址为: {image_url}\n\n用户的问题是: {message}"
+    else:
+        content = message
+
+    messages = past_messages + [HumanMessage(content=content)]
 
     # 初始分析步骤
     yield _sse_json({

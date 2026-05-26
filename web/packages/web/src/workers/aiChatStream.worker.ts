@@ -13,8 +13,6 @@ type StartPayload = {
   knowledgeConfig?: { top_k?: number };
   /** 是否为恢复模式（刷新后重连，不重复保存用户消息） */
   resume?: boolean;
-  /** 是否启用深度思考 */
-  deepThinking?: boolean;
   /** 多模态图片 base64（仅 vision 模式使用） */
   imageBase64?: string;
   /** 指定检索的文档 doc_ids（仅 knowledge 模式使用） */
@@ -194,9 +192,8 @@ async function startStream(p: StartPayload) {
           }
         : {
             conversationId: p.conversationId,
-            content: p.content,
+            message: p.content,
             mode: p.mode ?? "aiserver_chat",
-            deepThinking: p.deepThinking ?? false,
             doc_ids: p.docIds,
             attachments: p.attachments ? JSON.stringify(p.attachments) : undefined,
           };

@@ -29,12 +29,15 @@ class ChatMessage(BaseModel):
 
 
 class ChatRequest(BaseModel):
-    message: str
+    message: str = ""
+    content: str = ""  # 前端兼容字段（与 message 等价）
     conversation_id: Optional[str] = None
     messages: Optional[List[ChatMessage]] = None
-    deep_thinking: Optional[bool] = False
     user_id: Optional[str] = ""  # 用于语义记忆隔离（向后兼容）
     attachments: Optional[str] = "[]"  # JSON 字符串，附件信息
+    image_url: Optional[str] = None  # 图片 URL，有值时走 Agent 图片识别工具
+    doc_ids: Optional[List[str]] = None  # 指定检索的文档 ID 列表
+    mode: Optional[str] = "aiserver_chat"  # aiserver_chat | aiserver_knowledge | aiserver_attachment
 
 
 def _sse_json(data: dict) -> str:
@@ -174,7 +177,9 @@ async def chat_message(
     user: UserContext = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
-    if not req.message.strip():
+    # 兼容前端字段：优先取 message，fallback 到 content
+    user_message = req.message.strip() or req.content.strip()
+    if not user_message:
         raise HTTPException(400, "消息不能为空")
 
     # user_id 优先从 JWT 获取，fallback 到请求体（向后兼容）
@@ -203,20 +208,29 @@ async def chat_message(
     conv_db_id = conv.id if conv else None
 
     # 语义检索：跨会话召回与当前问题相关的长期记忆
-    memory_context = semantic_memory.format_memory_context(req.message, str(user_id))
+    memory_context = semantic_memory.format_memory_context(user_message, str(user_id))
 
     # thread_id 用于 Checkpoint
     session_key = f"{user_id}:{conversation_id}" if user_id else conversation_id
+
+    # 判断是否需要走 Agent 流程（图片、指定文档、或知识库模式）
+    use_agent = bool(
+        req.image_url
+        or (req.doc_ids and len(req.doc_ids) > 0)
+        or req.mode == "aiserver_knowledge"
+    )
+    doc_ids_str = ",".join(req.doc_ids) if req.doc_ids else ""
 
     async def event_generator():
         full_response = ""
         error_msg = None
 
         try:
-            if req.deep_thinking:
-                # Agent 深度思考流程
+            if use_agent:
+                # Agent 流程：支持工具调用（图片识别、知识库搜索、计算器等）
                 async for event in stream_agent(
-                    req.message, session_key, str(user_id), memory_context
+                    user_message, session_key, str(user_id), memory_context,
+                    req.image_url or "", doc_ids_str
                 ):
                     data_str = event.removeprefix("data: ").strip()
                     try:
@@ -229,7 +243,7 @@ async def chat_message(
             else:
                 # 普通聊天流程（LangGraph + Checkpoint）
                 async for event in stream_chat(
-                    req.message, session_key, memory_context
+                    user_message, session_key, memory_context
                 ):
                     data_str = event.removeprefix("data: ").strip()
                     try:
@@ -251,7 +265,7 @@ async def chat_message(
             # 流式结束后，保存本轮交互到语义记忆（长期记忆）
             if full_response.strip():
                 semantic_memory.save_interaction(
-                    req.message, full_response, conversation_id, str(user_id)
+                    user_message, full_response, conversation_id, str(user_id)
                 )
         except Exception as e:
             error_msg = str(e)
@@ -267,7 +281,7 @@ async def chat_message(
                     conv_db_id,
                     full_response,
                     status,
-                    req.message.strip(),
+                    user_message,
                     req.attachments or "[]",
                 )
 

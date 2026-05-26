@@ -13,7 +13,7 @@ llm = ChatOpenAI(
     streaming=True,
 )
 
-# GLM-4V 多模态实例（智谱 AI，OpenAI 兼容接口）
+# GLM-4V 图片识别（智谱 AI，OpenAI 兼容接口）
 vision_llm = ChatOpenAI(
     model=config.GLM4V_MODEL,
     openai_api_key=config.GLM4V_API_KEY,
