@@ -243,38 +243,21 @@ export const ChatInput = ({ loading, sendMessage }: ChatInputProps) => {
     const imageItems = items.filter((it) => it.originFileObj && isImageFile(it.originFileObj));
     const docItems = items.filter((it) => it.originFileObj && !isImageFile(it.originFileObj));
 
-    // 有图片附件：走多模态 vision 模式
+    // 处理图片附件（转成 base64）
+    let imageBase64: string | undefined;
     if (imageItems.length > 0) {
       const firstImage = imageItems[0]!.originFileObj as File;
       try {
-        const base64 = await fileToBase64(firstImage);
-        const imgAttachments = imageItems.map((it) => ({
-          uid: it.uid,
-          filename: it.originFileObj?.name || "未知图片",
-          url: it.url || "",
-        }));
-        const ok = await sendMessage({
-          content: text,
-          imageBase64: base64,
-          attachments: imgAttachments,
-        });
-        if (ok) {
-          setValue("");
-          items.forEach((it) => {
-            if (it.url?.startsWith("blob:")) URL.revokeObjectURL(it.url);
-          });
-          setItems([]);
-          setUploadingFiles([]);
-        }
+        imageBase64 = await fileToBase64(firstImage);
       } catch (e: any) {
         antdMessage.error(`图片处理失败：${e?.message || e}`);
+        return;
       }
-      return;
     }
 
-    // 有文档附件：先解析（向量化），再进入附件问答（仅基于刚上传的文件回答，与知识库开关无关）
+    // 处理文档附件：先解析（向量化）
+    let docIds: string[] | undefined;
     if (docItems.length > 0) {
-      // 检查是否有已失败的文件，有则提示并阻止发送
       const failedDocs = docItems.filter((it) => {
         const cur = uploadingFiles.find((u) => u.uid === it.uid);
         return cur?.stage === "failed";
@@ -284,7 +267,6 @@ export const ChatInput = ({ loading, sendMessage }: ChatInputProps) => {
         return;
       }
 
-      // 只上传尚未完成的文件（已完成或失败的不重试）
       const pending = docItems.filter((it) => {
         const cur = uploadingFiles.find((u) => u.uid === it.uid);
         return !cur || (cur.stage !== "completed" && cur.stage !== "failed");
@@ -301,7 +283,6 @@ export const ChatInput = ({ loading, sendMessage }: ChatInputProps) => {
         return;
       }
 
-      // 上传完成后再次检查是否全部成功
       const stillFailed = docItems.filter((it) => {
         const cur = uploadingFiles.find((u) => u.uid === it.uid);
         return cur?.stage === "failed";
@@ -311,44 +292,37 @@ export const ChatInput = ({ loading, sendMessage }: ChatInputProps) => {
         return;
       }
 
-      // 收集本次已成功向量化的 doc_id，传给后端做精确检索
-      const docIds = docItems
+      docIds = docItems
         .map((it) => uploadingFiles.find((u) => u.uid === it.uid)?.docId)
         .filter((id): id is string => !!id);
-
-      const attachments = docItems.map((it) => {
-        const uploadInfo = uploadingFiles.find((u) => u.uid === it.uid);
-        return {
-          uid: it.uid,
-          filename: it.originFileObj?.name || "未知文件",
-          url: uploadInfo?.cosUrl || it.url || "",
-        };
-      });
-
-      // 附件和知识库开关独立：勾选了知识库就走 knowledge（会混合检索附件+知识库），否则只检索附件
-      const ok = await sendMessage({
-        content: text,
-        useKnowledge,
-        docIds,
-        attachments,
-      });
-      if (ok) {
-        setValue("");
-        items.forEach((it) => {
-          if (it.url?.startsWith("blob:")) URL.revokeObjectURL(it.url);
-        });
-        setItems([]);
-        setUploadingFiles([]);
-      }
-      return;
     }
 
-    // 无附件：正常聊天
-    const ok = await sendMessage({ content: text, useKnowledge });
+    // 合并所有附件元数据
+    const attachments = items.map((it) => {
+      const uploadInfo = uploadingFiles.find((u) => u.uid === it.uid);
+      return {
+        uid: it.uid,
+        filename: it.originFileObj?.name || "未知文件",
+        url: uploadInfo?.cosUrl || it.url || "",
+      };
+    });
+
+    // 统一发送（chat 接口已支持图片识别）
+    const ok = await sendMessage({
+      content: text,
+      useKnowledge,
+      imageBase64,
+      docIds,
+      attachments: attachments.length > 0 ? attachments : undefined,
+    });
     if (ok) {
       setValue("");
+      items.forEach((it) => {
+        if (it.url?.startsWith("blob:")) URL.revokeObjectURL(it.url);
+      });
+      setItems([]);
+      setUploadingFiles([]);
     }
-    setItems([]);
   };
 
   const handleKnowledgeChange = (checked: boolean) => {

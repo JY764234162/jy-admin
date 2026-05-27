@@ -12,9 +12,9 @@ import { message as antdMessage } from "antd";
 import { aiApi, type AIConversation, type AIMessage } from "@/api/aiDirect";
 import { aiChatStreamClient } from "@/workers/aiChatStreamClient";
 import { conversationTitleFromFirstMessage } from "./conversationTitle";
-import type { ChatMode, UiMessage, SendOptions } from "./types";
+import type { UiMessage, SendOptions } from "./types";
 
-export type { ChatMode, UiMessage, SendOptions } from "./types";
+export type { UiMessage, SendOptions } from "./types";
 
 interface UseAIChatOptions {
   pageSize?: number;
@@ -123,12 +123,12 @@ export function useAIChat(conversationId: number | null, options: UseAIChatOptio
 
   /** 列表里存在未完成的 AI 条目标记为 loading 时，由 worker 续传；与 sendMessage(resume) 共用一套启动逻辑 */
   const beginResumeStream = useCallback(
-    (cid: number, loadingMsg: UiMessage, resumeContent: string, mode: ChatMode, enableKnowledge: boolean) => {
+    (cid: number, loadingMsg: UiMessage, resumeContent: string, enableKnowledge: boolean) => {
       live.current.streamingAiMsgId = loadingMsg.id;
       markConversationStreaming(cid);
       try {
         live.current.refreshSessionsAfterStream = true;
-        aiChatStreamClient.start(cid, { content: resumeContent, mode, resume: true, enable_knowledge: enableKnowledge });
+        aiChatStreamClient.start(cid, { content: resumeContent, resume: true, enable_knowledge: enableKnowledge });
       } catch (error) {
         console.error("恢复流式输出失败:", error);
         antdMessage.error("恢复流式输出失败");
@@ -188,7 +188,7 @@ export function useAIChat(conversationId: number | null, options: UseAIChatOptio
               const loadingIdx = messageList.indexOf(loadingMsg);
               const userMsg = loadingIdx > 0 ? messageList[loadingIdx - 1] : null;
               setTimeout(() => {
-                beginResumeStream(cid, loadingMsg, userMsg?.content || "", "aiserver_chat", false);
+                beginResumeStream(cid, loadingMsg, userMsg?.content || "", false);
               }, 0);
             }
           }
@@ -316,9 +316,6 @@ export function useAIChat(conversationId: number | null, options: UseAIChatOptio
         attachments,
       } = options;
 
-      // 仅区分 vision 和非 vision（知识库通过 enable_knowledge 控制）
-      const mode: ChatMode = imageBase64 ? "aiserver_vision" : "aiserver_chat";
-
       if (!userContent.trim() && !resume) {
         return false;
       }
@@ -365,7 +362,7 @@ export function useAIChat(conversationId: number | null, options: UseAIChatOptio
           return false;
         }
         const enableKnowledge = !!(useKnowledge || (docIds && docIds.length > 0));
-        beginResumeStream(cid, loadingMsg, content, mode, enableKnowledge);
+        beginResumeStream(cid, loadingMsg, content, enableKnowledge);
         return true;
       }
 
@@ -399,7 +396,7 @@ export function useAIChat(conversationId: number | null, options: UseAIChatOptio
       try {
         live.current.refreshSessionsAfterStream = true;
         const enableKnowledgeForStart = !!(useKnowledge || (docIds && docIds.length > 0));
-        aiChatStreamClient.start(cid, { content, mode, imageBase64, docIds, attachments, enable_knowledge: enableKnowledgeForStart });
+        aiChatStreamClient.start(cid, { content, imageBase64, docIds, attachments, enable_knowledge: enableKnowledgeForStart });
         return true;
       } catch (error) {
         console.error("发送消息失败:", error);

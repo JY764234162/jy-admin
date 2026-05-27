@@ -1,5 +1,3 @@
-export type ChatMode = "aiserver_chat" | "aiserver_vision";
-
 export interface ProcessStep {
   step_id: string;
   status: "processing" | "successful" | "failed";

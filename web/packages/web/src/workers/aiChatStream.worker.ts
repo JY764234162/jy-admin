@@ -7,17 +7,15 @@ type StartPayload = {
   token?: string | null;
   conversationId: number;
   content: string;
-  /** 调用模式：aiserver_chat=ai-server聊天，aiserver_vision=多模态视觉 */
-  mode?: "aiserver_chat" | "aiserver_vision";
   /** 是否启用知识库工具（勾选知识库时传 true） */
   enable_knowledge?: boolean;
   /** 知识库问答配置 */
   knowledgeConfig?: { top_k?: number };
   /** 是否为恢复模式（刷新后重连，不重复保存用户消息） */
   resume?: boolean;
-  /** 多模态图片 base64（仅 vision 模式使用） */
+  /** 多模态图片 base64 */
   imageBase64?: string;
-  /** 指定检索的文档 doc_ids（仅 knowledge 模式使用） */
+  /** 指定检索的文档 doc_ids */
   docIds?: string[];
   /** 用户消息携带的附件元数据 */
   attachments?: { uid: string; filename: string; url?: string }[];
@@ -183,22 +181,17 @@ async function startStream(p: StartPayload) {
       headers.Authorization = `Bearer ${p.token}`;
     }
 
-    // resume 模式走 /ai/chat/resume，仅传 conversationId；正常聊天走 /ai/chat；vision 走 /ai/chat/vision
+    // resume 模式走 /ai/chat/resume，仅传 conversationId；正常聊天走 /ai/chat
     const body: Record<string, unknown> = p.resume
       ? { conversationId: p.conversationId }
-      : p.mode === "aiserver_vision"
-        ? {
-            conversationId: p.conversationId,
-            message: p.content,
-            image_base64: p.imageBase64 ?? "",
-          }
-        : {
-            conversationId: p.conversationId,
-            message: p.content,
-            enable_knowledge: p.enable_knowledge ?? false,
-            doc_ids: p.docIds,
-            attachments: p.attachments ? JSON.stringify(p.attachments) : undefined,
-          };
+      : {
+          conversationId: p.conversationId,
+          message: p.content,
+          image_url: p.imageBase64 ?? "",
+          enable_knowledge: p.enable_knowledge ?? false,
+          doc_ids: p.docIds,
+          attachments: p.attachments ? JSON.stringify(p.attachments) : undefined,
+        };
 
     const resp = await fetch(p.url, {
       method: "POST",

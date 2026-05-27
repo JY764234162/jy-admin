@@ -7,7 +7,7 @@
 # - 预下载 Embedding 模型到镜像，避免启动时超时
 # ============================================================
 
-FROM ghcr.io/astral-sh/uv:python3.12-bookworm-slim
+FROM ghcr.io/astral-sh/uv:python3.11-bookworm-slim
 
 LABEL MAINTAINER="jy-admin"
 

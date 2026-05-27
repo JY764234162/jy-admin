@@ -94,20 +94,13 @@ function ensureWorker() {
   return workerSingleton;
 }
 
-function buildChatUrl(resume = false, mode?: "aiserver_chat" | "aiserver_vision") {
+function buildChatUrl(resume = false) {
   const AI_SERVER_URL = import.meta.env.VITE_AI_SERVER_URL || "";
   if (AI_SERVER_URL) {
-    // 直连 ai-server（开发环境）
-    if (mode === "aiserver_vision") {
-      return `${AI_SERVER_URL}/api/ai/chat/vision`;
-    }
     return `${AI_SERVER_URL}/api/ai/chat${resume ? "/resume" : ""}`;
   }
   // 通过 Nginx 代理（生产环境，与 Go 后端同域名）
   const base = `${import.meta.env.VITE_API_BASE_URL || ""}${import.meta.env.VITE_API_PREFIX || "/api"}`;
-  if (mode === "aiserver_vision") {
-    return `${base}/ai/chat/vision`;
-  }
   return `${base}/ai/chat${resume ? "/resume" : ""}`;
 }
 
@@ -156,12 +149,11 @@ export const aiChatStreamClient = {
     return latestSnapshotByConversation.get(conversationId) || null;
   },
 
-  /** 启动流式聊天，通过 mode 区分目标服务，enable_knowledge 控制是否查询知识库 */
+  /** 启动流式聊天，enable_knowledge 控制是否查询知识库 */
   start(
     conversationId: number,
     options: {
       content: string;
-      mode?: "aiserver_chat" | "aiserver_vision";
       resume?: boolean;
       imageBase64?: string;
       docIds?: string[];
@@ -171,7 +163,6 @@ export const aiChatStreamClient = {
   ) {
     const {
       content,
-      mode = "aiserver_chat",
       resume = false,
       imageBase64,
       docIds,
@@ -184,11 +175,10 @@ export const aiChatStreamClient = {
       type: "START",
       payload: {
         streamId,
-        url: buildChatUrl(resume, mode),
+        url: buildChatUrl(resume),
         token,
         conversationId,
         content,
-        mode,
         resume,
         imageBase64,
         docIds,
@@ -201,12 +191,12 @@ export const aiChatStreamClient = {
 
   /** 兼容旧调用：启动 ai-server 基础对话流式聊天 */
   startAiServerChat(conversationId: number, content: string) {
-    return this.start(conversationId, { content, mode: "aiserver_chat" });
+    return this.start(conversationId, { content });
   },
 
   /** 兼容旧调用：启动 ai-server 知识库问答流式查询 */
   startAiServerKnowledge(conversationId: number, content: string, _top_k = 3) {
-    return this.start(conversationId, { content, mode: "aiserver_chat", enable_knowledge: true });
+    return this.start(conversationId, { content, enable_knowledge: true });
   },
 
   /** 停止某个 stream */
