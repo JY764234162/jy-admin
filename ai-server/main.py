@@ -18,7 +18,8 @@ app = FastAPI(title="AI Server",
               description="RAG 知识库问答 + AI 对话服务",
               version="2.0.0")
 
-# 认证中间件（在 CORS 之后注册，确保 OPTIONS 预检请求不受认证影响）
+# FastAPI 中间件是栈式注册：后注册的先执行。
+# 要让 CORS 处理 OPTIONS 预检请求，必须后注册 CORS（外层），先注册 Auth（内层）。
 app.add_middleware(AuthMiddleware)
 
 app.add_middleware(

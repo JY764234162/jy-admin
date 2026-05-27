@@ -2,7 +2,7 @@
 # AI Server Dockerfile（FastAPI + LangChain + PGVector + UV）
 # ============================================================
 
-FROM ghcr.io/astral-sh/uv:python3.13-bookworm-slim
+FROM ghcr.io/astral-sh/uv:python3.12-bookworm-slim
 
 LABEL MAINTAINER="jy-admin"
 
@@ -11,8 +11,11 @@ WORKDIR /app
 # 启用 uv 的编译缓存，加速构建
 ENV UV_COMPILE_BYTECODE=1
 
-# 可选：使用国内 PyPI 镜像
-ENV UV_INDEX_URL=https://pypi.tuna.tsinghua.edu.cn/simple
+# 使用阿里云 PyPI 镜像（清华镜像偶发 DNS 解析失败）
+ENV UV_INDEX_URL=https://mirrors.aliyun.com/pypi/simple/
+
+# 构建阶段也使用 HuggingFace 镜像站（避免 huggingface.co 直连失败）
+ENV HF_ENDPOINT=https://hf-mirror.com
 
 # 临时关闭代理、更换国内 apt 源（Debian）并安装系统依赖
 RUN export HTTP_PROXY="" HTTPS_PROXY="" http_proxy="" https_proxy="" \
