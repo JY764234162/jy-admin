@@ -6,11 +6,9 @@ from sqlalchemy import (
     String,
     Text,
     DateTime,
-    ForeignKey,
-    Index,
     create_engine,
 )
-from sqlalchemy.orm import declarative_base, relationship, sessionmaker
+from sqlalchemy.orm import declarative_base, sessionmaker
 
 import config
 
@@ -18,7 +16,7 @@ Base = declarative_base()
 
 
 class Conversation(Base):
-    """AI 会话表（对应 Go 后端 AIConversation）"""
+    """AI 会话元数据表（消息内容由 Checkpoint 管理）"""
 
     __tablename__ = "conversations"
 
@@ -36,35 +34,6 @@ class Conversation(Base):
         default=datetime.utcnow,
         onupdate=datetime.utcnow,
     )
-
-    messages = relationship(
-        "Message",
-        back_populates="conversation",
-        cascade="all, delete-orphan",
-        order_by="Message.created_at.desc()",
-    )
-
-
-class Message(Base):
-    """AI 消息表（对应 Go 后端 AIMessage）"""
-
-    __tablename__ = "messages"
-
-    id = Column(Integer, primary_key=True, autoincrement=True)
-    conversation_id = Column(
-        Integer,
-        ForeignKey("conversations.id", ondelete="CASCADE"),
-        nullable=False,
-        index=True,
-    )
-    role = Column(String(50), nullable=False)  # user / assistant
-    content = Column(Text, nullable=False, default="")
-    user_id = Column(Integer, nullable=False, index=True)
-    status = Column(String(50), nullable=False, default="success")  # success / loading / error
-    attachments = Column(Text, nullable=False, default="[]")
-    created_at = Column(DateTime, nullable=False, default=datetime.utcnow)
-
-    conversation = relationship("Conversation", back_populates="messages")
 
 
 # ========== 数据库引擎和会话工厂 ==========

@@ -4,7 +4,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
-from models.conversation import Conversation, Message, get_db
+from models.conversation import Conversation, get_db
 from services.middleware import get_current_user, UserContext
 from services.storage import (
     get_thread_messages,
@@ -38,20 +38,6 @@ class ConversationResponse(BaseModel):
         from_attributes = True
 
 
-class MessageResponse(BaseModel):
-    id: int
-    conversation_id: int
-    role: str
-    content: str
-    user_id: int
-    status: str
-    attachments: str
-    created_at: str
-
-    class Config:
-        from_attributes = True
-
-
 class PageResult(BaseModel):
     list: list
     total: int
@@ -70,19 +56,6 @@ def _conv_to_dict(c: Conversation) -> dict:
         "message_count": c.message_count,
         "createdAt": c.created_at.isoformat() if c.created_at else "",
         "updatedAt": c.updated_at.isoformat() if c.updated_at else "",
-    }
-
-
-def _msg_to_dict(m: Message) -> dict:
-    return {
-        "ID": m.id,
-        "conversationId": m.conversation_id,
-        "role": m.role,
-        "content": m.content,
-        "userId": m.user_id,
-        "status": m.status,
-        "attachments": m.attachments,
-        "createdAt": m.created_at.isoformat() if m.created_at else "",
     }
 
 
@@ -237,10 +210,7 @@ async def get_message_list(
     user: UserContext = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
-    """获取会话消息列表。
-
-    优先从 Checkpoint 读取；若 Checkpoint 中无数据，降级到 messages 表（兼容旧数据）。
-    """
+    """获取会话消息列表（从 Checkpoint 读取）。"""
     if not user:
         raise HTTPException(401, "未登录")
 
@@ -252,43 +222,19 @@ async def get_message_list(
     if not conv:
         raise HTTPException(404, "会话不存在或无权限")
 
-    # 优先从 Checkpoint 读取
     thread_id = f"{user.id}:{conv_id}"
-    if thread_exists(thread_id):
-        items = _messages_from_checkpoint(conv_id, user.id, conv)
-        # 倒序（最新的在前），内存分页
-        items.reverse()
-        total = len(items)
-        start = (page - 1) * page_size
-        end = start + page_size
-        page_items = items[start:end]
-
-        return {
-            "code": 0,
-            "data": {
-                "list": page_items,
-                "total": total,
-                "page": page,
-                "pageSize": page_size,
-            },
-            "msg": "获取成功",
-        }
-
-    # 降级：从 messages 表读取（旧数据兼容）
-    query = db.query(Message).filter(Message.conversation_id == conv_id)
-    total = query.count()
-
-    messages = (
-        query.order_by(Message.created_at.desc())
-        .offset((page - 1) * page_size)
-        .limit(page_size)
-        .all()
-    )
+    items = _messages_from_checkpoint(conv_id, user.id, conv)
+    # 倒序（最新的在前），内存分页
+    items.reverse()
+    total = len(items)
+    start = (page - 1) * page_size
+    end = start + page_size
+    page_items = items[start:end]
 
     return {
         "code": 0,
         "data": {
-            "list": [_msg_to_dict(m) for m in messages],
+            "list": page_items,
             "total": total,
             "page": page,
             "pageSize": page_size,
