@@ -23,17 +23,10 @@ semantic_memory = get_memory(top_k=5)
 
 # ========== 请求模型 ==========
 
-class ChatMessage(BaseModel):
-    role: str
-    content: str
-
-
 class ChatRequest(BaseModel):
     message: str = ""
-    content: str = ""  # 前端兼容字段（与 message 等价）
     conversation_id: Optional[str] = None
-    messages: Optional[List[ChatMessage]] = None
-    user_id: Optional[str] = ""  # 用于语义记忆隔离（向后兼容）
+    conversationId: Optional[str] = None  # 前端驼峰命名兼容
     attachments: Optional[str] = "[]"  # JSON 字符串，附件信息
     image_url: Optional[str] = None  # 图片 URL，有值时走 Agent 图片识别工具
     doc_ids: Optional[List[str]] = None  # 指定检索的文档 ID 列表
@@ -70,6 +63,7 @@ class VisionRequest(BaseModel):
     message: str
     image_base64: str
     conversation_id: Optional[str] = None
+    conversationId: Optional[str] = None  # 前端驼峰命名兼容
 
 
 @router.post("/vision")
@@ -92,13 +86,14 @@ async def chat_vision(
     if not user_id:
         raise HTTPException(401, "未登录")
 
-    conversation_id = req.conversation_id or uuid.uuid4().hex[:16]
+    # 兼容前端驼峰/蛇形两种命名
+    conversation_id = req.conversation_id or req.conversationId or uuid.uuid4().hex[:16]
 
     # 验证会话并更新元数据
     conv_db_id = None
-    if req.conversation_id:
+    if req.conversation_id or req.conversationId:
         try:
-            conv_id_int = int(req.conversation_id)
+            conv_id_int = int(conversation_id)
             conv = db.query(Conversation).filter(
                 Conversation.id == conv_id_int,
                 Conversation.user_id == user_id,
@@ -177,23 +172,22 @@ async def chat_message(
     user: UserContext = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
-    # 兼容前端字段：优先取 message，fallback 到 content
-    user_message = req.message.strip() or req.content.strip()
+    user_message = req.message.strip()
     if not user_message:
         raise HTTPException(400, "消息不能为空")
 
-    # user_id 优先从 JWT 获取，fallback 到请求体（向后兼容）
-    user_id = user.id if user else (req.user_id or "")
+    user_id = user.id if user else ""
     if not user_id:
         raise HTTPException(401, "未登录")
 
-    conversation_id = req.conversation_id or uuid.uuid4().hex[:16]
+    # 兼容前端驼峰/蛇形两种命名
+    conversation_id = req.conversation_id or req.conversationId or uuid.uuid4().hex[:16]
 
     # 验证会话存在且属于当前用户
     conv = None
-    if req.conversation_id:
+    if req.conversation_id or req.conversationId:
         try:
-            conv_id_int = int(req.conversation_id)
+            conv_id_int = int(conversation_id)
             conv = db.query(Conversation).filter(
                 Conversation.id == conv_id_int,
                 Conversation.user_id == user_id,
@@ -201,7 +195,7 @@ async def chat_message(
         except ValueError:
             pass
 
-    if req.conversation_id and not conv:
+    if (req.conversation_id or req.conversationId) and not conv:
         raise HTTPException(404, "会话不存在或无权限")
 
     # 会话数据库 ID（用于保存元数据）
