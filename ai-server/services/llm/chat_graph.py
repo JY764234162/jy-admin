@@ -11,7 +11,7 @@ from langchain_core.messages import HumanMessage
 from langchain_core.prompts import ChatPromptTemplate, MessagesPlaceholder
 from langgraph.graph import END, START, MessagesState, StateGraph
 
-from services.storage.checkpoint_store import get_saver
+from services.storage.checkpoint_store import get_saver, get_async_saver
 from .llm import llm
 
 
@@ -38,13 +38,13 @@ def make_chat_node(memory_context: str = "") -> Callable:
     return _node
 
 
-def build_chat_graph(memory_context: str = ""):
+def build_chat_graph(memory_context: str = "", checkpointer=None):
     """构建并编译普通聊天的 LangGraph。"""
     builder = StateGraph(MessagesState)
     builder.add_node("chat", make_chat_node(memory_context))
     builder.add_edge(START, "chat")
     builder.add_edge("chat", END)
-    return builder.compile(checkpointer=get_saver())
+    return builder.compile(checkpointer=checkpointer or get_saver())
 
 
 async def stream_chat(
@@ -59,7 +59,8 @@ async def stream_chat(
         thread_id: 格式 "{user_id}:{conversation_id}"
         memory_context: 语义记忆上下文（可选）
     """
-    graph = build_chat_graph(memory_context)
+    saver = await get_async_saver()
+    graph = build_chat_graph(memory_context, checkpointer=saver)
     config = {"configurable": {"thread_id": thread_id}}
 
     async for msg, metadata in graph.astream(

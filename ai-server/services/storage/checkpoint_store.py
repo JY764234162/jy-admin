@@ -3,16 +3,18 @@
 使用 PostgreSQL 作为 checkpoint 后端，与现有 pgvector 容器共用同一个数据库实例。
 """
 
-from typing import List, Optional, Any
+from typing import List, Optional
 
-from langchain_core.messages import BaseMessage, message_to_dict, messages_from_dict
+from langchain_core.messages import BaseMessage, messages_from_dict
 from langgraph.checkpoint.postgres import PostgresSaver
+from langgraph.checkpoint.postgres.aio import AsyncPostgresSaver
 import psycopg
 
 import config
 
 _pool: Optional[psycopg.Connection] = None
 _saver: Optional[PostgresSaver] = None
+_async_saver: Optional[AsyncPostgresSaver] = None
 
 
 def _get_pool() -> psycopg.Connection:
@@ -84,6 +86,16 @@ def get_thread_messages(thread_id: str) -> List[BaseMessage]:
         pass
 
     return []
+
+
+async def get_async_saver() -> AsyncPostgresSaver:
+    """获取 AsyncPostgresSaver 单例（供异步流式调用使用）。"""
+    global _async_saver
+    if _async_saver is None:
+        conn_str = config.PG_CONNECTION_STRING.replace("postgresql+psycopg", "postgresql")
+        conn = await psycopg.AsyncConnection.connect(conn_str, autocommit=True)
+        _async_saver = AsyncPostgresSaver(conn=conn)
+    return _async_saver
 
 
 def delete_thread(thread_id: str) -> None:

@@ -11,7 +11,7 @@ from langchain_core.messages import HumanMessage
 from langchain_core.tools import tool
 from langgraph.prebuilt import create_react_agent
 
-from services.storage.checkpoint_store import get_saver, get_thread_messages
+from services.storage.checkpoint_store import get_saver, get_async_saver, get_thread_messages
 from services.tools.image_tools import image_understand_tool
 from services.tools.knowledge_tools import make_search_knowledge_tool
 from .llm import llm
@@ -84,7 +84,7 @@ def make_tools(user_id: str = "", doc_ids: str = ""):
     return [search_knowledge, calculator, image_understand_tool]
 
 
-def build_agent_graph(system_prompt: str = "", user_id: str = "", doc_ids: str = ""):
+def build_agent_graph(system_prompt: str = "", user_id: str = "", doc_ids: str = "", checkpointer=None):
     """构建并编译 ReAct Agent 图。"""
     tools = make_tools(user_id=user_id, doc_ids=doc_ids)
     prompt = system_prompt or AGENT_SYSTEM_PROMPT
@@ -92,7 +92,7 @@ def build_agent_graph(system_prompt: str = "", user_id: str = "", doc_ids: str =
         llm,
         tools=tools,
         state_modifier=prompt,
-        checkpointer=get_saver(),
+        checkpointer=checkpointer or get_saver(),
     )
 
 
@@ -108,7 +108,8 @@ async def stream_agent(
 
     捕获 agent / tools 节点输出，实时推送思考过程。
     """
-    graph = build_agent_graph(memory_context, user_id, doc_ids)
+    saver = await get_async_saver()
+    graph = build_agent_graph(memory_context, user_id, doc_ids, checkpointer=saver)
     config = {"configurable": {"thread_id": thread_id}}
 
     # 获取历史消息并追加当前输入
