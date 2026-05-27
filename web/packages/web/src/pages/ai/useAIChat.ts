@@ -123,12 +123,12 @@ export function useAIChat(conversationId: number | null, options: UseAIChatOptio
 
   /** 列表里存在未完成的 AI 条目标记为 loading 时，由 worker 续传；与 sendMessage(resume) 共用一套启动逻辑 */
   const beginResumeStream = useCallback(
-    (cid: number, loadingMsg: UiMessage, resumeContent: string, mode: ChatMode) => {
+    (cid: number, loadingMsg: UiMessage, resumeContent: string, mode: ChatMode, enableKnowledge: boolean) => {
       live.current.streamingAiMsgId = loadingMsg.id;
       markConversationStreaming(cid);
       try {
         live.current.refreshSessionsAfterStream = true;
-        aiChatStreamClient.start(cid, { content: resumeContent, mode, resume: true });
+        aiChatStreamClient.start(cid, { content: resumeContent, mode, resume: true, enable_knowledge: enableKnowledge });
       } catch (error) {
         console.error("恢复流式输出失败:", error);
         antdMessage.error("恢复流式输出失败");
@@ -188,7 +188,7 @@ export function useAIChat(conversationId: number | null, options: UseAIChatOptio
               const loadingIdx = messageList.indexOf(loadingMsg);
               const userMsg = loadingIdx > 0 ? messageList[loadingIdx - 1] : null;
               setTimeout(() => {
-                beginResumeStream(cid, loadingMsg, userMsg?.content || "", "aiserver_chat");
+                beginResumeStream(cid, loadingMsg, userMsg?.content || "", "aiserver_chat", false);
               }, 0);
             }
           }
@@ -316,16 +316,8 @@ export function useAIChat(conversationId: number | null, options: UseAIChatOptio
         attachments,
       } = options;
 
-      // 根据附件类型和知识库开关推导最终 mode
-      const mode: ChatMode = imageBase64
-        ? "aiserver_vision"
-        : docIds && docIds.length > 0
-          ? useKnowledge
-            ? "aiserver_knowledge"
-            : "aiserver_attachment"
-          : useKnowledge
-            ? "aiserver_knowledge"
-            : "aiserver_chat";
+      // 仅区分 vision 和非 vision（知识库通过 enable_knowledge 控制）
+      const mode: ChatMode = imageBase64 ? "aiserver_vision" : "aiserver_chat";
 
       if (!userContent.trim() && !resume) {
         return false;
@@ -372,7 +364,8 @@ export function useAIChat(conversationId: number | null, options: UseAIChatOptio
           antdMessage.error("没有可恢复的 AI 消息");
           return false;
         }
-        beginResumeStream(cid, loadingMsg, content, mode);
+        const enableKnowledge = !!(useKnowledge || (docIds && docIds.length > 0));
+        beginResumeStream(cid, loadingMsg, content, mode, enableKnowledge);
         return true;
       }
 
@@ -405,7 +398,8 @@ export function useAIChat(conversationId: number | null, options: UseAIChatOptio
 
       try {
         live.current.refreshSessionsAfterStream = true;
-        aiChatStreamClient.start(cid, { content, mode, imageBase64, docIds, attachments });
+        const enableKnowledgeForStart = !!(useKnowledge || (docIds && docIds.length > 0));
+        aiChatStreamClient.start(cid, { content, mode, imageBase64, docIds, attachments, enable_knowledge: enableKnowledgeForStart });
         return true;
       } catch (error) {
         console.error("发送消息失败:", error);

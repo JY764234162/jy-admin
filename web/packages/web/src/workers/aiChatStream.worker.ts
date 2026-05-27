@@ -7,8 +7,10 @@ type StartPayload = {
   token?: string | null;
   conversationId: number;
   content: string;
-  /** 调用模式：aiserver_chat=ai-server聊天，aiserver_knowledge=ai-server知识库问答，aiserver_vision=多模态视觉 */
-  mode?: "aiserver_chat" | "aiserver_knowledge" | "aiserver_vision" | "aiserver_attachment";
+  /** 调用模式：aiserver_chat=ai-server聊天，aiserver_vision=多模态视觉 */
+  mode?: "aiserver_chat" | "aiserver_vision";
+  /** 是否启用知识库工具（勾选知识库时传 true） */
+  enable_knowledge?: boolean;
   /** 知识库问答配置 */
   knowledgeConfig?: { top_k?: number };
   /** 是否为恢复模式（刷新后重连，不重复保存用户消息） */
@@ -193,7 +195,7 @@ async function startStream(p: StartPayload) {
         : {
             conversationId: p.conversationId,
             message: p.content,
-            mode: p.mode ?? "aiserver_chat",
+            enable_knowledge: p.enable_knowledge ?? false,
             doc_ids: p.docIds,
             attachments: p.attachments ? JSON.stringify(p.attachments) : undefined,
           };

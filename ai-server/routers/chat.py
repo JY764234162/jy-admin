@@ -10,7 +10,6 @@ from sqlalchemy.orm import Session
 
 from services.llm import llm
 from services.storage.long_term_memory import get_memory
-from services.llm import stream_chat
 from services.llm import stream_agent
 from services.middleware import get_current_user, UserContext
 from models.conversation import Conversation, get_db, SessionLocal
@@ -25,12 +24,11 @@ semantic_memory = get_memory(top_k=5)
 
 class ChatRequest(BaseModel):
     message: str = ""
-    conversation_id: Optional[str] = None
-    conversationId: Optional[str] = None  # 前端驼峰命名兼容
+    conversationId: Optional[int] = None
     attachments: Optional[str] = "[]"  # JSON 字符串，附件信息
     image_url: Optional[str] = None  # 图片 URL，有值时走 Agent 图片识别工具
     doc_ids: Optional[List[str]] = None  # 指定检索的文档 ID 列表
-    mode: Optional[str] = "aiserver_chat"  # aiserver_chat | aiserver_knowledge | aiserver_attachment
+    enable_knowledge: Optional[bool] = False  # 是否启用知识库工具
 
 
 def _sse_json(data: dict) -> str:
@@ -62,8 +60,7 @@ def _persist_chat_result(
 class VisionRequest(BaseModel):
     message: str
     image_base64: str
-    conversation_id: Optional[str] = None
-    conversationId: Optional[str] = None  # 前端驼峰命名兼容
+    conversationId: Optional[int] = None
 
 
 @router.post("/vision")
@@ -86,22 +83,17 @@ async def chat_vision(
     if not user_id:
         raise HTTPException(401, "未登录")
 
-    # 兼容前端驼峰/蛇形两种命名
-    conversation_id = req.conversation_id or req.conversationId or uuid.uuid4().hex[:16]
+    conversation_id = req.conversationId or uuid.uuid4().hex[:16]
 
     # 验证会话并更新元数据
     conv_db_id = None
-    if req.conversation_id or req.conversationId:
-        try:
-            conv_id_int = int(conversation_id)
-            conv = db.query(Conversation).filter(
-                Conversation.id == conv_id_int,
-                Conversation.user_id == user_id,
-            ).first()
-            if conv:
-                conv_db_id = conv.id
-        except ValueError:
-            pass
+    if req.conversationId:
+        conv = db.query(Conversation).filter(
+            Conversation.id == conversation_id,
+            Conversation.user_id == user_id,
+        ).first()
+        if conv:
+            conv_db_id = conv.id
 
     # 构造多模态消息（OpenAI 兼容格式）
     image_url = req.image_base64
@@ -141,7 +133,7 @@ async def chat_vision(
                 yield _sse_json({"content": chunk.content, "done": False})
                 await asyncio.sleep(0.08)
 
-            yield _sse_json({"content": "", "done": True, "conversation_id": conversation_id})
+            yield _sse_json({"content": "", "done": True, "conversation_id": str(conversation_id)})
         except Exception as e:
             error_msg = str(e)
             yield _sse_json({"content": "", "done": True, "error": error_msg})
@@ -162,7 +154,7 @@ async def chat_vision(
     return StreamingResponse(
         event_generator(),
         media_type="text/event-stream",
-        headers={"X-Conversation-Id": conversation_id},
+        headers={"X-Conversation-Id": str(conversation_id)},
     )
 
 
@@ -180,22 +172,17 @@ async def chat_message(
     if not user_id:
         raise HTTPException(401, "未登录")
 
-    # 兼容前端驼峰/蛇形两种命名
-    conversation_id = req.conversation_id or req.conversationId or uuid.uuid4().hex[:16]
+    conversation_id = req.conversationId or uuid.uuid4().hex[:16]
 
     # 验证会话存在且属于当前用户
     conv = None
-    if req.conversation_id or req.conversationId:
-        try:
-            conv_id_int = int(conversation_id)
-            conv = db.query(Conversation).filter(
-                Conversation.id == conv_id_int,
-                Conversation.user_id == user_id,
-            ).first()
-        except ValueError:
-            pass
+    if req.conversationId:
+        conv = db.query(Conversation).filter(
+            Conversation.id == conversation_id,
+            Conversation.user_id == user_id,
+        ).first()
 
-    if (req.conversation_id or req.conversationId) and not conv:
+    if req.conversationId and not conv:
         raise HTTPException(404, "会话不存在或无权限")
 
     # 会话数据库 ID（用于保存元数据）
@@ -207,12 +194,8 @@ async def chat_message(
     # thread_id 用于 Checkpoint
     session_key = f"{user_id}:{conversation_id}" if user_id else conversation_id
 
-    # 判断是否需要走 Agent 流程（图片、指定文档、或知识库模式）
-    use_agent = bool(
-        req.image_url
-        or (req.doc_ids and len(req.doc_ids) > 0)
-        or req.mode == "aiserver_knowledge"
-    )
+    # 是否启用知识库工具（前端勾选知识库或传了 doc_ids）
+    enable_knowledge = req.enable_knowledge or bool(req.doc_ids and len(req.doc_ids) > 0)
     doc_ids_str = ",".join(req.doc_ids) if req.doc_ids else ""
 
     async def event_generator():
@@ -220,41 +203,19 @@ async def chat_message(
         error_msg = None
 
         try:
-            if use_agent:
-                # Agent 流程：支持工具调用（图片识别、知识库搜索、计算器等）
-                async for event in stream_agent(
-                    user_message, session_key, str(user_id), memory_context,
-                    req.image_url or "", doc_ids_str
-                ):
-                    data_str = event.removeprefix("data: ").strip()
-                    try:
-                        data = json.loads(data_str)
-                        if data.get("answer"):
-                            full_response = data["answer"]
-                    except Exception:
-                        pass
-                    yield event
-            else:
-                # 普通聊天流程（LangGraph + Checkpoint）
-                async for event in stream_chat(
-                    user_message, session_key, memory_context
-                ):
-                    data_str = event.removeprefix("data: ").strip()
-                    try:
-                        data = json.loads(data_str)
-                        if data.get("content"):
-                            full_response += data["content"]
-                        if data.get("done"):
-                            # 补充 conversation_id 到最终事件
-                            yield _sse_json({
-                                "content": "",
-                                "done": True,
-                                "conversation_id": conversation_id,
-                            })
-                            continue
-                    except Exception:
-                        pass
-                    yield event
+            # 统一走 Agent 模式，根据参数动态决定工具列表
+            async for event in stream_agent(
+                user_message, session_key, str(user_id), memory_context,
+                req.image_url or "", doc_ids_str, enable_knowledge
+            ):
+                data_str = event.removeprefix("data: ").strip()
+                try:
+                    data = json.loads(data_str)
+                    if data.get("answer"):
+                        full_response = data["answer"]
+                except Exception:
+                    pass
+                yield event
 
             # 流式结束后，保存本轮交互到语义记忆（长期记忆）
             if full_response.strip():
@@ -283,6 +244,6 @@ async def chat_message(
     response = StreamingResponse(
         event_generator(),
         media_type="text/event-stream",
-        headers={"X-Conversation-Id": conversation_id},
+        headers={"X-Conversation-Id": str(conversation_id)},
     )
     return response

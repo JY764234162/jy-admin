@@ -56,8 +56,6 @@ services:
       MYSQL_USER: ${MYSQL_USER}
       MYSQL_DATABASE: ${MYSQL_DATABASE}
       MYSQL_PASSWORD: ${MYSQL_PASSWORD}
-      LONGCAT_APP_KEY: ${LONGCAT_APP_KEY}
-      LONGCAT_MODEL: ${LONGCAT_MODEL}
     # ⚠️ 不暴露端口到主机，只在 Docker 网络内访问
     ports:
       - "7777:7777"
@@ -160,12 +158,16 @@ services:
     ports:
       - "8000:8000"
     volumes:
+      # 开发环境挂载代码目录，修改实时生效
+      - ./ai-server:/app
+      # 保护容器内的 .venv，避免被宿主机空/不完整的 .venv 覆盖
+      - ai-server-venv:/app/.venv
       - ai_uploads:/app/uploads
+      # 复用宿主机 HuggingFace 模型缓存，避免容器内重复下载
+      - ~/.cache/huggingface:/root/.cache/huggingface:ro
     depends_on:
       postgres-vector:
         condition: service_healthy
-    extra_hosts:
-      - "api.longcat.chat:101.50.8.136"
     networks:
       - jy-admin-network
     mem_limit: 1g
@@ -207,6 +209,9 @@ volumes:
   pgvector_data:
     driver: local
   ai_uploads:
+    driver: local
+  # 保护 ai-server 容器内的 .venv 不被宿主机挂载覆盖
+  ai-server-venv:
     driver: local
 
 networks:

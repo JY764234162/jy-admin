@@ -94,7 +94,7 @@ function ensureWorker() {
   return workerSingleton;
 }
 
-function buildChatUrl(resume = false, mode?: "aiserver_chat" | "aiserver_knowledge" | "aiserver_vision" | "aiserver_attachment") {
+function buildChatUrl(resume = false, mode?: "aiserver_chat" | "aiserver_vision") {
   const AI_SERVER_URL = import.meta.env.VITE_AI_SERVER_URL || "";
   if (AI_SERVER_URL) {
     // 直连 ai-server（开发环境）
@@ -156,16 +156,17 @@ export const aiChatStreamClient = {
     return latestSnapshotByConversation.get(conversationId) || null;
   },
 
-  /** 启动流式聊天，统一走 Go 后端，通过 mode 区分目标服务 */
+  /** 启动流式聊天，通过 mode 区分目标服务，enable_knowledge 控制是否查询知识库 */
   start(
     conversationId: number,
     options: {
       content: string;
-      mode?: "aiserver_chat" | "aiserver_knowledge" | "aiserver_vision" | "aiserver_attachment";
+      mode?: "aiserver_chat" | "aiserver_vision";
       resume?: boolean;
       imageBase64?: string;
       docIds?: string[];
       attachments?: { uid: string; filename: string; url?: string }[];
+      enable_knowledge?: boolean;
     }
   ) {
     const {
@@ -175,6 +176,7 @@ export const aiChatStreamClient = {
       imageBase64,
       docIds,
       attachments,
+      enable_knowledge = false,
     } = options;
     const streamId = createStreamId();
     const token = localStg.get("token");
@@ -191,6 +193,7 @@ export const aiChatStreamClient = {
         imageBase64,
         docIds,
         attachments,
+        enable_knowledge,
       },
     });
     return streamId;
@@ -203,7 +206,7 @@ export const aiChatStreamClient = {
 
   /** 兼容旧调用：启动 ai-server 知识库问答流式查询 */
   startAiServerKnowledge(conversationId: number, content: string, _top_k = 3) {
-    return this.start(conversationId, { content, mode: "aiserver_knowledge" });
+    return this.start(conversationId, { content, mode: "aiserver_chat", enable_knowledge: true });
   },
 
   /** 停止某个 stream */

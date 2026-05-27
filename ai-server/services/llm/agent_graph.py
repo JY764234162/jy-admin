@@ -54,10 +54,17 @@ def _make_process_with_steps(steps: list[dict]) -> dict:
     }
 
 
-def make_tools(user_id: str = "", doc_ids: str = ""):
-    """创建已绑定 user_id 和 doc_ids 的工具列表。"""
+def make_tools(user_id: str = "", doc_ids: str = "", enable_knowledge: bool = True):
+    """创建已绑定 user_id 和 doc_ids 的工具列表。
 
-    search_knowledge = make_search_knowledge_tool(user_id=user_id, doc_ids=doc_ids)
+    Args:
+        enable_knowledge: 是否启用知识库搜索工具（由前端是否勾选知识库决定）
+    """
+    tools = []
+
+    if enable_knowledge:
+        search_knowledge = make_search_knowledge_tool(user_id=user_id, doc_ids=doc_ids)
+        tools.append(search_knowledge)
 
     @tool
     def calculator(expression: str) -> str:
@@ -81,12 +88,20 @@ def make_tools(user_id: str = "", doc_ids: str = ""):
         except Exception as e:
             return f"计算错误：{str(e)}，请检查表达式格式。"
 
-    return [search_knowledge, calculator, image_understand_tool]
+    tools.append(calculator)
+    tools.append(image_understand_tool)
+    return tools
 
 
-def build_agent_graph(system_prompt: str = "", user_id: str = "", doc_ids: str = "", checkpointer=None):
+def build_agent_graph(
+    system_prompt: str = "",
+    user_id: str = "",
+    doc_ids: str = "",
+    enable_knowledge: bool = True,
+    checkpointer=None,
+):
     """构建并编译 ReAct Agent 图。"""
-    tools = make_tools(user_id=user_id, doc_ids=doc_ids)
+    tools = make_tools(user_id=user_id, doc_ids=doc_ids, enable_knowledge=enable_knowledge)
     prompt = system_prompt or AGENT_SYSTEM_PROMPT
     return create_react_agent(
         llm,
@@ -103,13 +118,15 @@ async def stream_agent(
     memory_context: str = "",
     image_url: str = "",
     doc_ids: str = "",
+    enable_knowledge: bool = True,
 ) -> AsyncIterator[str]:
-    """Agent 深度思考的流式 SSE 输出。
+    """Agent 流式 SSE 输出。
 
+    所有对话统一走 Agent 模式，根据 enable_knowledge 决定是否挂载知识库工具。
     捕获 agent / tools 节点输出，实时推送思考过程。
     """
     saver = await get_async_saver()
-    graph = build_agent_graph(memory_context, user_id, doc_ids, checkpointer=saver)
+    graph = build_agent_graph(memory_context, user_id, doc_ids, enable_knowledge, checkpointer=saver)
     config = {"configurable": {"thread_id": thread_id}}
 
     # 获取历史消息并追加当前输入

@@ -1,4 +1,4 @@
-export type ChatMode = "aiserver_chat" | "aiserver_knowledge" | "aiserver_vision" | "aiserver_attachment";
+export type ChatMode = "aiserver_chat" | "aiserver_vision";
 
 export interface ProcessStep {
   step_id: string;

@@ -4,6 +4,12 @@ import { localStg } from "@/utils/storage";
 // AI Server 直连地址（前端直接访问 ai-server，不再经过 Go 后端）
 const AI_SERVER_URL = import.meta.env.VITE_AI_SERVER_URL || "";
 
+/** 构造完整 URL（空 AI_SERVER_URL 时使用当前页面 origin） */
+function aiUrl(path: string): URL {
+  const base = AI_SERVER_URL || (typeof window !== "undefined" ? window.location.origin : "");
+  return new URL(path, base);
+}
+
 function getHeaders(): Record<string, string> {
   const headers: Record<string, string> = {
     "Content-Type": "application/json",
@@ -75,7 +81,7 @@ export interface UpdateConversationTitleRequest {
 export interface ChatMessageRequest {
   conversationId: number;
   content: string;
-  mode?: string;
+  enable_knowledge?: boolean;
   docIds?: string[];
   attachments?: string;
 }
@@ -156,7 +162,7 @@ export const aiApi = {
 
   /** 获取会话列表 */
   getConversationList: (params?: ConversationListParams): Promise<AIServerResponse<{ list: AIConversation[]; total: number; page: number; pageSize: number }>> => {
-    const url = new URL(`${AI_SERVER_URL}/api/ai/conversation/list`);
+    const url = aiUrl("/api/ai/conversation/list");
     if (params?.page) url.searchParams.set("page", String(params.page));
     if (params?.pageSize) url.searchParams.set("page_size", String(params.pageSize));
     return fetch(url.toString(), { headers: getHeaders() }).then((res) => wrapResponse(res));
@@ -181,7 +187,7 @@ export const aiApi = {
 
   /** 获取会话消息列表 */
   getMessageList: (conversationId: number, params?: MessageListParams): Promise<AIServerResponse<{ list: AIMessage[]; total: number; page: number; pageSize: number }>> => {
-    const url = new URL(`${AI_SERVER_URL}/api/ai/conversation/${conversationId}/messages`);
+    const url = aiUrl(`/api/ai/conversation/${conversationId}/messages`);
     if (params?.page) url.searchParams.set("page", String(params.page));
     if (params?.pageSize) url.searchParams.set("page_size", String(params.pageSize));
     return fetch(url.toString(), { headers: getHeaders() }).then((res) => wrapResponse(res));
@@ -271,7 +277,7 @@ export const aiApi = {
 export const aiServerApi = {
   /** 获取知识库文档列表 */
   getKnowledgeList: async (keyword?: string): Promise<{ documents: KnowledgeDocument[] }> => {
-    const url = new URL(`${AI_SERVER_URL}/api/ai/knowledge/list`);
+    const url = aiUrl("/api/ai/knowledge/list");
     if (keyword) url.searchParams.set("keyword", keyword);
     const res = await fetch(url.toString(), { headers: getHeaders() });
     return unwrap(res, "获取知识库列表失败");
