@@ -9,7 +9,7 @@ import {
 } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { message as antdMessage } from "antd";
-import { aiApi, type AIConversation, type AIMessage } from "@/api/aiDirect";
+import { aiApi, type AIConversation, type AIMessage } from "@/api/aiApi";
 import { aiChatStreamClient } from "@/workers/aiChatStreamClient";
 import { conversationTitleFromFirstMessage } from "./conversationTitle";
 import type { UiMessage, SendOptions } from "./types";

@@ -1,4 +1,4 @@
-import type { AIConversation } from "@/api/aiDirect";
+import type { AIConversation } from "@/api/aiApi";
 
 const MS_DAY = 86_400_000;
 

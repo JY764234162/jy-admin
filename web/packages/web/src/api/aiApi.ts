@@ -1,7 +1,7 @@
 import { fetchEventSource } from "@microsoft/fetch-event-source";
 import { localStg } from "@/utils/storage";
 
-// AI Server 直连地址（前端直接访问 ai-server，不再经过 Go 后端）
+// AI Server 地址
 const AI_SERVER_URL = import.meta.env.VITE_AI_SERVER_URL || "";
 
 /** 构造完整 URL（空 AI_SERVER_URL 时使用当前页面 origin） */
@@ -120,35 +120,7 @@ export interface UploadKnowledgeResponse {
   cos_url?: string;
 }
 
-/** 流式上传响应 */
-export interface UploadKnowledgeStreamResponse {
-  task_id: string;
-  filename: string;
-  user_id: string;
-  doc_id?: string;
-  cos_url?: string;
-}
-
-/** 解析进度事件 */
-export interface KnowledgeProgressEvent {
-  stage: "pending" | "parsing" | "splitting" | "embedding" | "storing" | "completed" | "failed";
-  message: string;
-  progress: number;
-  total?: number;
-  current?: number;
-  doc_id?: string;
-  chunk_count?: number;
-  error?: string;
-}
-
-/** 知识库问答结构化响应 */
-export interface KnowledgeQueryResponse {
-  answer: string;
-  sources: string[];
-  confidence: number;
-}
-
-// ========== AI 对话 API（直连 ai-server） ==========
+// ========== AI 对话 API ==========
 
 export const aiApi = {
   /** 创建会话 */
@@ -272,7 +244,7 @@ export const aiApi = {
   },
 };
 
-// ========== 知识库 API（直连 ai-server） ==========
+// ========== 知识库 API ==========
 
 export const aiServerApi = {
   /** 获取知识库文档列表 */
@@ -295,75 +267,6 @@ export const aiServerApi = {
     return unwrap(res, "上传失败");
   },
 
-  /** 异步上传文档 */
-  uploadKnowledgeStream: async (file: File): Promise<UploadKnowledgeStreamResponse> => {
-    const formData = new FormData();
-    formData.append("file", file);
-    const res = await fetch(`${AI_SERVER_URL}/api/ai/knowledge/upload-stream`, {
-      method: "POST",
-      headers: { Authorization: getHeaders().Authorization || "" },
-      body: formData,
-    });
-    return unwrap(res, "上传失败");
-  },
-
-  /** 监听文档解析进度（SSE） */
-  subscribeKnowledgeProgress: (
-    taskId: string,
-    onEvent: (event: KnowledgeProgressEvent) => void,
-    onError?: (err: Error) => void
-  ) => {
-    const controller = new AbortController();
-
-    void (async () => {
-      try {
-        const res = await fetch(`${AI_SERVER_URL}/api/ai/knowledge/progress/${taskId}`, {
-          method: "GET",
-          headers: getHeaders(),
-          signal: controller.signal,
-        });
-        if (!res.ok || !res.body) {
-          throw new Error(`HTTP ${res.status}`);
-        }
-        const reader = res.body.getReader();
-        const decoder = new TextDecoder("utf-8");
-        let buffer = "";
-        while (true) {
-          const { value, done } = await reader.read();
-          if (done) break;
-          buffer += decoder.decode(value, { stream: true });
-          let sepIndex: number;
-          while ((sepIndex = buffer.indexOf("\n\n")) !== -1) {
-            const rawEvent = buffer.slice(0, sepIndex);
-            buffer = buffer.slice(sepIndex + 2);
-            const lines = rawEvent.split("\n");
-            for (const line of lines) {
-              const trimmed = line.trim();
-              if (!trimmed.startsWith("data:")) continue;
-              const data = trimmed.replace(/^data:\s?/, "");
-              if (!data) continue;
-              try {
-                const parsed = JSON.parse(data) as KnowledgeProgressEvent;
-                onEvent(parsed);
-                if (parsed.stage === "completed" || parsed.stage === "failed") {
-                  controller.abort();
-                  return;
-                }
-              } catch {
-                continue;
-              }
-            }
-          }
-        }
-      } catch (e: any) {
-        if (e?.name === "AbortError") return;
-        onError?.(e instanceof Error ? e : new Error(String(e)));
-      }
-    })();
-
-    return { abort: () => controller.abort() };
-  },
-
   /** 删除知识库文档 */
   deleteKnowledge: async (docId: string): Promise<unknown> => {
     const res = await fetch(`${AI_SERVER_URL}/api/ai/knowledge/${docId}`, {
@@ -371,16 +274,6 @@ export const aiServerApi = {
       headers: getHeaders(),
     });
     return unwrap(res, "删除失败");
-  },
-
-  /** 知识库结构化查询 */
-  queryKnowledgeStructured: async (question: string, top_k = 3): Promise<KnowledgeQueryResponse> => {
-    const res = await fetch(`${AI_SERVER_URL}/api/ai/knowledge/query`, {
-      method: "POST",
-      headers: getHeaders(),
-      body: JSON.stringify({ question, top_k, structured: true }),
-    });
-    return unwrap(res, "查询失败");
   },
 
   /** 重试失败的文档解析 */

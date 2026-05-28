@@ -11,7 +11,7 @@ import {
 import { Attachments, type AttachmentsProps, Sender } from "@ant-design/x";
 import { Badge, Button, Flex, Divider, Progress, message as antdMessage } from "antd";
 import { layoutSlice } from "@/store/slice/layout";
-import { aiServerApi, type KnowledgeProgressEvent } from "@/api/aiDirect";
+import { aiServerApi } from "@/api/aiApi";
 const Switch = Sender.Switch;
 
 const SUPPORTED_DOC_EXTS = new Set([".pdf", ".txt", ".md", ".docx", ".xlsx", ".xls", ".csv"]);
@@ -56,12 +56,11 @@ interface ChatInputProps {
   sendMessage: SendFromInput;
 }
 
-/** 单文件上传/解析状态 */
+/** 单文件上传状态 */
 interface UploadingFile {
   uid: string;
   filename: string;
-  taskId?: string;
-  stage: KnowledgeProgressEvent["stage"];
+  stage: "uploading" | "completed" | "failed";
   message: string;
   progress: number;
   docId?: string;
@@ -70,11 +69,7 @@ interface UploadingFile {
 }
 
 const STAGE_LABEL: Record<UploadingFile["stage"], string> = {
-  pending: "等待处理",
-  parsing: "正在解析文档",
-  splitting: "正在切片",
-  embedding: "正在向量化",
-  storing: "正在写入向量库",
+  uploading: "正在上传解析",
   completed: "已就绪",
   failed: "失败",
 };
@@ -87,7 +82,6 @@ export const ChatInput = ({ loading, sendMessage }: ChatInputProps) => {
   const [items, setItems] = useState<NonNullable<AttachmentsProps["items"]>>([]);
   const [uploadingFiles, setUploadingFiles] = useState<UploadingFile[]>([]);
   const senderRef = useRef<ComponentRef<typeof Sender>>(null);
-  const abortMapRef = useRef<Map<string, { abort: () => void }>>(new Map());
 
   useEffect(() => {
     return () => {
@@ -96,65 +90,31 @@ export const ChatInput = ({ loading, sendMessage }: ChatInputProps) => {
           URL.revokeObjectURL(item.url);
         }
       });
-      abortMapRef.current.forEach((a) => a.abort());
-      abortMapRef.current.clear();
     };
   }, []);
 
-  /** 上传单个文件并监听解析进度，返回 doc_id（失败抛错） */
+  /** 上传单个文件（同步），返回 doc_id（失败抛错） */
   const uploadFileWithProgress = async (uid: string, file: File): Promise<string> => {
     setUploadingFiles((prev) => [
       ...prev.filter((f) => f.uid !== uid),
-      { uid, filename: file.name, stage: "pending", message: "准备上传...", progress: 0 },
+      { uid, filename: file.name, stage: "uploading", message: "正在上传解析...", progress: 0 },
     ]);
 
-    let taskId: string;
-    let cosUrl: string | undefined;
     try {
-      const res = await aiServerApi.uploadKnowledgeStream(file);
-      taskId = res.task_id;
-      cosUrl = res.cos_url;
+      const res = await aiServerApi.uploadKnowledge(file);
+      setUploadingFiles((prev) =>
+        prev.map((f) =>
+          f.uid === uid
+            ? { ...f, stage: "completed", message: "已就绪", progress: 100, docId: res.knowledge_id, cosUrl: res.cos_url }
+            : f
+        )
+      );
+      return res.knowledge_id;
     } catch (e: any) {
       const errMsg = e?.message || "上传失败";
       setUploadingFiles((prev) => prev.map((f) => (f.uid === uid ? { ...f, stage: "failed", message: errMsg, error: errMsg, progress: 0 } : f)));
       throw e;
     }
-    setUploadingFiles((prev) => prev.map((f) => (f.uid === uid ? { ...f, taskId, cosUrl, stage: "parsing", message: "开始解析...", progress: 2 } : f)));
-
-    return new Promise<string>((resolve, reject) => {
-      const sub = aiServerApi.subscribeKnowledgeProgress(
-        taskId,
-        (evt) => {
-          setUploadingFiles((prev) =>
-            prev.map((f) =>
-              f.uid === uid
-                ? {
-                    ...f,
-                    stage: evt.stage,
-                    message: evt.message,
-                    progress: evt.progress,
-                    docId: evt.doc_id || f.docId,
-                    error: evt.error,
-                  }
-                : f
-            )
-          );
-          if (evt.stage === "completed" && evt.doc_id) {
-            abortMapRef.current.delete(uid);
-            resolve(evt.doc_id);
-          } else if (evt.stage === "failed") {
-            abortMapRef.current.delete(uid);
-            reject(new Error(evt.error || evt.message || "解析失败"));
-          }
-        },
-        (err) => {
-          abortMapRef.current.delete(uid);
-          setUploadingFiles((prev) => prev.map((f) => (f.uid === uid ? { ...f, stage: "failed", message: err.message, error: err.message } : f)));
-          reject(err);
-        }
-      );
-      abortMapRef.current.set(uid, sub);
-    });
   };
 
   const senderHeader = (
@@ -212,11 +172,8 @@ export const ChatInput = ({ loading, sendMessage }: ChatInputProps) => {
             }
           }
 
-          // 文件被移除时同步清理上传状态和订阅
+          // 文件被移除时同步清理上传状态
           if (file.status === "removed") {
-            const sub = abortMapRef.current.get(file.uid);
-            sub?.abort();
-            abortMapRef.current.delete(file.uid);
             setUploadingFiles((prev) => prev.filter((f) => f.uid !== file.uid));
           }
         }}

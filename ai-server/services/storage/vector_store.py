@@ -1,3 +1,4 @@
+from pathlib import Path
 from typing import List, Dict
 
 from langchain_community.vectorstores import PGVector
@@ -103,10 +104,13 @@ def list_documents(user_id: str = "") -> List[Dict]:
         for row in rows:
             if row.doc_id and row.doc_id not in seen:
                 seen.add(row.doc_id)
+                source = row.source or ""
                 docs.append({
                     "doc_id": row.doc_id,
-                    "source": row.source,
-                    "chunk_count": row.chunk_count,
+                    "source": source,
+                    "chunk_count": int(row.chunk_count) if row.chunk_count else 0,
+                    "status": "indexed",
+                    "file_type": Path(source).suffix if source else "",
                 })
         return docs
 

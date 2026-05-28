@@ -11,6 +11,7 @@ from pprint import pprint
 
 from langchain_openai import ChatOpenAI
 from langchain.agents import create_agent
+from langchain.agents.middleware import before_model, before_agent
 from langchain_core.messages import HumanMessage, AIMessageChunk
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
@@ -72,7 +73,22 @@ _llm = ChatOpenAI(
     temperature=0.7,
     streaming=True,
 )
-_agent = create_agent(_llm, [calculator], system_prompt=SYSTEM_PROMPT)
+
+
+@before_model
+def pre_model(state, runtime):
+    """每次模型调用前"""
+    pprint(f"  -> [state]\n{state}\n")
+    pprint(f"  -> [runtime]\n{runtime}\n")
+
+    msg_count = len(state.get("messages", []))
+    # print(f"  -> [before_model] 第 {msg_count} 条消息")
+    return None
+
+
+_agent = create_agent(
+    model=_llm, tools=[calculator], system_prompt=SYSTEM_PROMPT, middleware=[pre_model]
+)
 
 
 async def chat_stream(question: str):
@@ -92,7 +108,7 @@ async def chat_stream(question: str):
     for msg_chunk, meta_data in _agent.stream(
         {"messages": messages}, stream_mode="messages"
     ):
-        pprint(meta_data)
+        # pprint(meta_data)
         if isinstance(msg_chunk, AIMessageChunk) and msg_chunk.content:
             yield f"data: {msg_chunk.content}\n\n"
     yield "data: [DONE]\n\n"
