@@ -2,6 +2,7 @@ import asyncio
 import time
 import uuid
 from dataclasses import dataclass, field
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Dict, List
 
@@ -79,7 +80,7 @@ def _get_parse_task(task_id: str) -> ParseTask | None:
 
 
 
-async def _process_document_async(task: ParseTask, file_bytes: bytes, user_id: str = "", doc_id: str = ""):
+async def _process_document_async(task: ParseTask, file_bytes: bytes, user_id: str = "", doc_id: str = "", created_at: str = ""):
     """后台协程：解析文档并实时推送进度"""
     try:
         # 1. 解析文件
@@ -99,6 +100,11 @@ async def _process_document_async(task: ParseTask, file_bytes: bytes, user_id: s
         total = len(chunks)
         if not doc_id:
             doc_id = uuid.uuid4().hex[:12]
+
+        parse_at = datetime.now(timezone.utc).isoformat()
+        if not created_at:
+            created_at = parse_at
+        file_type = Path(task.filename).suffix.lower()
 
         # 3. 向量化（分批次，每批推送进度）
         await task.emit("embedding", f"正在向量化(0/{total})...", 30, total=total)
@@ -127,7 +133,16 @@ async def _process_document_async(task: ParseTask, file_bytes: bytes, user_id: s
         documents = [
             Document(
                 page_content=chunks[i],
-                metadata={"doc_id": doc_id, "source": task.filename, "user_id": user_id or "", "chunk_idx": i},
+                metadata={
+                    "doc_id": doc_id,
+                    "source": task.filename,
+                    "file_type": file_type,
+                    "created_at": created_at,
+                    "parse_at": parse_at,
+                    "cos_url": "",
+                    "user_id": user_id or "",
+                    "chunk_idx": i,
+                },
             )
             for i in range(total)
         ]
@@ -165,9 +180,21 @@ async def upload_document(file: UploadFile = File(...)):
     if not chunks:
         raise HTTPException(400, "文档拆分结果为空")
 
+    now = datetime.now(timezone.utc).isoformat()
     doc_id = uuid.uuid4().hex[:12]
+    file_type = Path(file.filename).suffix.lower()
     documents = [
-        Document(page_content=chunk, metadata={"doc_id": doc_id, "source": file.filename})
+        Document(
+            page_content=chunk,
+            metadata={
+                "doc_id": doc_id,
+                "source": file.filename,
+                "file_type": file_type,
+                "created_at": now,
+                "parse_at": now,
+                "cos_url": "",
+            },
+        )
         for chunk in chunks
     ]
     vector_store.add_documents(documents)
@@ -207,11 +234,15 @@ async def retry_knowledge(doc_id: str, user_id: str = Query("")):
     filename = file_path.name[len(doc_id) + 1:]  # 去掉前缀 "{doc_id}_"
     file_bytes = file_path.read_bytes()
 
-    # 删除旧的向量数据
+    # 保留原始 created_at，再删除旧向量
+    docs = vector_store.list_documents(user_id=user_id)
+    old_doc = next((d for d in docs if d["doc_id"] == doc_id), None)
+    created_at = old_doc.get("created_at") if old_doc else ""
+
     vector_store.delete_document(doc_id, user_id=user_id)
 
     # 创建新的异步解析任务
     task = _create_parse_task(filename)
-    asyncio.create_task(_process_document_async(task, file_bytes, user_id, doc_id))
+    asyncio.create_task(_process_document_async(task, file_bytes, user_id, doc_id, created_at))
 
     return {"code": 0, "data": {"task_id": task.task_id, "filename": filename, "doc_id": doc_id}, "msg": "任务已创建"}

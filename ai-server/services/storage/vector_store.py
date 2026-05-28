@@ -89,6 +89,10 @@ def list_documents(user_id: str = "") -> List[Dict]:
                 SELECT DISTINCT
                     cmetadata->>'doc_id' as doc_id,
                     cmetadata->>'source' as source,
+                    cmetadata->>'file_type' as file_type,
+                    cmetadata->>'created_at' as created_at,
+                    cmetadata->>'parse_at' as parse_at,
+                    cmetadata->>'cos_url' as cos_url,
                     COUNT(*) OVER (PARTITION BY cmetadata->>'doc_id') as chunk_count
                 FROM langchain_pg_embedding
                 WHERE collection_id = (
@@ -109,10 +113,44 @@ def list_documents(user_id: str = "") -> List[Dict]:
                     "doc_id": row.doc_id,
                     "source": source,
                     "chunk_count": int(row.chunk_count) if row.chunk_count else 0,
+                    "file_type": row.file_type or (Path(source).suffix if source else ""),
+                    "created_at": row.created_at or "",
+                    "parse_at": row.parse_at or "",
+                    "cos_url": row.cos_url or "",
                     "status": "indexed",
-                    "file_type": Path(source).suffix if source else "",
                 })
         return docs
+
+
+def clear_old_documents() -> bool:
+    """清空没有 parse_at 字段的旧版向量数据，返回是否执行了清空"""
+    engine = _get_engine()
+    with engine.connect() as conn:
+        result = conn.execute(
+            text("""
+                SELECT COUNT(*) as cnt
+                FROM langchain_pg_embedding
+                WHERE collection_id = (
+                    SELECT uuid FROM langchain_pg_collection WHERE name = :name
+                )
+                AND cmetadata->>'parse_at' IS NULL
+            """),
+            {"name": _collection_name},
+        )
+        row = result.fetchone()
+        if row and row.cnt > 0:
+            conn.execute(
+                text("""
+                    DELETE FROM langchain_pg_embedding
+                    WHERE collection_id = (
+                        SELECT uuid FROM langchain_pg_collection WHERE name = :name
+                    )
+                """),
+                {"name": _collection_name},
+            )
+            conn.commit()
+            return True
+        return False
 
 
 def delete_document(doc_id: str, user_id: str = "") -> bool:

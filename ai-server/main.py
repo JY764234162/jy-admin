@@ -62,6 +62,14 @@ async def check_config():
     # 初始化长期记忆 store 表
     setup_store()
     print("Long-term memory store tables initialized")
+    # 清空旧版向量数据（metadata 格式变更后需要重建）
+    from services.storage import vector_store
+    try:
+        cleared = vector_store.clear_old_documents()
+        if cleared:
+            print("Old vector data cleared (metadata format changed)")
+    except Exception as e:
+        print(f"Vector data clear skipped: {e}")
 
 
 if __name__ == "__main__":

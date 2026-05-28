@@ -108,6 +108,7 @@ export interface KnowledgeDocument {
   cos_url?: string;
   file_type?: string;
   created_at?: string;
+  parse_at?: string;
   status?: string;
   error_msg?: string;
 }
