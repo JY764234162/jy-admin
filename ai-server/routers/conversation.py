@@ -70,6 +70,10 @@ def _messages_from_checkpoint(conv_id: int, user_id: int, conv: Conversation) ->
         if msg.type == "human":
             role = "user"
         elif msg.type == "assistant" or msg.type == "ai":
+            # 跳过包含工具调用的 AI 消息（只保留最终回答）
+            tool_calls = getattr(msg, "tool_calls", None)
+            if tool_calls:
+                continue
             role = "assistant"
         else:
             # system / tool 消息不展示在前端
