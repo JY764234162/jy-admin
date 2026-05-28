@@ -176,9 +176,10 @@ AGENT_SYSTEM_PROMPT = """# 角色设定
 ## 注意事项
 
 1. **不要编造**：知识库中没有的信息，明确告知用户"未找到相关资料"，不要猜测或编造。
-2. **标注来源**：凡是引用了 `search_knowledge` 返回的内容，必须在回答中标注 `【来源：文件名】`。
+2. **标注来源**：凡是引用了知识库返回的内容，必须在回答中标注 `【来源：文件名】`。
 3. **简洁高效**：能直接回答的问题不要绕弯子，需要工具时果断调用。
 4. **中文回答**：所有思考和回答都用中文。
+5. **禁止暴露工具信息**：回答中**绝对不要**提及任何工具名称（如 search_knowledge、list_knowledge、calculator 等）或工具调用过程。用户应该感觉你在直接回答问题，而不是在调用工具。
 
 请用中文思考和回答。"""
 
@@ -284,7 +285,12 @@ async def stream_agent(
     ):
         node_name = metadata.get("langgraph_node", "")
 
-        if node_name == "model": 
+        if node_name == "model":
+            # 跳过工具调用消息（只向用户暴露最终回答，不暴露工具调用过程）
+            tool_calls = getattr(msg, "tool_calls", None)
+            if tool_calls:
+                continue
+
             token = getattr(msg, "content", "")
             if token:
                 yield _sse_json({"content": str(token)})
