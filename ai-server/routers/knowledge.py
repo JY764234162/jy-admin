@@ -112,18 +112,18 @@ def _get_parse_task(task_id: str) -> ParseTask | None:
 
 
 async def _process_document_async(task: ParseTask, file_bytes: bytes, user_id: str = "", doc_id: str = "", created_at: str = ""):
-    """后台协程：解析文档并实时推送进度"""
+    """后台协程：解析文档并实时推送进度（同步操作扔到线程池，不阻塞事件循环）"""
     try:
         # 1. 解析文件
         await task.emit("parsing", "正在解析文档...", 5)
-        text = document.parse_file(task.filename, file_bytes)
+        text = await asyncio.to_thread(document.parse_file, task.filename, file_bytes)
         if not text.strip():
             await task.finish(error="文件内容为空或无法提取文字")
             return
 
         # 2. 切片
         await task.emit("splitting", "正在切片...", 20)
-        chunks = document.split_text(text)
+        chunks = await asyncio.to_thread(document.split_text, text)
         if not chunks:
             await task.finish(error="文档拆分结果为空")
             return
@@ -137,7 +137,7 @@ async def _process_document_async(task: ParseTask, file_bytes: bytes, user_id: s
             created_at = parse_at
         file_type = Path(task.filename).suffix.lower()
 
-        # 3. 向量化（分批次，每批推送进度）
+        # 3. 向量化（分批次，每批扔到线程池执行，不阻塞事件循环）
         await task.emit("embedding", f"正在向量化(0/{total})...", 30, total=total)
 
         embed_fn = embedding.get_embeddings()
@@ -146,7 +146,7 @@ async def _process_document_async(task: ParseTask, file_bytes: bytes, user_id: s
 
         for i in range(0, total, batch_size):
             batch = chunks[i:i + batch_size]
-            batch_embs = embed_fn.embed_documents(batch)
+            batch_embs = await asyncio.to_thread(embed_fn.embed_documents, batch)
             all_embeddings.extend(batch_embs)
 
             current = min(i + batch_size, total)
@@ -159,10 +159,10 @@ async def _process_document_async(task: ParseTask, file_bytes: bytes, user_id: s
                 total=total,
             )
 
-        # 4. 上传 COS + 写入向量库
+        # 4. 上传 COS + 写入向量库（同步操作扔线程池）
         await task.emit("storing", "正在写入向量库...", 85)
         cos_key = f"{config.COS_PREFIX}/{doc_id}_{task.filename}"
-        cos_url = _upload_to_cos(file_bytes, cos_key)
+        cos_url = await asyncio.to_thread(_upload_to_cos, file_bytes, cos_key)
 
         documents = [
             Document(
@@ -180,13 +180,12 @@ async def _process_document_async(task: ParseTask, file_bytes: bytes, user_id: s
             )
             for i in range(total)
         ]
-        # 使用自定义写入方式（带 embedding）
         store = vector_store.get_store()
-        store.add_documents(documents)
+        await asyncio.to_thread(store.add_documents, documents)
 
         # 保存原始文件（本地备份）
         save_path = config.UPLOAD_DIR / f"{doc_id}_{task.filename}"
-        save_path.write_bytes(file_bytes)
+        await asyncio.to_thread(save_path.write_bytes, file_bytes)
 
         # 5. 完成
         await task.finish(doc_id=doc_id, chunk_count=total)
@@ -206,21 +205,28 @@ async def upload_document(file: UploadFile = File(...)):
 
     file_bytes = await file.read()
 
-    text = document.parse_file(file.filename, file_bytes)
+    # 所有同步操作扔到线程池执行，不阻塞事件循环，前端保持同步等待
+    text = await asyncio.to_thread(document.parse_file, file.filename, file_bytes)
     if not text.strip():
         raise HTTPException(400, "文件内容为空或无法提取文字")
 
-    chunks = document.split_text(text)
+    chunks = await asyncio.to_thread(document.split_text, text)
     if not chunks:
         raise HTTPException(400, "文档拆分结果为空")
 
-    now = datetime.now(timezone.utc).isoformat()
     doc_id = uuid.uuid4().hex[:12]
     file_type = Path(file.filename).suffix.lower()
 
+    # 向量化（分批次扔到线程池）
+    embed_fn = embedding.get_embeddings()
+    batch_size = 8
+    for i in range(0, len(chunks), batch_size):
+        batch = chunks[i:i + batch_size]
+        await asyncio.to_thread(embed_fn.embed_documents, batch)
+
     # 上传 COS
     cos_key = f"{config.COS_PREFIX}/{doc_id}_{file.filename}"
-    cos_url = _upload_to_cos(file_bytes, cos_key)
+    cos_url = await asyncio.to_thread(_upload_to_cos, file_bytes, cos_key)
 
     documents = [
         Document(
@@ -229,17 +235,19 @@ async def upload_document(file: UploadFile = File(...)):
                 "doc_id": doc_id,
                 "source": file.filename,
                 "file_type": file_type,
-                "created_at": now,
-                "parse_at": now,
+                "created_at": datetime.now(timezone.utc).isoformat(),
+                "parse_at": datetime.now(timezone.utc).isoformat(),
                 "cos_url": cos_url,
             },
         )
         for chunk in chunks
     ]
-    vector_store.add_documents(documents)
+    store = vector_store.get_store()
+    await asyncio.to_thread(store.add_documents, documents)
 
+    # 保存原始文件
     save_path = config.UPLOAD_DIR / f"{doc_id}_{file.filename}"
-    save_path.write_bytes(file_bytes)
+    await asyncio.to_thread(save_path.write_bytes, file_bytes)
 
     return {"code": 0, "data": {"knowledge_id": doc_id, "filename": file.filename, "chunks": len(chunks), "cos_url": cos_url}, "msg": "上传成功"}
 

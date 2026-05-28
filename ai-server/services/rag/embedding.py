@@ -14,7 +14,7 @@ class CloudEmbeddings:
             openai_api_key=config.AI_API_KEY,
             openai_api_base=config.AI_BASE_URL,
             dimensions=1024,
-            chunk_size=16,
+            chunk_size=8,
             check_embedding_ctx_length=False,
         )
 
