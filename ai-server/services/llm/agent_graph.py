@@ -1,25 +1,23 @@
-"""Agent 深度思考的 LangGraph ReAct Agent。
+"""Agent 流式 SSE 输出。
 
-自己构建 ReAct 图，模型节点直接 yield LLM.astream() 的逐 token chunk，
-通过 graph.astream_events() 捕获真实流式输出，替代 create_agent 的 ainvoke 封装。
+使用 create_agent 构建 ReAct Agent：
+- llm 从 .llm 模块导入（已初始化的全局单例）
+- Agent 按 (user_id, doc_ids, enable_knowledge, system_prompt) 缓存，避免重复创建
+- 通过 agent.stream(stream_mode="messages") 获取模型/工具节点的输出
 """
 
 import asyncio
 import json
 from typing import AsyncIterator
 
-from langchain_core.messages import HumanMessage, SystemMessage, ToolMessage
-from langchain_core.tools import tool
-from langgraph.graph import StateGraph, START, END
-from langgraph.graph.message import add_messages
-from langgraph.prebuilt import ToolNode
-from typing_extensions import TypedDict
-from typing import Annotated
+from langchain.agents import create_agent
+from langchain_core.messages import HumanMessage
 
-from services.storage.checkpoint_store import get_saver, get_async_saver, get_thread_messages
+from services.storage.checkpoint_store import get_saver, get_thread_messages
 from services.tools.knowledge_tools import make_search_knowledge_tool
 from .llm import llm
 
+# ========== 系统提示词 ==========
 AGENT_SYSTEM_PROMPT = """# 角色设定
 
 你叫**芳芳**，是一个聪明、可靠的智能助手，擅长通过调用工具来帮用户解决各种问题。
@@ -185,49 +183,30 @@ AGENT_SYSTEM_PROMPT = """# 角色设定
 请用中文思考和回答。"""
 
 
+# ========== SSE 辅助函数 ==========
+
+
 def _sse_json(data: dict) -> str:
+    """把 dict 转成 SSE data: 行。"""
     return f"data: {json.dumps(data, ensure_ascii=False)}\n\n"
 
 
-def _make_process_with_steps(steps: list[dict]) -> dict:
-    """从步骤列表构造兼容 studio.kxsz.net 的 process 数据结构。"""
-    return {
-        "plan": {
-            "status": "successful",
-            "message": ""
-        },
-        "step": {
-            "status": "successful",
-            "processes": steps,
-            "source": [],
-        },
-        "task_status": "successful",
-    }
+# ========== 工具创建 ==========
 
 
-def make_tools(user_id: str = "",
-               doc_ids: str = "",
-               enable_knowledge: bool = True):
-    """创建已绑定 user_id 和 doc_ids 的工具列表。
+def make_tools(user_id: str = "", doc_ids: str = "", enable_knowledge: bool = True):
+    """创建已绑定 user_id 和 doc_ids 的工具列表。"""
+    from langchain_core.tools import tool
 
-    Args:
-        enable_knowledge: 是否启用知识库搜索工具（由前端是否勾选知识库决定）
-    """
     tools = []
 
     if enable_knowledge:
-        search_knowledge = make_search_knowledge_tool(user_id=user_id,
-                                                      doc_ids=doc_ids)
+        search_knowledge = make_search_knowledge_tool(user_id=user_id, doc_ids=doc_ids)
         tools.append(search_knowledge)
 
     @tool
     def calculator(expression: str) -> str:
-        """计算数学表达式，返回计算结果。
-
-        当你需要进行数学计算时，请使用此工具。
-        支持的运算符：+ - * / ** % // ( ) 以及常见数学函数。
-        示例输入："2 + 3 * 4"、"(100 - 25) / 5"、"2 ** 10"
-        """
+        """计算数学表达式，返回计算结果。"""
         safe_names = {
             "abs": abs,
             "max": max,
@@ -246,52 +225,27 @@ def make_tools(user_id: str = "",
     return tools
 
 
-class AgentState(TypedDict):
-    messages: Annotated[list, add_messages]
+# ========== Agent 单例缓存 ==========
+
+_agent_cache: dict = {}
 
 
-def build_agent_graph(
-    system_prompt: str = "",
-    user_id: str = "",
-    doc_ids: str = "",
-    enable_knowledge: bool = True,
-    checkpointer=None,
-):
-    """构建并编译 ReAct Agent 图。
+def _get_agent(user_id: str, doc_ids: str, enable_knowledge: bool, system_prompt: str):
+    """获取或创建 Agent 实例（按参数缓存，避免重复创建）。"""
+    key = (user_id, doc_ids, enable_knowledge, system_prompt)
+    if key not in _agent_cache:
+        tools = make_tools(user_id, doc_ids, enable_knowledge)
+        prompt = system_prompt or AGENT_SYSTEM_PROMPT
+        _agent_cache[key] = create_agent(
+            llm,
+            tools=tools,
+            system_prompt=prompt,
+            checkpointer=get_saver(),
+        )
+    return _agent_cache[key]
 
-    模型节点直接 yield llm.astream() 的 chunk，实现真正的逐 token 流式。
-    """
-    tools = make_tools(user_id=user_id,
-                       doc_ids=doc_ids,
-                       enable_knowledge=enable_knowledge)
-    prompt = system_prompt or AGENT_SYSTEM_PROMPT
 
-    tool_node = ToolNode(tools)
-    model = llm.bind_tools(tools)
-
-    async def agent_node(state: AgentState):
-        messages = list(state.get("messages", []))
-        if prompt:
-            if not messages or getattr(messages[0], "type", "") != "system":
-                messages.insert(0, SystemMessage(content=prompt))
-            else:
-                messages[0] = SystemMessage(content=prompt)
-        async for chunk in model.astream(messages):
-            yield {"messages": [chunk]}
-
-    def should_continue(state: AgentState):
-        last = state["messages"][-1]
-        if getattr(last, "tool_calls", None):
-            return "tools"
-        return END
-
-    workflow = StateGraph(AgentState)
-    workflow.add_node("agent", agent_node)
-    workflow.add_node("tools", tool_node)
-    workflow.add_edge(START, "agent")
-    workflow.add_conditional_edges("agent", should_continue, {"tools": "tools", END: END})
-    workflow.add_edge("tools", "agent")
-    return workflow.compile(checkpointer=checkpointer or get_saver())
+# ========== 主函数：流式 SSE 输出 ==========
 
 
 async def stream_agent(
@@ -306,107 +260,34 @@ async def stream_agent(
     """Agent 流式 SSE 输出。
 
     所有对话统一走 Agent 模式，根据 enable_knowledge 决定是否挂载知识库工具。
-    通过 graph.astream_events() 捕获 agent 节点内部 yield 的逐 token chunk。
     """
-    saver = await get_async_saver()
-    graph = build_agent_graph(memory_context,
-                              user_id,
-                              doc_ids,
-                              enable_knowledge,
-                              checkpointer=saver)
-    config = {"configurable": {"thread_id": thread_id}}
+    # 1. 获取缓存的 Agent 实例
+    agent = _get_agent(user_id, doc_ids, enable_knowledge, memory_context)
 
+    # 2. 构造消息（历史 + 当前输入）
     past_messages = get_thread_messages(thread_id)
-
     if image_url:
-        content = f"用户上传了一张图片，图片地址为: {image_url}\n\n用户的问题是: {message}"
+        content = [
+            {"type": "text", "text": message},
+            {"type": "image", "url": image_url},
+        ]
     else:
         content = message
-
     messages = past_messages + [HumanMessage(content=content)]
 
-    yield _sse_json({
-        "status": "processing",
-        "process": _make_process_with_steps([{
-            "step_id": "analysis",
-            "status": "processing",
-            "message": "",
-            "description": "正在分析问题，准备调用工具...",
-        }]),
-    })
-    await asyncio.sleep(0.08)
+    # 3. 遍历 Agent 输出，只返回 content（不展示工具过程）
+    config = {"configurable": {"thread_id": thread_id}}
 
-    steps: list[dict] = []
-    yielded_tool_keys: set[str] = set()
-    last_agent_chunk: str = ""
+    for msg, metadata in agent.stream(
+        {"messages": messages}, config, stream_mode="messages"
+    ):
+        node_name = metadata.get("langgraph_node", "")
 
-    async for event in graph.astream_events({"messages": messages}, config, version="v2"):
-        kind = event["event"]
-        metadata = event.get("metadata", {})
-        node = metadata.get("langgraph_node", "")
+        if node_name == "model": 
+            token = getattr(msg, "content", "")
+            if token:
+                yield _sse_json({"content": str(token)})
+                await asyncio.sleep(0.01)
 
-        if kind != "on_chain_stream":
-            continue
-        if node not in ("agent", "tools"):
-            continue
-
-        chunk = event["data"].get("chunk", {})
-        msg_list = chunk.get("messages", [])
-
-        for msg in msg_list:
-            if node == "agent":
-                # 检测工具调用
-                tool_call_chunks = getattr(msg, "tool_call_chunks", None)
-                tool_calls = getattr(msg, "tool_calls", None)
-                tc_list = []
-                if tool_calls:
-                    tc_list = list(tool_calls)
-                elif tool_call_chunks:
-                    tc_list = [tc for tc in tool_call_chunks if tc.get("name")]
-
-                for tc in tc_list:
-                    tool_name = tc.get("name", "unknown")
-                    key = f"{tool_name}_{len(steps)}"
-                    if key not in yielded_tool_keys:
-                        yielded_tool_keys.add(key)
-                        steps.append({
-                            "step_id": tool_name,
-                            "status": "processing",
-                            "message": "",
-                            "description": f"正在调用工具：{tool_name}...",
-                        })
-                        yield _sse_json({
-                            "status": "processing",
-                            "process": _make_process_with_steps(steps),
-                        })
-                        await asyncio.sleep(0.05)
-
-                # 逐 token 输出（去重：LangGraph 会在节点结束时再发一次最终合并结果）
-                token = getattr(msg, "content", "") or ""
-                if token and token != last_agent_chunk:
-                    last_agent_chunk = token
-                    yield _sse_json({
-                        "status": "stream_answer_content",
-                        "content": token,
-                        "process": _make_process_with_steps(steps),
-                    })
-                    await asyncio.sleep(0.01)
-
-            elif node == "tools" and isinstance(msg, ToolMessage):
-                # 更新最后一个 processing 状态的工具步骤
-                for i in range(len(steps) - 1, -1, -1):
-                    if steps[i]["status"] == "processing":
-                        steps[i]["status"] = "successful"
-                        steps[i]["description"] = f"工具返回：{str(msg.content)[:300]}"
-                        yield _sse_json({
-                            "status": "processing",
-                            "process": _make_process_with_steps(steps),
-                        })
-                        await asyncio.sleep(0.05)
-                        break
-                last_agent_chunk = ""
-
-    yield _sse_json({
-        "status": "successful",
-        "done": True,
-    })
+    # 4. 完成
+    yield _sse_json({"done": True})

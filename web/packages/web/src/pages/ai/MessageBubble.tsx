@@ -1,7 +1,7 @@
-import { memo, useState } from "react";
+import { memo } from "react";
 import { useSelector } from "react-redux";
-import { UserOutlined, BulbOutlined, DownOutlined, FilePdfOutlined, FileTextOutlined, FileExcelOutlined, FileWordOutlined, FileImageOutlined, FileOutlined, DownloadOutlined } from "@ant-design/icons";
-import { Avatar, Collapse, Button } from "antd";
+import { UserOutlined, FilePdfOutlined, FileTextOutlined, FileExcelOutlined, FileWordOutlined, FileImageOutlined, FileOutlined, DownloadOutlined } from "@ant-design/icons";
+import { Avatar, Button } from "antd";
 import agentAvatar from "@/assets/agentAvatar.png";
 import { getImageUrl } from "@/utils/image";
 import { userSlice } from "@/store/slice/user";
@@ -23,90 +23,6 @@ interface MessageBubbleProps {
   msg: UiMessage;
 }
 
-const ThinkingPanel: React.FC<{ msg: UiMessage }> = ({ msg }) => {
-  const [expanded, setExpanded] = useState(false);
-
-  if (!msg.thinkingProcess && !msg.thinkingStatus) return null;
-
-  const isProcessing = msg.thinkingStatus === "processing";
-  const processes = msg.thinkingProcess?.step?.processes || [];
-
-  if (isProcessing) {
-    return (
-      <div
-        style={{
-          marginBottom: 12,
-          padding: "10px 14px",
-          background: "rgba(255, 255, 255, 0.1)",
-          borderRadius: 8,
-          display: "flex",
-          alignItems: "center",
-          gap: 8,
-          fontSize: 13,
-          color: "rgba(255, 255, 255, 0.85)",
-        }}
-      >
-        <span className={styles.loadingDots}>
-          <span className={styles.dot} style={{ animationDelay: "0s", backgroundColor: "rgba(255,255,255,0.6)" }} />
-          <span className={styles.dot} style={{ animationDelay: "0.15s", backgroundColor: "rgba(255,255,255,0.6)" }} />
-          <span className={styles.dot} style={{ animationDelay: "0.3s", backgroundColor: "rgba(255,255,255,0.6)" }} />
-        </span>
-        <span>深度思考中…</span>
-      </div>
-    );
-  }
-
-  if (processes.length === 0) return null;
-
-  const thinkingText = processes.map((p) => p.description).filter(Boolean).join("\n\n");
-  if (!thinkingText) return null;
-
-  return (
-    <div style={{ marginBottom: 12 }}>
-      <Collapse
-        ghost
-        bordered={false}
-        expandIconPosition="end"
-        expandIcon={({ isActive }) => (
-          <DownOutlined rotate={isActive ? 180 : 0} style={{ fontSize: 12, color: "rgba(255,255,255,0.6)" }} />
-        )}
-        activeKey={expanded ? "think" : undefined}
-        onChange={(keys) => setExpanded(Array.isArray(keys) ? keys.includes("think") : keys === "think")}
-        items={[
-          {
-            key: "think",
-            label: (
-              <span style={{ fontSize: 13, color: "rgba(255,255,255,0.85)", display: "flex", alignItems: "center", gap: 6 }}>
-                <BulbOutlined style={{ fontSize: 13 }} />
-                已深度思考
-              </span>
-            ),
-            children: (
-              <div
-                style={{
-                  padding: "8px 0",
-                  fontSize: 13,
-                  lineHeight: 1.6,
-                  color: "rgba(255,255,255,0.7)",
-                  whiteSpace: "pre-wrap",
-                  wordBreak: "break-word",
-                }}
-              >
-                {thinkingText}
-              </div>
-            ),
-            style: {
-              background: "rgba(255, 255, 255, 0.08)",
-              borderRadius: 8,
-              padding: "6px 12px",
-            },
-          },
-        ]}
-      />
-    </div>
-  );
-};
-
 const MessageBubbleInner: React.FC<MessageBubbleProps> = ({ msg }) => {
   const renderLoading = (text: string) => (
     <span
@@ -125,23 +41,9 @@ const MessageBubbleInner: React.FC<MessageBubbleProps> = ({ msg }) => {
     </span>
   );
 
-  // AI 正在生成且暂无内容时展示 loading 动画（优先用 stepStatus）
+  // AI 正在生成且暂无内容时展示 loading 动画
   if (msg.role === "ai" && msg.status === "loading" && !msg.content) {
-    const stepText =
-      msg.stepStatus === "retrieving"
-        ? "正在检索相关内容…"
-        : msg.stepStatus === "generating"
-          ? "正在生成答案…"
-          : msg.stepStatus === "parsing"
-            ? "正在解析文档…"
-            : msg.stepStatus === "splitting"
-              ? "正在切片…"
-              : msg.stepStatus === "embedding"
-                ? "正在向量化…"
-                : msg.stepStatus === "storing"
-                  ? "正在写入向量库…"
-                  : "AI 正在思考…";
-    return renderLoading(stepText);
+    return renderLoading("AI 正在思考…");
   }
 
   // AI 消息：流式期间按块切分 + memo + content-visibility 优化；
@@ -158,7 +60,6 @@ const MessageBubbleInner: React.FC<MessageBubbleProps> = ({ msg }) => {
           overflowWrap: "anywhere",
         }}
       >
-        <ThinkingPanel msg={msg} />
         <StreamingMarkdown
           content={msg.content}
           streaming={msg.status === "loading"}
@@ -228,9 +129,6 @@ export const MessageBubble = memo(
     prev.msg.content === next.msg.content &&
     prev.msg.status === next.msg.status &&
     prev.msg.role === next.msg.role &&
-    prev.msg.stepStatus === next.msg.stepStatus &&
-    prev.msg.thinkingStatus === next.msg.thinkingStatus &&
-    JSON.stringify(prev.msg.thinkingProcess) === JSON.stringify(next.msg.thinkingProcess) &&
     JSON.stringify(prev.msg.attachments) === JSON.stringify(next.msg.attachments)
 );
 

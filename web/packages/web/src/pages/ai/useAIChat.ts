@@ -494,9 +494,6 @@ export function useAIChat(conversationId: number | null, options: UseAIChatOptio
 
       const isStreamingPhase = snap.status === "streaming" || snap.status === "idle";
 
-      const hasThinking = snap.thinkingProcess || snap.thinkingStatus;
-      const hasStep = snap.stepStatus != null;
-
       if (snap.fullText && isStreamingPhase) {
         setMessages((prev) => {
           const idx = findTargetIdx(prev);
@@ -505,13 +502,6 @@ export function useAIChat(conversationId: number | null, options: UseAIChatOptio
             next[idx] = {
               ...next[idx]!,
               content: snap.fullText,
-              stepStatus: snap.stepStatus,
-              ...(hasThinking
-                ? {
-                    thinkingProcess: snap.thinkingProcess,
-                    thinkingStatus: snap.thinkingStatus,
-                  }
-                : {}),
             };
             return next;
           }
@@ -523,13 +513,6 @@ export function useAIChat(conversationId: number | null, options: UseAIChatOptio
               role: "ai",
               status: "loading",
               timestamp: Date.now(),
-              stepStatus: snap.stepStatus,
-              ...(hasThinking
-                ? {
-                    thinkingProcess: snap.thinkingProcess,
-                    thinkingStatus: snap.thinkingStatus,
-                  }
-                : {}),
             },
           ];
         });
@@ -546,12 +529,7 @@ export function useAIChat(conversationId: number | null, options: UseAIChatOptio
           const nextContent = snap.fullText || existingMsg.content;
           const contentChanged = existingMsg.content !== nextContent;
           const statusChanged = existingMsg.status !== status;
-          const thinkingChanged =
-            hasThinking &&
-            (existingMsg.thinkingProcess !== snap.thinkingProcess ||
-              existingMsg.thinkingStatus !== snap.thinkingStatus);
-          const stepChanged = hasStep && existingMsg.stepStatus !== snap.stepStatus;
-          if (!contentChanged && !statusChanged && !thinkingChanged && !stepChanged) {
+          if (!contentChanged && !statusChanged) {
             return prev;
           }
           const next = prev.slice();
@@ -559,13 +537,6 @@ export function useAIChat(conversationId: number | null, options: UseAIChatOptio
             ...existingMsg,
             content: nextContent,
             status,
-            stepStatus: snap.stepStatus,
-            ...(hasThinking
-              ? {
-                  thinkingProcess: snap.thinkingProcess,
-                  thinkingStatus: snap.thinkingStatus,
-                }
-              : {}),
           };
           return next;
         });

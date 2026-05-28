@@ -1,15 +1,5 @@
 import { localStg } from "@/utils/storage";
 
-interface ThinkingProcess {
-  plan: { status: "processing" | "successful" | "failed"; message: string };
-  step: {
-    status: "processing" | "successful" | "failed";
-    processes: { step_id: string; status: "processing" | "successful" | "failed"; message: string; description: string }[];
-    source: unknown[];
-  };
-  task_status: "processing" | "successful" | "failed";
-}
-
 type UpdateMsg = {
   type: "UPDATE";
   payload: {
@@ -19,9 +9,6 @@ type UpdateMsg = {
     fullText: string;
     done: boolean;
     error?: string;
-    thinkingProcess?: ThinkingProcess;
-    thinkingStatus?: "processing" | "successful" | "failed";
-    stepStatus?: string;
   };
 };
 
@@ -32,9 +19,6 @@ type SnapshotMsg = {
     fullText: string;
     status: "idle" | "streaming" | "done" | "error";
     updatedAt: number;
-    thinkingProcess?: ThinkingProcess;
-    thinkingStatus?: "processing" | "successful" | "failed";
-    stepStatus?: string;
   };
 };
 
@@ -83,9 +67,6 @@ function ensureWorker() {
         fullText: msg.payload.fullText,
         status: msg.payload.error ? "error" : msg.payload.done ? "done" : "streaming",
         updatedAt: Date.now(),
-        thinkingProcess: msg.payload.thinkingProcess,
-        thinkingStatus: msg.payload.thinkingStatus,
-        stepStatus: msg.payload.stepStatus,
       };
       dispatchSnapshot(snap);
       return;
@@ -220,4 +201,3 @@ export const aiChatStreamClient = {
     ensureWorker().postMessage({ type: "SNAPSHOT", payload: { conversationId } });
   },
 };
-
