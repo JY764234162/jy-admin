@@ -15,8 +15,6 @@ type StartPayload = {
   resume?: boolean;
   /** 多模态图片 base64 */
   imageBase64?: string;
-  /** 指定检索的文档 doc_ids */
-  docIds?: string[];
   /** 用户消息携带的附件元数据 */
   attachments?: { uid: string; filename: string; url?: string }[];
 };
@@ -164,7 +162,6 @@ async function startStream(p: StartPayload) {
           message: p.content,
           image_url: p.imageBase64 ?? "",
           enable_knowledge: p.enable_knowledge ?? false,
-          doc_ids: p.docIds,
           attachments: p.attachments ? JSON.stringify(p.attachments) : undefined,
         };
 

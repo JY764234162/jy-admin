@@ -11,8 +11,8 @@ AI_API_KEY = os.getenv("AI_API_KEY", "")
 AI_BASE_URL = os.getenv("AI_BASE_URL", "https://api.openai.com/v1")
 AI_MODEL = os.getenv("AI_MODEL", "gpt-4o")
 
-# Embedding 配置（本地 HuggingFace 模型）
-EMBEDDING_MODEL = os.getenv("EMBEDDING_MODEL", "BAAI/bge-small-zh")
+# Embedding 配置（云端模型）
+EMBEDDING_MODEL = os.getenv("EMBEDDING_MODEL", "text-embedding-v3")
 
 # PostgreSQL + pgvector 配置（优先）
 PG_HOST = os.getenv("PG_HOST", "localhost")
@@ -37,10 +37,6 @@ UPLOAD_DIR.mkdir(exist_ok=True)
 # 向量存储目录（SQLite 模式下用）
 VECTOR_DIR = BASE_DIR / os.getenv("VECTOR_DIR", "vector_data")
 VECTOR_DIR.mkdir(exist_ok=True)
-
-# HuggingFace 镜像（国内访问）
-HF_ENDPOINT = os.getenv("HF_ENDPOINT", "https://hf-mirror.com")
-os.environ.setdefault("HF_ENDPOINT", HF_ENDPOINT)
 
 # 腾讯云 COS 配置
 COS_SECRET_ID = os.getenv("COS_SECRET_ID", "")

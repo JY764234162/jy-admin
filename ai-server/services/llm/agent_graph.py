@@ -2,7 +2,7 @@
 
 使用 create_agent 构建 ReAct Agent：
 - llm 从 .llm 模块导入（已初始化的全局单例）
-- Agent 按 (user_id, doc_ids, enable_knowledge, system_prompt) 缓存，避免重复创建
+- Agent 按 (user_id, enable_knowledge, system_prompt) 缓存，避免重复创建
 - 通过 agent.stream(stream_mode="messages") 获取模型/工具节点的输出
 """
 
@@ -14,7 +14,7 @@ from langchain.agents import create_agent
 from langchain_core.messages import HumanMessage
 
 from services.storage.checkpoint_store import get_saver, get_thread_messages
-from services.tools.knowledge_tools import make_search_knowledge_tool
+from services.tools.knowledge_tools import make_search_knowledge_tool, make_list_knowledge_tool
 from .llm import llm
 
 # ========== 系统提示词 ==========
@@ -194,15 +194,17 @@ def _sse_json(data: dict) -> str:
 # ========== 工具创建 ==========
 
 
-def make_tools(user_id: str = "", doc_ids: str = "", enable_knowledge: bool = True):
-    """创建已绑定 user_id 和 doc_ids 的工具列表。"""
+def make_tools(user_id: str = "", enable_knowledge: bool = True):
+    """创建已绑定 user_id 的工具列表。"""
     from langchain_core.tools import tool
 
     tools = []
 
     if enable_knowledge:
-        search_knowledge = make_search_knowledge_tool(user_id=user_id, doc_ids=doc_ids)
+        search_knowledge = make_search_knowledge_tool(user_id=user_id)
         tools.append(search_knowledge)
+        list_knowledge = make_list_knowledge_tool(user_id=user_id)
+        tools.append(list_knowledge)
 
     @tool
     def calculator(expression: str) -> str:
@@ -230,11 +232,11 @@ def make_tools(user_id: str = "", doc_ids: str = "", enable_knowledge: bool = Tr
 _agent_cache: dict = {}
 
 
-def _get_agent(user_id: str, doc_ids: str, enable_knowledge: bool, system_prompt: str):
+def _get_agent(user_id: str, enable_knowledge: bool, system_prompt: str):
     """获取或创建 Agent 实例（按参数缓存，避免重复创建）。"""
-    key = (user_id, doc_ids, enable_knowledge, system_prompt)
+    key = (user_id, enable_knowledge, system_prompt)
     if key not in _agent_cache:
-        tools = make_tools(user_id, doc_ids, enable_knowledge)
+        tools = make_tools(user_id, enable_knowledge)
         prompt = system_prompt or AGENT_SYSTEM_PROMPT
         _agent_cache[key] = create_agent(
             llm,
@@ -254,7 +256,6 @@ async def stream_agent(
     user_id: str = "",
     memory_context: str = "",
     image_url: str = "",
-    doc_ids: str = "",
     enable_knowledge: bool = True,
 ) -> AsyncIterator[str]:
     """Agent 流式 SSE 输出。
@@ -262,7 +263,7 @@ async def stream_agent(
     所有对话统一走 Agent 模式，根据 enable_knowledge 决定是否挂载知识库工具。
     """
     # 1. 获取缓存的 Agent 实例
-    agent = _get_agent(user_id, doc_ids, enable_knowledge, memory_context)
+    agent = _get_agent(user_id, enable_knowledge, memory_context)
 
     # 2. 构造消息（历史 + 当前输入）
     past_messages = get_thread_messages(thread_id)

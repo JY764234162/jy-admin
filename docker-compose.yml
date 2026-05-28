@@ -153,7 +153,6 @@ services:
       COS_BUCKET: ${COS_BUCKET}
       COS_REGION: ${COS_REGION:-ap-beijing}
       COS_PREFIX: ${COS_PREFIX:-ai-knowledge}
-      HF_ENDPOINT: ${HF_ENDPOINT:-https://hf-mirror.com}
       PG_HOST: ${PG_HOST:-postgres-vector}
       PG_PORT: ${PG_PORT:-5432}
       PG_DB: ${PG_DB:-ai_vectors}
@@ -168,8 +167,6 @@ services:
       # 保护容器内的 .venv，避免被宿主机空/不完整的 .venv 覆盖
       - ai-server-venv:/app/.venv
       - ai_uploads:/app/uploads
-      # 复用宿主机 HuggingFace 模型缓存，避免容器内重复下载
-      - ~/.cache/huggingface:/root/.cache/huggingface:ro
     depends_on:
       postgres-vector:
         condition: service_healthy

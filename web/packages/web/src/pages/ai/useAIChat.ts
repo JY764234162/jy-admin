@@ -312,7 +312,6 @@ export function useAIChat(conversationId: number | null, options: UseAIChatOptio
         targetConversationId,
         resume,
         imageBase64,
-        docIds,
         attachments,
       } = options;
 
@@ -361,7 +360,7 @@ export function useAIChat(conversationId: number | null, options: UseAIChatOptio
           antdMessage.error("没有可恢复的 AI 消息");
           return false;
         }
-        const enableKnowledge = !!(useKnowledge || (docIds && docIds.length > 0));
+        const enableKnowledge = !!useKnowledge;
         beginResumeStream(cid, loadingMsg, content, enableKnowledge);
         return true;
       }
@@ -395,8 +394,8 @@ export function useAIChat(conversationId: number | null, options: UseAIChatOptio
 
       try {
         live.current.refreshSessionsAfterStream = true;
-        const enableKnowledgeForStart = !!(useKnowledge || (docIds && docIds.length > 0));
-        aiChatStreamClient.start(cid, { content, imageBase64, docIds, attachments, enable_knowledge: enableKnowledgeForStart });
+        const enableKnowledgeForStart = !!useKnowledge;
+        aiChatStreamClient.start(cid, { content, imageBase64, attachments, enable_knowledge: enableKnowledgeForStart });
         return true;
       } catch (error) {
         console.error("发送消息失败:", error);

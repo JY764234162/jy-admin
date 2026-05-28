@@ -28,7 +28,7 @@ def _get_store() -> PostgresStore:
         _store = PostgresStore(
             conn,
             index={
-                "dims": 512,  # BAAI/bge-small-zh 的向量维度
+                "dims": 1024,  # text-embedding-v3 的向量维度
                 "embed": embed_documents,  # list[str] -> list[list[float]]
             },
         )

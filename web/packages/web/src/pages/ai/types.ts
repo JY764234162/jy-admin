@@ -21,6 +21,5 @@ export interface SendOptions {
   targetConversationId?: number;
   resume?: boolean;
   imageBase64?: string;
-  docIds?: string[];
   attachments?: MessageAttachment[];
 }

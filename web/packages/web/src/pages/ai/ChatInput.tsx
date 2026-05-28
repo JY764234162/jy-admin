@@ -47,7 +47,6 @@ type SendFromInput = (options: {
   content: string;
   useKnowledge?: boolean;
   imageBase64?: string;
-  docIds?: string[];
   attachments?: { uid: string; filename: string }[];
 }) => Promise<boolean>;
 
@@ -213,7 +212,6 @@ export const ChatInput = ({ loading, sendMessage }: ChatInputProps) => {
     }
 
     // 处理文档附件：先解析（向量化）
-    let docIds: string[] | undefined;
     if (docItems.length > 0) {
       const failedDocs = docItems.filter((it) => {
         const cur = uploadingFiles.find((u) => u.uid === it.uid);
@@ -248,10 +246,6 @@ export const ChatInput = ({ loading, sendMessage }: ChatInputProps) => {
         antdMessage.error(`${stillFailed.length} 个文件解析失败，请移除后重试`);
         return;
       }
-
-      docIds = docItems
-        .map((it) => uploadingFiles.find((u) => u.uid === it.uid)?.docId)
-        .filter((id): id is string => !!id);
     }
 
     // 合并所有附件元数据
@@ -269,7 +263,6 @@ export const ChatInput = ({ loading, sendMessage }: ChatInputProps) => {
       content: text,
       useKnowledge,
       imageBase64,
-      docIds,
       attachments: attachments.length > 0 ? attachments : undefined,
     });
     if (ok) {

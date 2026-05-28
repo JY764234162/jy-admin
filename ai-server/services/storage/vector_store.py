@@ -53,27 +53,6 @@ def search(query: str, top_k: int = 3, user_id: str = "") -> List[Dict]:
     ]
 
 
-def search_by_doc_id(query: str, doc_id: str, top_k: int = 3, user_id: str = "") -> List[Dict]:
-    """在指定文档的 chunks 中做向量检索（按 doc_id 过滤）"""
-    store = get_store()
-    filter_dict = {"doc_id": doc_id}
-    if user_id:
-        filter_dict["user_id"] = user_id
-    docs_with_scores = store.similarity_search_with_score(query, k=top_k, filter=filter_dict)
-    # fallback：兼容旧数据
-    if user_id and not docs_with_scores:
-        docs_with_scores = store.similarity_search_with_score(query, k=top_k, filter={"doc_id": doc_id})
-    return [
-        {
-            "content": doc.page_content,
-            "score": float(score),
-            "source": doc.metadata.get("source", ""),
-            "doc_id": doc.metadata.get("doc_id", ""),
-        }
-        for doc, score in docs_with_scores
-    ]
-
-
 def list_documents(user_id: str = "") -> List[Dict]:
     """列出已上传的文档（按 doc_id 去重，可按 user_id 过滤）"""
     engine = _get_engine()

@@ -4,7 +4,6 @@
 # 构建优化说明：
 # - 使用 BuildKit cache mount 缓存 uv 和 apt 下载，避免每次全量重装
 # - 依赖文件单独 COPY，代码变更不会导致依赖层失效
-# - 预下载 Embedding 模型到镜像，避免启动时超时
 # ============================================================
 
 FROM ghcr.io/astral-sh/uv:python3.11-bookworm-slim
@@ -18,9 +17,6 @@ ENV UV_COMPILE_BYTECODE=1
 
 # 使用阿里云 PyPI 镜像（清华镜像偶发 DNS 解析失败）
 ENV UV_INDEX_URL=https://mirrors.aliyun.com/pypi/simple/
-
-# 构建阶段也使用 HuggingFace 镜像站
-ENV HF_ENDPOINT=https://hf-mirror.com
 
 # 安装系统依赖（apt 缓存挂载加速）
 RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
@@ -41,14 +37,6 @@ RUN --mount=type=cache,target=/root/.cache/uv,sharing=locked \
 
 # 复制应用代码（.dockerignore 已排除 .venv/ uploads/ 等）
 COPY . .
-
-# 预下载 Embedding 模型到本地缓存（避免启动时下载超时）
-RUN uv run python -c \
-    "from sentence_transformers import SentenceTransformer; \
-    import os; \
-    model = os.getenv('EMBEDDING_MODEL', 'BAAI/bge-small-zh'); \
-    SentenceTransformer(model)" \
-    || echo "Model pre-download skipped, will download on first use"
 
 # 创建上传目录
 RUN mkdir -p uploads

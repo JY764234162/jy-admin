@@ -1,7 +1,7 @@
 import asyncio
 import json
 import uuid
-from typing import Optional, List
+from typing import Optional
 
 from fastapi import APIRouter, HTTPException, Header, Depends
 from pydantic import BaseModel
@@ -27,7 +27,6 @@ class ChatRequest(BaseModel):
     conversationId: Optional[int] = None
     attachments: Optional[str] = "[]"  # JSON 字符串，附件信息
     image_url: Optional[str] = None  # 图片 URL，有值时走 Agent 图片识别工具
-    doc_ids: Optional[List[str]] = None  # 指定检索的文档 ID 列表
     enable_knowledge: Optional[bool] = False  # 是否启用知识库工具
 
 
@@ -93,9 +92,8 @@ async def chat_message(
     # thread_id 用于 Checkpoint
     session_key = f"{user_id}:{conversation_id}" if user_id else conversation_id
 
-    # 是否启用知识库工具（前端勾选知识库或传了 doc_ids）
-    enable_knowledge = req.enable_knowledge or bool(req.doc_ids and len(req.doc_ids) > 0)
-    doc_ids_str = ",".join(req.doc_ids) if req.doc_ids else ""
+    # 是否启用知识库工具（前端勾选知识库）
+    enable_knowledge = req.enable_knowledge if req.enable_knowledge is not None else False
 
     async def event_generator():
         full_response = ""
@@ -105,7 +103,7 @@ async def chat_message(
             # 统一走 Agent 模式，根据参数动态决定工具列表
             async for event in stream_agent(
                 user_message, session_key, str(user_id), memory_context,
-                req.image_url or "", doc_ids_str, enable_knowledge
+                req.image_url or "", enable_knowledge
             ):
                 data_str = event.removeprefix("data: ").strip()
                 try:
