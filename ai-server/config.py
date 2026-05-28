@@ -42,6 +42,12 @@ VECTOR_DIR.mkdir(exist_ok=True)
 HF_ENDPOINT = os.getenv("HF_ENDPOINT", "https://hf-mirror.com")
 os.environ.setdefault("HF_ENDPOINT", HF_ENDPOINT)
 
+# 腾讯云 COS 配置
+COS_SECRET_ID = os.getenv("COS_SECRET_ID", "")
+COS_SECRET_KEY = os.getenv("COS_SECRET_KEY", "")
+COS_BUCKET = os.getenv("COS_BUCKET", "jiangyi-knowledge")
+COS_REGION = os.getenv("COS_REGION", "ap-beijing")
+
 # Tavily 搜索
 TAVILY_API_KEY = os.getenv("TAVILY_API_KEY", "")
 

@@ -8,10 +8,41 @@ from typing import Dict, List
 
 from fastapi import APIRouter, UploadFile, File, HTTPException, Query
 from langchain_core.documents import Document
+from qcloud_cos import CosConfig, CosS3Client
 
 import config
 from services.rag import document, embedding
 from services.storage import vector_store
+
+# ========== COS 客户端 ==========
+
+
+def _get_cos_client() -> CosS3Client | None:
+    if not config.COS_SECRET_ID or not config.COS_SECRET_KEY:
+        return None
+    cos_config = CosConfig(
+        Region=config.COS_REGION,
+        SecretId=config.COS_SECRET_ID,
+        SecretKey=config.COS_SECRET_KEY,
+    )
+    return CosS3Client(cos_config)
+
+
+def _upload_to_cos(file_bytes: bytes, key: str) -> str:
+    """上传文件到腾讯云 COS，返回访问 URL"""
+    client = _get_cos_client()
+    if not client:
+        return ""
+    try:
+        client.put_object(
+            Bucket=config.COS_BUCKET,
+            Body=file_bytes,
+            Key=key,
+        )
+        return f"https://{config.COS_BUCKET}.cos.{config.COS_REGION}.myqcloud.com/{key}"
+    except Exception as e:
+        print(f"[COS] upload failed: {e}")
+        return ""
 
 router = APIRouter(prefix="/api/ai/knowledge", tags=["knowledge"])
 
@@ -128,8 +159,11 @@ async def _process_document_async(task: ParseTask, file_bytes: bytes, user_id: s
                 total=total,
             )
 
-        # 4. 写入向量库
+        # 4. 上传 COS + 写入向量库
         await task.emit("storing", "正在写入向量库...", 85)
+        cos_key = f"knowledge/{doc_id}_{task.filename}"
+        cos_url = _upload_to_cos(file_bytes, cos_key)
+
         documents = [
             Document(
                 page_content=chunks[i],
@@ -139,7 +173,7 @@ async def _process_document_async(task: ParseTask, file_bytes: bytes, user_id: s
                     "file_type": file_type,
                     "created_at": created_at,
                     "parse_at": parse_at,
-                    "cos_url": "",
+                    "cos_url": cos_url,
                     "user_id": user_id or "",
                     "chunk_idx": i,
                 },
@@ -150,7 +184,7 @@ async def _process_document_async(task: ParseTask, file_bytes: bytes, user_id: s
         store = vector_store.get_store()
         store.add_documents(documents)
 
-        # 保存原始文件
+        # 保存原始文件（本地备份）
         save_path = config.UPLOAD_DIR / f"{doc_id}_{task.filename}"
         save_path.write_bytes(file_bytes)
 
@@ -183,6 +217,11 @@ async def upload_document(file: UploadFile = File(...)):
     now = datetime.now(timezone.utc).isoformat()
     doc_id = uuid.uuid4().hex[:12]
     file_type = Path(file.filename).suffix.lower()
+
+    # 上传 COS
+    cos_key = f"knowledge/{doc_id}_{file.filename}"
+    cos_url = _upload_to_cos(file_bytes, cos_key)
+
     documents = [
         Document(
             page_content=chunk,
@@ -192,7 +231,7 @@ async def upload_document(file: UploadFile = File(...)):
                 "file_type": file_type,
                 "created_at": now,
                 "parse_at": now,
-                "cos_url": "",
+                "cos_url": cos_url,
             },
         )
         for chunk in chunks
@@ -202,7 +241,7 @@ async def upload_document(file: UploadFile = File(...)):
     save_path = config.UPLOAD_DIR / f"{doc_id}_{file.filename}"
     save_path.write_bytes(file_bytes)
 
-    return {"code": 0, "data": {"knowledge_id": doc_id, "filename": file.filename, "chunks": len(chunks)}, "msg": "上传成功"}
+    return {"code": 0, "data": {"knowledge_id": doc_id, "filename": file.filename, "chunks": len(chunks), "cos_url": cos_url}, "msg": "上传成功"}
 
 
 @router.get("/list")
