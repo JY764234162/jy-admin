@@ -47,6 +47,7 @@ COS_SECRET_ID = os.getenv("COS_SECRET_ID", "")
 COS_SECRET_KEY = os.getenv("COS_SECRET_KEY", "")
 COS_BUCKET = os.getenv("COS_BUCKET", "jiangyi-knowledge")
 COS_REGION = os.getenv("COS_REGION", "ap-beijing")
+COS_PREFIX = os.getenv("COS_PREFIX", "ai-knowledge")
 
 # Tavily 搜索
 TAVILY_API_KEY = os.getenv("TAVILY_API_KEY", "")

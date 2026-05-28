@@ -150,13 +150,14 @@ services:
       JWT_SIGNING_KEY: ${JWT_SIGNING_KEY}
       COS_SECRET_ID: ${COS_SECRET_ID}
       COS_SECRET_KEY: ${COS_SECRET_KEY}
-      COS_BUCKET: ${COS_BUCKET:-jiangyi-knowledge}
+      COS_BUCKET: ${COS_BUCKET}
       COS_REGION: ${COS_REGION:-ap-beijing}
-      HF_ENDPOINT: https://hf-mirror.com
-      PG_HOST: postgres-vector
-      PG_PORT: 5432
-      PG_DB: ai_vectors
-      PG_USER: ai_admin
+      COS_PREFIX: ${COS_PREFIX:-ai-knowledge}
+      HF_ENDPOINT: ${HF_ENDPOINT:-https://hf-mirror.com}
+      PG_HOST: ${PG_HOST:-postgres-vector}
+      PG_PORT: ${PG_PORT:-5432}
+      PG_DB: ${PG_DB:-ai_vectors}
+      PG_USER: ${PG_USER:-ai_admin}
       PG_PASSWORD: ${PG_PASSWORD:-ai123456}
     # 暴露端口到宿主机（前端开发环境直连 + Nginx 代理）
     ports:
