@@ -6,6 +6,7 @@ from sqlalchemy.orm import Session
 
 from models.conversation import Conversation, get_db
 from services.middleware import get_current_user, UserContext
+from services.llm.response_filter import sanitize_response
 from services.storage import (
     get_thread_messages,
     thread_exists,
@@ -83,7 +84,7 @@ def _messages_from_checkpoint(conv_id: int, user_id: int, conv: Conversation) ->
             "ID": i + 1,
             "conversationId": conv_id,
             "role": role,
-            "content": msg.content,
+            "content": sanitize_response(msg.content) if role == "assistant" else msg.content,
             "userId": user_id,
             "status": conv.latest_status,
             "attachments": conv.latest_attachments,
