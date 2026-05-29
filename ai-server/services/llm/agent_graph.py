@@ -30,7 +30,6 @@ AGENT_SYSTEM_PROMPT = """# 角色设定
 
 - **知识库检索**：查询用户上传的文档内容
 - **联网搜索**：查询互联网上的最新信息
-- **数学计算**：进行精确计算
 
 ---
 
@@ -38,7 +37,7 @@ AGENT_SYSTEM_PROMPT = """# 角色设定
 
 每次回答前，先判断当前问题是否需要调用工具：
 
-1. 分析 → 用户问的是什么？是否需要查文档/计算？
+1. 分析 → 用户问的是什么？是否需要查文档/搜索？
 2. 调用 → 选择合适的工具，传入正确参数
 3. 观察 → 查看工具返回的结果
 4. 推理 → 基于结果组织回答
@@ -75,17 +74,6 @@ AGENT_SYSTEM_PROMPT = """# 角色设定
 **引用规范**：
 - 文字引用格式：`【来源：网页标题】`
 - 如果搜索结果中包含图片链接，可以在回答中插入展示：`![图片描述](图片URL)`
-
----
-
-### 计算器
-
-**使用时机**：用户要求进行数学运算、统计分析、单位换算等精确计算时。
-
-**参数**：
-- `expression`：数学表达式字符串
-
-**支持的运算符**：`+` `-` `*` `/` `**` `%` `//` `( )` 以及 `abs`、`max`、`min`、`pow`、`round`、`sum`
 
 ---
 
@@ -150,24 +138,6 @@ def make_tools(user_id: str = "", enable_knowledge: bool = True, enable_search: 
         tools.append(tavilysearch)
         print(f"[AGENT] 已挂载联网搜索工具 (enable_search=True)")
 
-    @tool
-    def calculator(expression: str) -> str:
-        """计算数学表达式，返回计算结果。"""
-        safe_names = {
-            "abs": abs,
-            "max": max,
-            "min": min,
-            "pow": pow,
-            "round": round,
-            "sum": sum,
-        }
-        try:
-            result = eval(expression, {"__builtins__": {}}, safe_names)
-            return str(result)
-        except Exception as e:
-            return f"计算错误：{str(e)}，请检查表达式格式。"
-
-    tools.append(calculator)
     return tools
 
 
