@@ -139,6 +139,7 @@ export const aiChatStreamClient = {
       imageBase64?: string;
       attachments?: { uid: string; filename: string; url?: string }[];
       enable_knowledge?: boolean;
+      enable_search?: boolean;
     }
   ) {
     const {
@@ -147,6 +148,7 @@ export const aiChatStreamClient = {
       imageBase64,
       attachments,
       enable_knowledge = false,
+      enable_search = false,
     } = options;
     const streamId = createStreamId();
     const token = localStg.get("token");
@@ -162,6 +164,7 @@ export const aiChatStreamClient = {
         imageBase64,
         attachments,
         enable_knowledge,
+        enable_search,
       },
     });
     return streamId;

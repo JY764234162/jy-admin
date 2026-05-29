@@ -123,12 +123,12 @@ export function useAIChat(conversationId: number | null, options: UseAIChatOptio
 
   /** 列表里存在未完成的 AI 条目标记为 loading 时，由 worker 续传；与 sendMessage(resume) 共用一套启动逻辑 */
   const beginResumeStream = useCallback(
-    (cid: number, loadingMsg: UiMessage, resumeContent: string, enableKnowledge: boolean) => {
+    (cid: number, loadingMsg: UiMessage, resumeContent: string, enableKnowledge: boolean, enableSearch: boolean) => {
       live.current.streamingAiMsgId = loadingMsg.id;
       markConversationStreaming(cid);
       try {
         live.current.refreshSessionsAfterStream = true;
-        aiChatStreamClient.start(cid, { content: resumeContent, resume: true, enable_knowledge: enableKnowledge });
+        aiChatStreamClient.start(cid, { content: resumeContent, resume: true, enable_knowledge: enableKnowledge, enable_search: enableSearch });
       } catch (error) {
         console.error("恢复流式输出失败:", error);
         antdMessage.error("恢复流式输出失败");
@@ -188,7 +188,7 @@ export function useAIChat(conversationId: number | null, options: UseAIChatOptio
               const loadingIdx = messageList.indexOf(loadingMsg);
               const userMsg = loadingIdx > 0 ? messageList[loadingIdx - 1] : null;
               setTimeout(() => {
-                beginResumeStream(cid, loadingMsg, userMsg?.content || "", false);
+                beginResumeStream(cid, loadingMsg, userMsg?.content || "", false, false);
               }, 0);
             }
           }
@@ -309,6 +309,7 @@ export function useAIChat(conversationId: number | null, options: UseAIChatOptio
       const {
         content: userContent,
         useKnowledge,
+        useSearch,
         targetConversationId,
         resume,
         imageBase64,
@@ -361,7 +362,8 @@ export function useAIChat(conversationId: number | null, options: UseAIChatOptio
           return false;
         }
         const enableKnowledge = !!useKnowledge;
-        beginResumeStream(cid, loadingMsg, content, enableKnowledge);
+        const enableSearch = false;
+        beginResumeStream(cid, loadingMsg, content, enableKnowledge, enableSearch);
         return true;
       }
 
@@ -395,7 +397,8 @@ export function useAIChat(conversationId: number | null, options: UseAIChatOptio
       try {
         live.current.refreshSessionsAfterStream = true;
         const enableKnowledgeForStart = !!useKnowledge;
-        aiChatStreamClient.start(cid, { content, imageBase64, attachments, enable_knowledge: enableKnowledgeForStart });
+        const enableSearchForStart = !!useSearch;
+        aiChatStreamClient.start(cid, { content, imageBase64, attachments, enable_knowledge: enableKnowledgeForStart, enable_search: enableSearchForStart });
         return true;
       } catch (error) {
         console.error("发送消息失败:", error);

@@ -82,6 +82,7 @@ export interface ChatMessageRequest {
   conversationId: number;
   content: string;
   enable_knowledge?: boolean;
+  enable_search?: boolean;
   attachments?: string;
 }
 

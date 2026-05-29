@@ -18,6 +18,7 @@ export interface UiMessage {
 export interface SendOptions {
   content: string;
   useKnowledge?: boolean;
+  useSearch?: boolean;
   targetConversationId?: number;
   resume?: boolean;
   imageBase64?: string;

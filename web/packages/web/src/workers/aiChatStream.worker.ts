@@ -9,6 +9,8 @@ type StartPayload = {
   content: string;
   /** 是否启用知识库工具（勾选知识库时传 true） */
   enable_knowledge?: boolean;
+  /** 是否启用联网搜索工具（勾选联网搜索时传 true） */
+  enable_search?: boolean;
   /** 知识库问答配置 */
   knowledgeConfig?: { top_k?: number };
   /** 是否为恢复模式（刷新后重连，不重复保存用户消息） */
@@ -162,6 +164,7 @@ async function startStream(p: StartPayload) {
           message: p.content,
           image_url: p.imageBase64 ?? "",
           enable_knowledge: p.enable_knowledge ?? false,
+          enable_search: p.enable_search ?? false,
           attachments: p.attachments ? JSON.stringify(p.attachments) : undefined,
         };
 

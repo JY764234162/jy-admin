@@ -7,20 +7,21 @@ _TOOL_NAMES = [
     "search_knowledge",
     "list_knowledge",
     "calculator",
+    "tavilysearch",
 ]
 
 # 常见工具调用描述模式（中文）
 _TOOL_PATTERNS = [
     # 我调用了 xxx 工具
-    r"我(?:已经|刚刚)?[调使]用了\s*[`"]?(?:search_knowledge|list_knowledge|calculator)[`"]?\s*(?:工具)?[，。]?",
+    r"我(?:已经|刚刚)?[调使]用了\s*[`"]?(?:search_knowledge|list_knowledge|calculator|tavilysearch)[`"]?\s*(?:工具)?[，。]?",
     # 调用 xxx
-    r"(?:通过|借助|使用|调用)\s*[`"]?(?:search_knowledge|list_knowledge|calculator)[`"]?\s*(?:工具)?[，。]?",
+    r"(?:通过|借助|使用|调用)\s*[`"]?(?:search_knowledge|list_knowledge|calculator|tavilysearch)[`"]?\s*(?:工具)?[，。]?",
     # xxx 工具返回/告诉我
-    r"(?:search_knowledge|list_knowledge|calculator)\s*(?:工具)?\s*(?:返回|告诉我|显示|给出)[了，。]?",
+    r"(?:search_knowledge|list_knowledge|calculator|tavilysearch)\s*(?:工具)?\s*(?:返回|告诉我|显示|给出)[了，。]?",
     # 根据 xxx 的结果
-    r"根据\s*(?:search_knowledge|list_knowledge|calculator)\s*(?:工具)?\s*的?[结果查询][，。]?",
+    r"根据\s*(?:search_knowledge|list_knowledge|calculator|tavilysearch)\s*(?:工具)?\s*的?[结果查询][，。]?",
     # 我用 xxx 查了一下
-    r"我(?:用|通过)\s*(?:search_knowledge|list_knowledge|calculator)\s*(?:工具)?\s*查[了查]?[，。]?",
+    r"我(?:用|通过)\s*(?:search_knowledge|list_knowledge|calculator|tavilysearch)\s*(?:工具)?\s*查[了查]?[，。]?",
 ]
 
 # 合并为统一正则

@@ -28,6 +28,7 @@ class ChatRequest(BaseModel):
     attachments: Optional[str] = "[]"  # JSON 字符串，附件信息
     image_url: Optional[str] = None  # 图片 URL，有值时走 Agent 图片识别工具
     enable_knowledge: Optional[bool] = False  # 是否启用知识库工具
+    enable_search: Optional[bool] = False  # 是否启用联网搜索工具
 
 
 def _sse_json(data: dict) -> str:
@@ -94,6 +95,8 @@ async def chat_message(
 
     # 是否启用知识库工具（前端勾选知识库）
     enable_knowledge = req.enable_knowledge if req.enable_knowledge is not None else False
+    # 是否启用联网搜索工具（前端勾选联网搜索）
+    enable_search = req.enable_search if req.enable_search is not None else False
 
     async def event_generator():
         full_response = ""
@@ -103,7 +106,7 @@ async def chat_message(
             # 统一走 Agent 模式，根据参数动态决定工具列表
             async for event in stream_agent(
                 user_message, session_key, str(user_id), memory_context,
-                req.image_url or "", enable_knowledge
+                req.image_url or "", enable_knowledge, enable_search
             ):
                 data_str = event.removeprefix("data: ").strip()
                 try:

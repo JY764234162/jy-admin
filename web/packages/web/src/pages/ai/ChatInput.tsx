@@ -4,6 +4,7 @@ import {
   CloudUploadOutlined,
   LinkOutlined,
   BookOutlined,
+  GlobalOutlined,
   LoadingOutlined,
   CheckCircleFilled,
   CloseCircleFilled,
@@ -46,6 +47,7 @@ function fileToBase64(file: File): Promise<string> {
 type SendFromInput = (options: {
   content: string;
   useKnowledge?: boolean;
+  useSearch?: boolean;
   imageBase64?: string;
   attachments?: { uid: string; filename: string }[];
 }) => Promise<boolean>;
@@ -77,6 +79,7 @@ export const ChatInput = ({ loading, sendMessage }: ChatInputProps) => {
   const isMobile = useSelector(layoutSlice.selectors.getIsMobile);
   const [value, setValue] = useState("");
   const [useKnowledge, setUseKnowledge] = useState(false);
+  const [useSearch, setUseSearch] = useState(false);
   const [open, setOpen] = useState(false);
   const [items, setItems] = useState<NonNullable<AttachmentsProps["items"]>>([]);
   const [uploadingFiles, setUploadingFiles] = useState<UploadingFile[]>([]);
@@ -262,6 +265,7 @@ export const ChatInput = ({ loading, sendMessage }: ChatInputProps) => {
     const ok = await sendMessage({
       content: text,
       useKnowledge,
+      useSearch,
       imageBase64,
       attachments: attachments.length > 0 ? attachments : undefined,
     });
@@ -277,6 +281,10 @@ export const ChatInput = ({ loading, sendMessage }: ChatInputProps) => {
 
   const handleKnowledgeChange = (checked: boolean) => {
     setUseKnowledge(checked);
+  };
+
+  const handleSearchChange = (checked: boolean) => {
+    setUseSearch(checked);
   };
 
   const renderUploadProgressList = () => {
@@ -363,7 +371,9 @@ export const ChatInput = ({ loading, sendMessage }: ChatInputProps) => {
             ? "提问与已上传文件相关的问题..."
             : useKnowledge
               ? "输入问题，基于知识库内容回答..."
-              : "输入消息与 AI 对话..."
+              : useSearch
+                ? "输入问题，联网搜索最新信息..."
+                : "输入消息与 AI 对话..."
         }
         suffix={false}
         autoSize={{ minRows: 2, maxRows: 6 }}
@@ -376,6 +386,13 @@ export const ChatInput = ({ loading, sendMessage }: ChatInputProps) => {
                 unCheckedChildren="知识库"
                 onChange={handleKnowledgeChange}
                 icon={<BookOutlined />}
+              />
+              <Switch
+                value={useSearch}
+                checkedChildren="联网搜索"
+                unCheckedChildren="联网搜索"
+                onChange={handleSearchChange}
+                icon={<GlobalOutlined />}
               />
             </Flex>
             <Flex align="center">
