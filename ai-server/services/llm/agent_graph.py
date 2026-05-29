@@ -127,6 +127,15 @@ async def stream_agent(
 
     # 2. 构造消息（历史 + 当前输入）
     past_messages = get_thread_messages(thread_id)
+
+    # 当启用联网搜索时，过滤掉历史中的旧 AI 回答和工具结果，
+    # 避免模型看到过期搜索结果后偷懒不再调用工具
+    if enable_search:
+        original_count = len(past_messages)
+        past_messages = [m for m in past_messages if getattr(m, "type", "") == "human"]
+        if len(past_messages) < original_count:
+            print(f"[AGENT] 过滤历史消息：只保留 {len(past_messages)} 条用户提问，移除 {original_count - len(past_messages)} 条旧回答/工具结果")
+
     if image_url:
         content = [
             {"type": "text", "text": message},
