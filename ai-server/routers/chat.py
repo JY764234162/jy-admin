@@ -111,8 +111,8 @@ async def chat_message(
                 data_str = event.removeprefix("data: ").strip()
                 try:
                     data = json.loads(data_str)
-                    if data.get("answer"):
-                        full_response = data["answer"]
+                    if data.get("content"):
+                        full_response = data["content"]
                 except Exception:
                     pass
                 yield event

@@ -128,13 +128,6 @@ async def stream_agent(
     # 2. 构造消息（历史 + 当前输入）
     past_messages = get_thread_messages(thread_id)
 
-    # 当启用联网搜索时，不传历史消息给 agent。
-    # 原因：checkpointer 加载的 state 中仍包含完整的旧 AI 回答和工具结果，
-    # 模型看到旧搜索结果后会偷懒不再调用工具。不传历史可强制模型重新搜索。
-    if enable_search:
-        print(f"[AGENT] 联网搜索模式：忽略 {len(past_messages)} 条历史消息，只使用当前提问")
-        past_messages = []
-
     if image_url:
         content = [
             {"type": "text", "text": message},
@@ -146,6 +139,7 @@ async def stream_agent(
 
     # 3. 遍历 Agent 输出，只返回 content（不展示工具过程）
     config = {"configurable": {"thread_id": thread_id}}
+    has_content = False
 
     for msg, metadata in agent.stream(
         {"messages": messages}, config, stream_mode="messages"
@@ -160,8 +154,13 @@ async def stream_agent(
 
             token = getattr(msg, "content", "")
             if token:
+                has_content = True
                 yield _sse_json({"content": sanitize_response(str(token))})
                 await asyncio.sleep(0.01)
 
-    # 4. 完成
+    # 4. 兜底：如果模型没有生成任何内容，返回友好提示
+    if not has_content:
+        yield _sse_json({"content": "抱歉，我暂时无法回答这个问题，请稍后重试。"})
+
+    # 5. 完成
     yield _sse_json({"done": True})
