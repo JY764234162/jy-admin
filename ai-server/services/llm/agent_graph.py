@@ -1,8 +1,8 @@
 """Agent 流式 SSE 输出。
 
-使用 create_agent 构建 ReAct Agent：
+使用 create_react_agent 构建 ReAct Agent：
 - llm 从 .llm 模块导入（已初始化的全局单例）
-- Agent 按 (user_id, enable_knowledge, system_prompt) 缓存，避免重复创建
+- Agent 按 (user_id, enable_knowledge, enable_search, system_prompt) 缓存，避免重复创建
 - 通过 agent.stream(stream_mode="messages") 获取模型/工具节点的输出
 """
 
@@ -10,8 +10,8 @@ import asyncio
 import json
 from typing import AsyncIterator
 
-from langchain.agents import create_agent
 from langchain_core.messages import HumanMessage
+from langgraph.prebuilt import create_react_agent
 
 from services.storage.checkpoint_store import get_saver, get_thread_messages
 from services.tools.knowledge_tools import make_search_knowledge_tool, make_list_knowledge_tool
@@ -159,10 +159,10 @@ def _get_agent(user_id: str, enable_knowledge: bool, enable_search: bool, system
         tool_names = [t.name for t in tools]
         print(f"[AGENT] 创建新 Agent: key={key}, tools={tool_names}")
         prompt = system_prompt or AGENT_SYSTEM_PROMPT
-        _agent_cache[key] = create_agent(
+        _agent_cache[key] = create_react_agent(
             llm,
             tools=tools,
-            system_prompt=prompt,
+            prompt=prompt,
             checkpointer=get_saver(),
         )
     else:
@@ -209,7 +209,7 @@ async def stream_agent(
     ):
         node_name = metadata.get("langgraph_node", "")
 
-        if node_name == "model":
+        if node_name in ("model", "agent"):
             # 跳过工具调用消息（只向用户暴露最终回答，不暴露工具调用过程）
             tool_calls = getattr(msg, "tool_calls", None)
             if tool_calls:
