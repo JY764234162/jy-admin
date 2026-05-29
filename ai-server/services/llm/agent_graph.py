@@ -65,14 +65,16 @@ AGENT_SYSTEM_PROMPT = """# 角色设定
 
 ### 联网搜索
 
-**使用时机**：用户询问时事新闻、最新数据、实时信息、或通用知识库中未涵盖的内容时。
+**使用时机**：用户询问时事新闻、最新数据、实时信息、或通用知识库中未涵盖的内容时。**只要问题涉及时效性信息（如"最近"、"最新"、"今天"、具体年份日期），必须调用此工具，不要凭记忆回答。**
 
 **参数**：
-- `query`：搜索关键词
+- `query`：搜索关键词（用中文关键词效果更好）
 
-**返回值**：网页摘要 + 来源链接
+**返回值**：网页摘要 + 来源链接 + 相关图片链接
 
-**引用规范**：引用联网搜索结果时，标注来源格式为 `【来源：网页标题】`。
+**引用规范**：
+- 文字引用格式：`【来源：网页标题】`
+- 如果搜索结果中包含图片链接，可以在回答中插入展示：`![图片描述](图片URL)`
 
 ---
 
@@ -146,6 +148,7 @@ def make_tools(user_id: str = "", enable_knowledge: bool = True, enable_search: 
     if enable_search:
         tavilysearch = make_tavily_search_tool()
         tools.append(tavilysearch)
+        print(f"[AGENT] 已挂载联网搜索工具 (enable_search=True)")
 
     @tool
     def calculator(expression: str) -> str:
@@ -178,6 +181,8 @@ def _get_agent(user_id: str, enable_knowledge: bool, enable_search: bool, system
     key = (user_id, enable_knowledge, enable_search, system_prompt)
     if key not in _agent_cache:
         tools = make_tools(user_id, enable_knowledge, enable_search)
+        tool_names = [t.name for t in tools]
+        print(f"[AGENT] 创建新 Agent: key={key}, tools={tool_names}")
         prompt = system_prompt or AGENT_SYSTEM_PROMPT
         _agent_cache[key] = create_agent(
             llm,
@@ -185,6 +190,8 @@ def _get_agent(user_id: str, enable_knowledge: bool, enable_search: bool, system
             system_prompt=prompt,
             checkpointer=get_saver(),
         )
+    else:
+        print(f"[AGENT] 命中缓存 Agent: key={key}")
     return _agent_cache[key]
 
 
@@ -204,6 +211,7 @@ async def stream_agent(
 
     所有对话统一走 Agent 模式，根据 enable_knowledge 和 enable_search 动态挂载工具。
     """
+    print(f"[AGENT] stream_agent 参数: enable_knowledge={enable_knowledge}, enable_search={enable_search}, user_id={user_id}")
     # 1. 获取缓存的 Agent 实例
     agent = _get_agent(user_id, enable_knowledge, enable_search, memory_context)
 
