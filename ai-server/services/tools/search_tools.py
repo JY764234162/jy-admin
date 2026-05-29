@@ -1,5 +1,7 @@
 """联网搜索工具：供 Agent 检索互联网信息。"""
 
+import json
+
 from langchain_core.tools import tool
 from langchain_tavily import TavilySearch
 
@@ -7,40 +9,51 @@ import config
 
 
 def _format_results(results: dict) -> str:
-    """将 Tavily 搜索结果格式化为带来源、图片的文本。"""
+    """将 Tavily 搜索结果格式化为结构化 JSON 文本。
+
+    返回格式：
+    {
+        "results": [
+            {
+                "answer": "网页摘要内容",
+                "citations": [{"title": "网页标题", "url": "链接地址"}],
+                "images": ["图片URL1", "图片URL2"]
+            }
+        ]
+    }
+    """
     if not results or not isinstance(results, dict):
-        return "搜索未返回有效结果。"
+        return json.dumps({"results": []}, ensure_ascii=False)
 
     error = results.get("error")
     if error:
-        return f"搜索出错：{error}"
+        return json.dumps({"error": error}, ensure_ascii=False)
 
     items = results.get("results", [])
     if not items:
-        return "未找到相关搜索结果。"
+        return json.dumps({"results": []}, ensure_ascii=False)
 
-    parts = []
-    for i, r in enumerate(items, 1):
-        title = r.get("title", "未知标题")
-        url = r.get("url", "")
-        content = r.get("content", "")
-        part = f"【结果 {i}】{title}\n{content}\n来源：{url}"
-        # Tavily 可能返回图片
-        images = r.get("images", []) or []
-        if images:
-            part += "\n相关图片："
-            for img_url in images:
-                part += f"\n- {img_url}"
-        parts.append(part)
+    formatted = []
+    for r in items:
+        formatted.append({
+            "answer": r.get("content", ""),
+            "citations": [
+                {
+                    "title": r.get("title", "未知标题"),
+                    "url": r.get("url", ""),
+                }
+            ],
+            "images": r.get("images", []) or [],
+        })
 
-    return "\n\n---\n\n".join(parts)
+    return json.dumps({"results": formatted}, ensure_ascii=False, indent=2)
 
 
 def make_tavily_search_tool():
     """创建联网搜索工具。"""
     tavily = TavilySearch(
         tavily_api_key=config.TAVILY_API_KEY,
-        max_results=5,
+        max_results=3,
         search_depth="basic",
         include_images=True,
     )
