@@ -37,17 +37,15 @@ if [ ! -f "server/config.docker.yaml" ]; then
     exit 1
 fi
 
-# 读取 .env（可选）
-# - 本地开发：通常会有 .env
-# - CI/CD/服务器：推荐由外部环境变量注入敏感信息，此时 .env 可以不存在
+# 读取 .env（必填：所有环境变量配置已集中到根目录）
 if [ -f ".env" ]; then
     # shellcheck disable=SC1091
     source .env 2>/dev/null || true
+    echo -e "${GREEN}✓ 已加载根目录 .env${NC}"
 else
-    echo -e "${YELLOW}提示: 未找到 .env，将仅使用当前环境变量进行部署${NC}"
-    if [ -f ".env.example" ]; then
-        echo -e "${YELLOW}  可参考 .env.example 创建本地 .env（本地开发推荐）${NC}"
-    fi
+    echo -e "${RED}错误: 根目录 .env 文件不存在${NC}"
+    echo -e "${YELLOW}所有环境变量配置已集中到根目录，请先创建 .env 文件${NC}"
+    exit 1
 fi
 
 # 检查关键环境变量（只检查是否为空，不检查默认值）
@@ -56,7 +54,7 @@ fi
 # - 可选：LongCat（不填则后端回退到 Mock）
 MISSING_VARS=()
 
-# 必填：数据库与 JWT与COS与LongCat
+# 必填：数据库 + JWT + COS + AI 服务
 REQUIRED_VARS=(
     JWT_SIGNING_KEY
     MYSQL_ROOT_PASSWORD
@@ -65,8 +63,10 @@ REQUIRED_VARS=(
     MYSQL_PASSWORD
     COS_SECRET_ID
     COS_SECRET_KEY
-    LONGCAT_APP_KEY
-    LONGCAT_MODEL
+    COS_BUCKET
+    AI_API_KEY
+    AI_BASE_URL
+    AI_MODEL
 )
 
 for var in "${REQUIRED_VARS[@]}"; do
@@ -82,10 +82,7 @@ if [ ${#MISSING_VARS[@]} -gt 0 ]; then
     for var in "${MISSING_VARS[@]}"; do
         echo -e "${RED}  - $var${NC}"
     done
-    echo -e "${YELLOW}请通过以下任一方式设置这些环境变量：${NC}"
-    echo -e "${YELLOW}  1) 本地创建/编辑 .env 文件（可参考 .env.example）${NC}"
-    echo -e "${YELLOW}  2) 在执行脚本前导出环境变量（export XXX=...）${NC}"
-    echo -e "${YELLOW}  3) 在 CI/CD 中注入 Secrets/环境变量到服务器执行环境${NC}\n"
+    echo -e "${YELLOW}请在根目录 .env 文件中设置以上环境变量${NC}\n"
     exit 1
 fi
 
