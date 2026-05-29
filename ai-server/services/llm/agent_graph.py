@@ -128,22 +128,12 @@ async def stream_agent(
     # 2. 构造消息（历史 + 当前输入）
     past_messages = get_thread_messages(thread_id)
 
-    # 当启用联网搜索时，过滤掉历史中的旧 AI 回答和工具结果，
-    # 避免模型看到过期搜索结果后偷懒不再调用工具。
-    # 同时去重并只保留最近 2 条不同内容的用户提问，避免重复内容触发模型限制。
+    # 当启用联网搜索时，不传历史消息给 agent。
+    # 原因：checkpointer 加载的 state 中仍包含完整的旧 AI 回答和工具结果，
+    # 模型看到旧搜索结果后会偷懒不再调用工具。不传历史可强制模型重新搜索。
     if enable_search:
-        original_count = len(past_messages)
-        seen = set()
-        unique_human = []
-        for m in past_messages:
-            if getattr(m, "type", "") == "human":
-                content = getattr(m, "content", "")
-                if content not in seen:
-                    seen.add(content)
-                    unique_human.append(m)
-        past_messages = unique_human[-2:]  # 只保留最近 2 条不同内容的提问
-        if len(past_messages) < original_count:
-            print(f"[AGENT] 过滤历史消息：只保留最近 {len(past_messages)} 条不同提问，移除 {original_count - len(past_messages)} 条旧数据")
+        print(f"[AGENT] 联网搜索模式：忽略 {len(past_messages)} 条历史消息，只使用当前提问")
+        past_messages = []
 
     if image_url:
         content = [
