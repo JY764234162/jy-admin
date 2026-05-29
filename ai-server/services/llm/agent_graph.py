@@ -130,13 +130,20 @@ async def stream_agent(
 
     # 当启用联网搜索时，过滤掉历史中的旧 AI 回答和工具结果，
     # 避免模型看到过期搜索结果后偷懒不再调用工具。
-    # 同时只保留最近 2 条用户提问，防止重复提问干扰模型判断。
+    # 同时去重并只保留最近 2 条不同内容的用户提问，避免重复内容触发模型限制。
     if enable_search:
         original_count = len(past_messages)
-        past_messages = [m for m in past_messages if getattr(m, "type", "") == "human"]
-        past_messages = past_messages[-2:]  # 只保留最近 2 条
+        seen = set()
+        unique_human = []
+        for m in past_messages:
+            if getattr(m, "type", "") == "human":
+                content = getattr(m, "content", "")
+                if content not in seen:
+                    seen.add(content)
+                    unique_human.append(m)
+        past_messages = unique_human[-2:]  # 只保留最近 2 条不同内容的提问
         if len(past_messages) < original_count:
-            print(f"[AGENT] 过滤历史消息：只保留最近 {len(past_messages)} 条用户提问，移除 {original_count - len(past_messages)} 条旧数据")
+            print(f"[AGENT] 过滤历史消息：只保留最近 {len(past_messages)} 条不同提问，移除 {original_count - len(past_messages)} 条旧数据")
 
     if image_url:
         content = [
