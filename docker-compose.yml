@@ -100,7 +100,10 @@ services:
       # 证书目录：宿主机 ./certs 挂载到容器 /etc/nginx/certs（勿提交 certs/ 到仓库）
       - ./web/packages/web/certs:/etc/nginx/certs:ro
     depends_on:
-      - backend
+      backend:
+        condition: service_healthy
+      ai-server:
+        condition: service_healthy
     networks:
       - jy-admin-network
     mem_limit: 256m # 内存限制：256MB（Nginx 占用很少）
@@ -170,6 +173,17 @@ services:
     depends_on:
       postgres-vector:
         condition: service_healthy
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "python3",
+          "-c",
+          "import urllib.request; urllib.request.urlopen('http://localhost:8000/api/health')",
+        ]
+      interval: 30s
+      timeout: 5s
+      retries: 3
     networks:
       - jy-admin-network
     mem_limit: 1g
