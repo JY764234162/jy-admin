@@ -22,7 +22,7 @@ def _format_results(results: List[dict]) -> str:
 
 def _do_search(query: str, user_id: str = "") -> str:
     """执行知识库搜索的实际逻辑。"""
-    results = vector_store.search(query, top_k=5, user_id=user_id)
+    results = vector_store.search(query=query, top_k=5, user_id=user_id)
     return _format_results(results)
 
 
@@ -66,7 +66,7 @@ def make_search_knowledge_tool(user_id: str = ""):
         Args:
             query: 清晰、具体的问题或关键词
         """
-        return _do_search(query, user_id=user_id)
+        return _do_search(query=query, user_id=user_id)
 
     return search_knowledge
 

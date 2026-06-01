@@ -259,7 +259,7 @@ async def list_knowledge(user_id: str = Query("")):
 
 @router.delete("/{doc_id}")
 async def delete_knowledge(doc_id: str, user_id: str = Query("")):
-    ok = vector_store.delete_document(doc_id, user_id=user_id)
+    ok = vector_store.delete_document(doc_id=doc_id, user_id=user_id)
     if not ok:
         raise HTTPException(404, f"文档 {doc_id} 不存在")
 
@@ -286,10 +286,16 @@ async def retry_knowledge(doc_id: str, user_id: str = Query("")):
     old_doc = next((d for d in docs if d["doc_id"] == doc_id), None)
     created_at = old_doc.get("created_at") if old_doc else ""
 
-    vector_store.delete_document(doc_id, user_id=user_id)
+    vector_store.delete_document(doc_id=doc_id, user_id=user_id)
 
     # 创建新的异步解析任务
-    task = _create_parse_task(filename)
-    asyncio.create_task(_process_document_async(task, file_bytes, user_id, doc_id, created_at))
+    task = _create_parse_task(filename=filename)
+    asyncio.create_task(_process_document_async(
+        task=task,
+        file_bytes=file_bytes,
+        user_id=user_id,
+        doc_id=doc_id,
+        created_at=created_at,
+    ))
 
     return {"code": 0, "data": {"task_id": task.task_id, "filename": filename, "doc_id": doc_id}, "msg": "任务已创建"}

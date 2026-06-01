@@ -88,7 +88,7 @@ async def chat_message(
     conv_db_id = conv.id if conv else None
 
     # 语义检索：跨会话召回与当前问题相关的长期记忆
-    memory_context = semantic_memory.format_memory_context(user_message, str(user_id))
+    memory_context = semantic_memory.format_memory_context(query=user_message, user_id=str(user_id))
 
     # thread_id 用于 Checkpoint
     session_key = f"{user_id}:{conversation_id}" if user_id else conversation_id
@@ -105,8 +105,13 @@ async def chat_message(
         try:
             # 统一走 Agent 模式，根据参数动态决定工具列表
             async for event in stream_agent(
-                user_message, session_key, str(user_id), memory_context,
-                req.image_url or "", enable_knowledge, enable_search
+                message=user_message,
+                thread_id=session_key,
+                user_id=str(user_id),
+                memory_context=memory_context,
+                image_url=req.image_url or "",
+                enable_knowledge=enable_knowledge,
+                enable_search=enable_search,
             ):
                 data_str = event.removeprefix("data: ").strip()
                 try:
@@ -120,7 +125,10 @@ async def chat_message(
             # 流式结束后，保存本轮交互到语义记忆（长期记忆）
             if full_response.strip():
                 semantic_memory.save_interaction(
-                    user_message, full_response, conversation_id, str(user_id)
+                    user_msg=user_message,
+                    ai_msg=full_response,
+                    session_id=conversation_id,
+                    user_id=str(user_id),
                 )
         except Exception as e:
             error_msg = str(e)

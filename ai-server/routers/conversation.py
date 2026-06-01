@@ -228,7 +228,7 @@ async def get_message_list(
         raise HTTPException(404, "会话不存在或无权限")
 
     thread_id = f"{user.id}:{conv_id}"
-    items = _messages_from_checkpoint(conv_id, user.id, conv)
+    items = _messages_from_checkpoint(conv_id=conv_id, user_id=user.id, conv=conv)
     # 倒序（最新的在前），内存分页
     items.reverse()
     total = len(items)

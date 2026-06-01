@@ -96,7 +96,7 @@ class LongTermMemory:
 
     def format_memory_context(self, query: str, user_id: str = "") -> str:
         """将检索到的记忆格式化为可注入 prompt 的上下文文本。"""
-        memory_text = self.retrieve(query, user_id)
+        memory_text = self.retrieve(query=query, user_id=user_id)
         if not memory_text:
             return ""
         return (

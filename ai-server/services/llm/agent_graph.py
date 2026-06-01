@@ -180,7 +180,7 @@ def _build_graph(user_id: str, enable_knowledge: bool, enable_search: bool, syst
     代码量多一点，但每个环节都清晰可见、可修改。
     """
     # 1. 创建实际挂载的工具列表
-    tools = make_tools(user_id, enable_knowledge, enable_search)
+    tools = make_tools(user_id=user_id, enable_knowledge=enable_knowledge, enable_search=enable_search)
     tool_names = [t.name for t in tools]
     print(
         f"[AGENT] 构建 Graph: user_id={user_id}, tools={tool_names}, "
@@ -189,7 +189,7 @@ def _build_graph(user_id: str, enable_knowledge: bool, enable_search: bool, syst
 
     # 2. 构建系统提示词（根据工具可用性动态生成）
     prompt_text = (
-        system_prompt if system_prompt else build_system_prompt(enable_knowledge, enable_search)
+        system_prompt if system_prompt else build_system_prompt(enable_knowledge=enable_knowledge, enable_search=enable_search)
     )
 
     # 3. 构建 agent 节点（Runnable）
@@ -246,7 +246,7 @@ def _get_graph(user_id: str, enable_knowledge: bool, enable_search: bool, system
     key = (user_id, enable_knowledge, enable_search, system_prompt)
     if key not in _graph_cache:
         print(f"[AGENT] 创建新 Graph: key={key}")
-        _graph_cache[key] = _build_graph(user_id, enable_knowledge, enable_search, system_prompt)
+        _graph_cache[key] = _build_graph(user_id=user_id, enable_knowledge=enable_knowledge, enable_search=enable_search, system_prompt=system_prompt)
     else:
         print(f"[AGENT] 命中缓存 Graph: key={key}")
     return _graph_cache[key]
@@ -274,7 +274,7 @@ async def stream_agent(
     )
 
     # 1. 获取缓存的 Graph 实例
-    graph = _get_graph(user_id, enable_knowledge, enable_search, memory_context)
+    graph = _get_graph(user_id=user_id, enable_knowledge=enable_knowledge, enable_search=enable_search, system_prompt=memory_context)
 
     # 2. 构造消息（历史 + 当前输入）
     past_messages = get_thread_messages(thread_id)
