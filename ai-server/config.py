@@ -59,3 +59,9 @@ CHUNK_OVERLAP = int(os.getenv("CHUNK_OVERLAP", "50"))
 
 # JWT 配置（与 Go 后端共用同一个签名密钥）
 JWT_SIGNING_KEY = os.getenv("JWT_SIGNING_KEY", "")
+
+# LangSmith 可观测性配置
+LANGSMITH_TRACING = os.getenv("LANGSMITH_TRACING", "false").lower() == "true"
+LANGSMITH_API_KEY = os.getenv("LANGSMITH_API_KEY", "")
+LANGSMITH_PROJECT = os.getenv("LANGSMITH_PROJECT", "jy-admin")
+LANGSMITH_ENDPOINT = os.getenv("LANGSMITH_ENDPOINT", "https://api.smith.langchain.com")

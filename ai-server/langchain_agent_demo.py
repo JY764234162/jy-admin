@@ -7,16 +7,25 @@ LangChain Agent Demo - 测试 Agent 模型调用（支持线上图片 URL）
 """
 
 import asyncio
+import os
 from pprint import pprint
 
-from langchain_openai import ChatOpenAI
 from langchain.agents import create_agent
 from langchain.agents.middleware import before_model, before_agent
 from langchain_core.messages import HumanMessage, AIMessageChunk
-from fastapi import FastAPI, Request
+from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
+from dotenv import load_dotenv
+from langchain_openai import ChatOpenAI
+
+# 加载 .env 文件（.env 在 ai-server 的父目录）
+env_path = os.path.join(os.path.dirname(__file__), "..", ".env")
+load_dotenv(env_path)
+
+# 独立项目区分
+os.environ["LANGSMITH_PROJECT"] = "jy-admin-demo"
 
 app = FastAPI(
     title="AI Server", description="RAG 知识库问答 + AI 对话服务", version="2.0.0"
@@ -45,15 +54,10 @@ async def chat(req: ChatRequest):
     return response
 
 
-# ========== 配置 ==========
-API_KEY = "sk-8978d2c8a453406e8b2678091be19186"
-BASE_URL = "https://dashscope.aliyuncs.com/compatible-mode/v1"
-MODEL = "qwen3-vl-plus"
+def run_server():
+    import uvicorn
 
-# IMAGE_URL = "https://gips0.baidu.com/it/u=1690853528,2506870245&fm=3028&app=3028&f=JPEG&fmt=auto?w=1024&h=1024"  # 线上图片地址，例如：https://example.com/image.jpg
-# QUESTION = "这张图片里有什么？请详细描述。"
-
-SYSTEM_PROMPT = "你是一个智能助手，你叫芳芳"
+    uvicorn.run("langchain_agent_demo:app", host="0.0.0.0", port=8001, reload=True)
 
 
 # ========== Agent 工具 ==========
@@ -65,14 +69,15 @@ def calculator(expression: str) -> str:
         return f"计算错误: {e}"
 
 
+# ========== 配置 ==========
+API_KEY = os.getenv("AI_API_KEY")
+BASE_URL = os.getenv("AI_BASE_URL")
+MODEL = os.getenv("AI_MODEL")
+QUESTION = "这张图片的内容是什么"
+IMAGE_URL = "https://gips0.baidu.com/it/u=1690853528,2506870245&fm=3028&app=3028&f=JPEG&fmt=auto?w=1024&h=1024"  # 线上图片地址，例如：https://example.com/image.jpg
+
+
 # ========== 全局单例：模型和 Agent 只初始化一次 ==========
-_llm = ChatOpenAI(
-    api_key=API_KEY,
-    base_url=BASE_URL,
-    model=MODEL,
-    temperature=0.7,
-    streaming=True,
-)
 
 
 @before_model
@@ -82,40 +87,70 @@ def pre_model(state, runtime):
     pprint(f"  -> [runtime]\n{runtime}\n")
 
     msg_count = len(state.get("messages", []))
-    # print(f"  -> [before_model] 第 {msg_count} 条消息")
+    print(f"  -> [before_model] 第 {msg_count} 条消息")
     return None
 
 
-_agent = create_agent(
-    model=_llm, tools=[calculator], system_prompt=SYSTEM_PROMPT, middleware=[pre_model]
-)
+_agent_instance = None
 
 
-async def chat_stream(question: str):
-    if not API_KEY or not BASE_URL or not MODEL:
-        print("❌ 请先填写 API_KEY、BASE_URL 和 MODEL")
+def get_agent():
+    global _agent_instance
+    if _agent_instance is not None:
+        return _agent_instance
+
+    _llm = ChatOpenAI(
+        api_key=API_KEY,
+        base_url=BASE_URL,
+        model=MODEL,
+        temperature=0.7, 
+        streaming=True,
+    )
+    _agent_instance = create_agent(
+        model=_llm,
+        tools=[calculator],
+        system_prompt="你是一个智能助手，你叫芳芳",
+        middleware=[pre_model],
+    )
+    return _agent_instance
+
+
+def chat_stream(question: str):
+    agent = get_agent()
+    if not agent:
+        print("agent获取失败")
         return
 
-    messages = [HumanMessage(content=question)]
+    messages = [HumanMessage(content=QUESTION)]
 
-    print(f"🤖 模型: {MODEL}")
-    print(f"💬 问题: {question}")
-    # if IMAGE_URL:
-    #     print(f"🖼️ 图片: {IMAGE_URL}")
-    print("⏳ Agent 调用中...\n")
+    print(f"💬 问题: {QUESTION}")
 
     # Agent 调用
-    for msg_chunk, meta_data in _agent.stream(
+    for msg_chunk, meta_data in agent.stream(
         {"messages": messages}, stream_mode="messages"
     ):
-        # pprint(meta_data)
+        pprint(meta_data)
         if isinstance(msg_chunk, AIMessageChunk) and msg_chunk.content:
             yield f"data: {msg_chunk.content}\n\n"
     yield "data: [DONE]\n\n"
     print("⏳ Agent 回答已结束...\n")
 
 
-if __name__ == "__main__":
-    import uvicorn
+def test_smith():
+    agent = get_agent()
+    if not agent:
+        print("agent获取失败")
+        return
 
-    uvicorn.run("langchain_agent_demo:app", host="0.0.0.0", port=8001, reload=True)
+    messages = [HumanMessage(content=[
+        {"type": "text", "text": QUESTION},
+        {"type": "image_url", "image_url": {"url": IMAGE_URL}}
+    ])]
+
+    result = agent.invoke({"messages": messages})
+
+    print(result["messages"][-1].content)
+
+
+if __name__ == "__main__":
+    test_smith()

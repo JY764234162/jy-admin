@@ -161,6 +161,11 @@ services:
       PG_DB: ${PG_DB:-ai_vectors}
       PG_USER: ${PG_USER:-ai_admin}
       PG_PASSWORD: ${PG_PASSWORD:-ai123456}
+      # LangSmith 可观测性（可选，开启后自动追踪 LLM 调用链）
+      LANGSMITH_TRACING: ${LANGSMITH_TRACING:-false}
+      LANGSMITH_API_KEY: ${LANGSMITH_API_KEY:-}
+      LANGSMITH_PROJECT: ${LANGSMITH_PROJECT:-jy-admin}
+      LANGSMITH_ENDPOINT: ${LANGSMITH_ENDPOINT:-https://api.smith.langchain.com}
     # 暴露端口到宿主机（前端开发环境直连 + Nginx 代理）
     ports:
       - "8000:8000"
