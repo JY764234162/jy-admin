@@ -143,6 +143,10 @@ services:
       AI_API_KEY: ${AI_API_KEY}
       AI_BASE_URL: ${AI_BASE_URL}
       AI_MODEL: ${AI_MODEL}
+      # 摘要模型（独立配置，默认 fallback 到主模型）
+      SUMMARY_API_KEY: ${SUMMARY_API_KEY:-${AI_API_KEY}}
+      SUMMARY_BASE_URL: ${SUMMARY_BASE_URL:-${AI_BASE_URL}}
+      SUMMARY_MODEL: ${SUMMARY_MODEL:-${AI_MODEL}}
       EMBEDDING_MODEL: ${EMBEDDING_MODEL:-BAAI/bge-small-zh}
       GLM4V_API_KEY: ${GLM4V_API_KEY}
       GLM4V_BASE_URL: ${GLM4V_BASE_URL}

@@ -6,10 +6,16 @@ load_dotenv()
 
 BASE_DIR = Path(__file__).parent
 
-# LLM 配置
+# LLM 配置（主模型：用于对话回复）
 AI_API_KEY = os.getenv("AI_API_KEY", "")
 AI_BASE_URL = os.getenv("AI_BASE_URL", "https://api.openai.com/v1")
 AI_MODEL = os.getenv("AI_MODEL", "gpt-4o")
+
+# 摘要模型配置（独立配置，可与大模型不同以节省成本）
+# 默认 fallback 到主模型配置，如需区分请在 .env 中单独设置
+SUMMARY_API_KEY = os.getenv("SUMMARY_API_KEY", AI_API_KEY)
+SUMMARY_BASE_URL = os.getenv("SUMMARY_BASE_URL", AI_BASE_URL)
+SUMMARY_MODEL = os.getenv("SUMMARY_MODEL", AI_MODEL)
 
 # Embedding 配置（云端模型）
 EMBEDDING_MODEL = os.getenv("EMBEDDING_MODEL", "text-embedding-v3")

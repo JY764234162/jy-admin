@@ -1,18 +1,21 @@
 """Agent 流式 SSE 输出。
 
-【架构说明：LangGraph StateGraph vs create_react_agent】
+【架构说明：LangGraph StateGraph + 自动摘要机制】
 --------------------------------------------------------------------------------
-原方案（create_react_agent）：
-  - 一个黑盒函数封装了 ReAct 循环的全部逻辑
-  - 提示词和工具列表是分离的两样东西，容易出现"提示词让模型调用某工具，但工具列表里根本没有"的错位
-  - 无法干预"什么情况下该调用工具""工具失败后怎么办"等内部逻辑
-  - stream_mode="messages" 的流式输出由内部封装处理
+本方案在标准 StateGraph 基础上增加了会话摘要功能，解决历史对话过多时的
+上下文窗口溢出问题。
 
-本方案（LangGraph StateGraph）：
-  - 显式定义状态（AgentState）、节点（agent/tools）和条件边（should_continue）
-  - agent 节点内部同时控制"系统提示词内容"和"绑定的工具列表"，二者始终保持一致
-  - 条件边完全开放：可自定义重试策略、最大轮次、根据工具返回结果走不同分支
-  - stream_mode="messages" 同样支持逐 token 流式，且过滤逻辑更清晰
+【短期记忆三层结构】
+  1. 完整历史 → checkpoint 持久化到 PostgreSQL（长期存档）
+  2. 会话摘要 → 对早期对话的压缩摘要，随状态自动保存
+  3. 近期原始 → 最近 MAX_RAW_MESSAGES 条消息直接传入 LLM
+
+【自动摘要触发流程】
+  agent 生成回复后 → 检查消息数量
+      ↓ 超过阈值
+  调用 summarize 节点 → LLM 生成摘要 → 更新 state.summary
+      ↓
+  下次请求时，agent 节点将摘要拼入 system prompt
 --------------------------------------------------------------------------------
 """
 
@@ -20,29 +23,32 @@ import asyncio
 import json
 from typing import Annotated, AsyncIterator, TypedDict
 
-from langchain_core.messages import HumanMessage
-from langchain_core.prompts import ChatPromptTemplate, MessagesPlaceholder
-from langchain_core.runnables import RunnableLambda
+from langchain_core.messages import HumanMessage, SystemMessage
 from langgraph.graph import END, StateGraph
 from langgraph.graph.message import add_messages
 from langgraph.prebuilt import ToolNode
 
-from services.storage.checkpoint_store import get_saver, get_thread_messages
+from services.storage.checkpoint_store import get_saver
 from services.tools.knowledge_tools import make_list_knowledge_tool, make_search_knowledge_tool
 from services.tools.search_tools import make_tavily_search_tool
-from .llm import llm
+from .llm import llm, summary_llm
 from .response_filter import sanitize_response
+
+
+# ========== 摘要配置 ==========
+
+# 保留的原始消息条数（超过后触发摘要）
+# 按对话轮数估算：一轮 ≈ 2 条（user + AI），10 条 ≈ 5 轮
+MAX_RAW_MESSAGES = 10
 
 
 # ========== 动态系统提示词构建 ==========
 
 def build_system_prompt(enable_knowledge: bool = True, enable_search: bool = False) -> str:
-    """根据实际挂载的工具动态构建系统提示词。
+    """根据实际挂载的工具动态构建系统提示词基础部分。
 
-    【与 create_react_agent 的关键区别】
-    create_react_agent 把提示词和工具列表分开管理，容易出现错位。
-    StateGraph 在 agent 节点里同时控制 prompt 和 llm.bind_tools(tools)，
-    保证模型"看到的工具"和"被告诉要用的工具"永远是同一批。
+    【注意】这里只构建不含摘要和长期记忆的"基础"提示词。
+    摘要和长期记忆会在 agent 节点中动态拼接，确保每次都能拿到最新的。
     """
     tools_desc = []
     rules = []
@@ -61,12 +67,10 @@ def build_system_prompt(enable_knowledge: bool = True, enable_search: bool = Fal
             "历史消息中的旧搜索结果可能已经过期，每次回答涉及时效性问题时必须重新调用工具，不得依赖历史中的旧数据。",
         ])
     else:
-        # 明确告诉模型：你没有这个能力，不要假装有
         rules.append(
             "你**没有**联网搜索能力。对于涉及时效性的问题，请诚实告知用户你无法获取实时信息，不要编造。"
         )
 
-    # 通用规则（始终生效）
     rules.extend([
         "只有纯闲聊（'你好''谢谢'）才不需要工具。",
         "调用工具后，根据返回结果组织回答。不要编造未返回的信息。",
@@ -75,7 +79,6 @@ def build_system_prompt(enable_knowledge: bool = True, enable_search: bool = Fal
     tools_section = "\n".join(tools_desc) if tools_desc else "（当前没有可用的工具）"
     rules_section = "\n".join(f"{i + 1}. {r}" for i, r in enumerate(rules))
 
-    # 未启用搜索时，额外加一条禁止生成工具调用标记的约束
     search_restriction = (
         ""
         if enable_search
@@ -106,14 +109,12 @@ def build_system_prompt(enable_knowledge: bool = True, enable_search: bool = Fal
 
 # ========== SSE 辅助函数 ==========
 
-
 def _sse_json(data: dict) -> str:
     """把 dict 转成 SSE data: 行。"""
     return f"data: {json.dumps(data, ensure_ascii=False)}\n\n"
 
 
 # ========== 工具创建 ==========
-
 
 def make_tools(user_id: str = "", enable_knowledge: bool = True, enable_search: bool = False):
     """创建已绑定 user_id 的工具列表。"""
@@ -138,31 +139,186 @@ def make_tools(user_id: str = "", enable_knowledge: bool = True, enable_search: 
 class AgentState(TypedDict):
     """LangGraph 显式状态定义。
 
-    【与 create_react_agent 的关键区别】
-    create_react_agent 的状态是隐式的，你拿不到中间过程。
-    StateGraph 要求显式定义状态结构，每个节点读取/写入状态的哪些字段完全可控。
-    这里的 `messages` 用 `add_messages` 做 reducer，保证多节点写入时自动追加而不是覆盖。
+    字段说明：
+      messages: 对话消息列表（含完整历史）。
+                使用 add_messages reducer，多节点写入时自动追加。
+      summary:  对早期对话的文本摘要。
+                由 summarize 节点生成，agent 节点读取后拼入 system prompt。
     """
     messages: Annotated[list, add_messages]
+    summary: str
 
 
-# ========== 条件边：判断是否继续调用工具 ==========
+# ========== 摘要生成 ==========
 
-def should_continue(state: AgentState) -> str:
-    """条件边：根据最后一条消息决定是否进入工具节点。
+_SUMMARY_SYSTEM_PROMPT = """你是一个对话摘要助手。请对以下对话历史进行摘要，要求：
+1. 保留关键信息：用户的核心需求、重要决策、已确认的方案
+2. 简洁明了：控制在 300 字以内
+3. 不要遗漏：待办事项、未解决的问题、用户明确要求记住的信息
+4. 如果提供了已有摘要，请在原有基础上增量更新，输出完整的新摘要
 
-    【与 create_react_agent 的关键区别】
-    create_react_agent 的工具调用循环是写死的内部逻辑，你无法干预。
-    StateGraph 的条件边是显式函数，你可以在这里做很多事情：
-      - 限制最大工具调用轮次（防止无限循环）
-      - 某工具失败后改走其他分支（降级策略）
-      - 根据工具返回结果决定下一步动作
+请直接输出摘要内容，不要加任何前缀或解释。"""
+
+
+def _generate_summary(messages: list, existing_summary: str = "") -> str:
+    """调用 LLM 生成对话摘要。
+
+    Args:
+        messages: 需要被摘要的原始消息列表（较早的对话）
+        existing_summary: 已有的历史摘要（增量更新时使用）
+
+    Returns:
+        生成的摘要文本
+    """
+    # 将消息格式化为易读的对话文本
+    dialog_lines = []
+    for msg in messages:
+        if not hasattr(msg, "content") or not msg.content:
+            continue
+        role = "用户" if msg.type == "human" else "助手"
+        # 截断过长的单条消息，避免摘要 prompt 过大
+        content = str(msg.content)[:500]
+        dialog_lines.append(f"{role}: {content}")
+
+    dialog_text = "\n".join(dialog_lines)
+
+    # 构建摘要请求 prompt
+    prompt_parts = [_SUMMARY_SYSTEM_PROMPT]
+    if existing_summary:
+        prompt_parts.append(f"\n【已有摘要】\n{existing_summary}")
+    prompt_parts.append(f"\n【新增对话】\n{dialog_text}\n\n【更新后的完整摘要】")
+
+    prompt = "\n".join(prompt_parts)
+
+    # 调用非流式 LLM 生成摘要
+    # 关键：传入空回调配置，阻断 graph stream 的旁路捕获，防止摘要内容泄漏到前端
+    from langchain_core.runnables import RunnableConfig
+    response = summary_llm.invoke(
+        [HumanMessage(content=prompt)],
+        config=RunnableConfig(callbacks=[]),
+    )
+    return response.content.strip()
+
+
+# ========== 节点函数 ==========
+
+def _make_agent_node(enable_knowledge: bool, enable_search: bool, system_prompt: str, tools: list):
+    """创建 agent 节点的工厂函数。
+
+    使用闭包捕获构建时的配置参数（工具列表、提示词等），
+    避免每次节点执行时重复计算。
+
+    Args:
+        enable_knowledge: 是否启用知识库工具
+        enable_search: 是否启用联网搜索工具
+        system_prompt: 外部传入的长期记忆上下文
+        tools: 已创建的工具实例列表
+
+    Returns:
+        agent_node 异步函数
+    """
+    # 预构建基础 system prompt（只需计算一次）
+    base_prompt = build_system_prompt(enable_knowledge, enable_search)
+
+    # 预绑定工具（只需绑定一次）
+    llm_with_tools = llm.bind_tools(tools) if tools else None
+
+    def agent_node(state: AgentState) -> dict:
+        """Agent 节点：动态构建 prompt 并调用 LLM。
+
+        每次执行时按以下顺序动态拼接 system prompt：
+          1. 基础系统提示词（工具说明、回答规则）
+          2. 长期记忆（外部传入的 system_prompt 参数）
+          3. 会话摘要（由 summarize 节点自动生成，可能为空）
+          4. 最近 N 条原始消息（避免上下文溢出）
+
+        这样 LLM 始终看到：基础规则 + 记忆 + 摘要 + 近期细节
+        """
+        messages = state["messages"]
+        summary = state.get("summary", "")
+
+        # 1. 组装完整 system prompt
+        # 顺序：历史摘要（背景上下文）→ 基础提示词（角色/规则）→ 长期记忆（业务上下文）
+        parts = []
+        if summary:
+            parts.append(f"## 历史摘要\n{summary}")
+        parts.append(base_prompt)
+        if system_prompt:
+            parts.append(f"## 长期记忆\n{system_prompt}")
+        full_system = "\n\n".join(parts)
+
+        # 2. 只取最近 N 条消息传入 LLM（滑动窗口）
+        # checkpoint 中仍保留完整历史，但 LLM 只消费近期部分
+        recent_messages = messages[-MAX_RAW_MESSAGES:]
+
+        # 3. 构建完整消息列表：system + 近期对话
+        prompt_messages = [SystemMessage(content=full_system)] + recent_messages
+
+        # 4. 调用 LLM（预绑定的工具实例或裸 LLM）
+        if llm_with_tools:
+            response = llm_with_tools.invoke(prompt_messages)
+        else:
+            response = llm.invoke(prompt_messages)
+
+        # 5. 返回状态更新
+        # LangGraph 的 add_messages reducer 会自动将 response 追加到 messages
+        return {"messages": [response]}
+
+    return agent_node
+
+
+def summarize_node(state: AgentState) -> dict:
+    """摘要节点：对超出的历史消息生成摘要。
+
+    触发条件：checkpoint 中的 messages 数量超过 MAX_RAW_MESSAGES
+    行为：
+      - 取较早的消息生成摘要
+      - 与已有摘要合并（增量更新）
+      - 更新 state.summary 字段
+    注意：不删除原始消息，checkpoint 保留完整历史；
+          上下文截断在 agent 节点中通过滑动窗口实现。
+    """
+    messages = state["messages"]
+    existing_summary = state.get("summary", "")
+
+    # 需要被摘要的消息（除最近 N 条外的所有）
+    to_summarize = messages[:-MAX_RAW_MESSAGES]
+
+    # 生成新摘要
+    summary = _generate_summary(to_summarize, existing_summary)
+
+    print(f"[AGENT] 生成摘要: {len(to_summarize)} 条消息 → {len(summary)} 字摘要")
+
+    # 只更新 summary 字段，messages 保持不变
+    return {"summary": summary}
+
+
+# ========== 条件边 ==========
+
+def agent_router(state: AgentState) -> str:
+    """Agent 节点后的统一路由函数。
+
+    按优先级判断下一步走向：
+      1. 最后一条消息包含 tool_calls → 需要执行工具
+      2. 消息总数超过阈值 → 需要生成摘要
+      3. 否则 → 流程结束
+
+    Returns:
+        "tools"     → 进入工具执行节点
+        "summarize" → 进入摘要生成节点
+        END         → 结束流程
     """
     last_message = state["messages"][-1]
-    # AIMessage 包含 tool_calls 字段时，说明模型要求调用工具
+
+    # 优先级 1：模型要求调用工具
     if hasattr(last_message, "tool_calls") and last_message.tool_calls:
         return "tools"
-    # 没有工具调用，直接结束
+
+    # 优先级 2：历史消息过多，需要摘要
+    if len(state["messages"]) > MAX_RAW_MESSAGES:
+        return "summarize"
+
+    # 无需特殊处理，直接结束
     return END
 
 
@@ -172,14 +328,13 @@ _graph_cache: dict = {}
 
 
 def _build_graph(user_id: str, enable_knowledge: bool, enable_search: bool, system_prompt: str = ""):
-    """构建并编译 StateGraph。
+    """构建并编译 StateGraph（含自动摘要机制）。
 
-    【与 create_react_agent 的关键区别】
-    create_react_agent 是一句话调用：create_react_agent(llm, tools, prompt)。
-    StateGraph 需要显式拼图：定义节点 → 添加节点 → 连边 → 编译。
-    代码量多一点，但每个环节都清晰可见、可修改。
+    与标准 StateGraph 的区别：
+      - 增加 summarize 节点，自动管理历史摘要
+      - agent 节点使用滑动窗口，只传入近期消息到 LLM
     """
-    # 1. 创建实际挂载的工具列表
+    # 1. 创建工具列表
     tools = make_tools(user_id=user_id, enable_knowledge=enable_knowledge, enable_search=enable_search)
     tool_names = [t.name for t in tools]
     print(
@@ -187,57 +342,32 @@ def _build_graph(user_id: str, enable_knowledge: bool, enable_search: bool, syst
         f"enable_knowledge={enable_knowledge}, enable_search={enable_search}"
     )
 
-    # 2. 构建系统提示词（根据工具可用性动态生成）
-    prompt_text = (
-        system_prompt if system_prompt else build_system_prompt(enable_knowledge=enable_knowledge, enable_search=enable_search)
-    )
+    # 2. 创建 agent 节点（闭包捕获所有配置）
+    agent_node = _make_agent_node(enable_knowledge, enable_search, system_prompt, tools)
 
-    # 3. 构建 agent 节点（Runnable）
-    #
-    # 【流式输出的关键】ChatPromptTemplate | llm.bind_tools(tools) 是一个标准 Runnable，
-    # LangGraph 内部会自动调用它的 astream 方法，因此 stream_mode="messages" 仍然可以
-    # 逐 token 地流式输出，和 create_react_agent 的体验完全一致。
-    #
-    # 【注意】当 tools 为空列表时，不能调用 llm.bind_tools([])，
-    # 否则底层 OpenAI 兼容 API 会报错："[] is too short - 'tools'"
-    #
-    # 【关键修复】LangGraph 的节点输出必须是对状态的更新（dict）。
-    # 裸 AIMessage 不会被自动写入 "messages" 通道，导致 checkpoint 中消息丢失。
-    # 因此需要在 Runnable 管道末尾加 RunnableLambda，把 AIMessage 包装成 {"messages": [msg]}。
-    prompt_template = ChatPromptTemplate.from_messages(
-        [
-            ("system", prompt_text),
-            MessagesPlaceholder(variable_name="messages"),
-        ]
-    )
-    _wrap_message = RunnableLambda(lambda msg: {"messages": [msg]})
-    if tools:
-        agent_runnable = prompt_template | llm.bind_tools(tools) | _wrap_message
-    else:
-        agent_runnable = prompt_template | llm | _wrap_message
-
-    # 5. 构图：添加节点 + 连边
+    # 3. 构图
     builder = StateGraph(AgentState)
-    builder.add_node("agent", agent_runnable)  # LLM 思考节点
+    builder.add_node("agent", agent_node)
     builder.set_entry_point("agent")
 
+    # 4. 添加工具节点（如果有工具）
     if tools:
-        # 有工具时才添加 tools 节点和条件边
-        # ToolNode 会自动并行执行 AIMessage.tool_calls 中的所有工具调用，
-        # 并返回对应的 ToolMessage 列表。
         tool_node = ToolNode(tools)
         builder.add_node("tools", tool_node)
-        builder.add_conditional_edges(
-            "agent",
-            should_continue,
-            {"tools": "tools", END: END},
-        )
         builder.add_edge("tools", "agent")  # 工具执行完后回到 agent 继续思考
-    else:
-        # 没有可用工具时，agent 节点输出后直接结束
-        builder.add_edge("agent", END)
 
-    # 6. 编译，附加 checkpoint（对话记忆持久化）
+    # 5. 添加摘要节点
+    builder.add_node("summarize", summarize_node)
+    builder.add_edge("summarize", END)  # 摘要完成后结束
+
+    # 6. 统一条件边：从 agent 出发，根据状态决定走向
+    routing_map = {"summarize": "summarize", END: END}
+    if tools:
+        routing_map["tools"] = "tools"
+
+    builder.add_conditional_edges("agent", agent_router, routing_map)
+
+    # 7. 编译，附加 checkpoint（对话记忆持久化）
     return builder.compile(checkpointer=get_saver())
 
 
@@ -246,14 +376,18 @@ def _get_graph(user_id: str, enable_knowledge: bool, enable_search: bool, system
     key = (user_id, enable_knowledge, enable_search, system_prompt)
     if key not in _graph_cache:
         print(f"[AGENT] 创建新 Graph: key={key}")
-        _graph_cache[key] = _build_graph(user_id=user_id, enable_knowledge=enable_knowledge, enable_search=enable_search, system_prompt=system_prompt)
+        _graph_cache[key] = _build_graph(
+            user_id=user_id,
+            enable_knowledge=enable_knowledge,
+            enable_search=enable_search,
+            system_prompt=system_prompt,
+        )
     else:
         print(f"[AGENT] 命中缓存 Graph: key={key}")
     return _graph_cache[key]
 
 
 # ========== 主函数：流式 SSE 输出 ==========
-
 
 async def stream_agent(
     message: str,
@@ -267,6 +401,7 @@ async def stream_agent(
     """Agent 流式 SSE 输出。
 
     所有对话统一走 Agent 模式，根据 enable_knowledge 和 enable_search 动态挂载工具。
+    短期记忆由 LangGraph checkpoint 自动管理，超出阈值时自动触发摘要。
     """
     print(
         f"[AGENT] stream_agent 参数: enable_knowledge={enable_knowledge}, "
@@ -274,11 +409,14 @@ async def stream_agent(
     )
 
     # 1. 获取缓存的 Graph 实例
-    graph = _get_graph(user_id=user_id, enable_knowledge=enable_knowledge, enable_search=enable_search, system_prompt=memory_context)
+    graph = _get_graph(
+        user_id=user_id,
+        enable_knowledge=enable_knowledge,
+        enable_search=enable_search,
+        system_prompt=memory_context,
+    )
 
-    # 2. 构造消息（历史 + 当前输入）
-    past_messages = get_thread_messages(thread_id)
-
+    # 2. 构造当前用户消息
     if image_url:
         content = [
             {"type": "text", "text": message},
@@ -286,20 +424,20 @@ async def stream_agent(
         ]
     else:
         content = message
-    messages = past_messages + [HumanMessage(content=content)]
 
-    # 3. 遍历 Graph 输出
-    #
-    # 【与 create_react_agent 的流式输出对比】
-    # 二者都使用 stream_mode="messages"，调用方式和遍历逻辑完全一致。
-    # 区别只在于 metadata 中的节点名：create_react_agent 内部节点叫 "agent" 或 "model"；
-    # StateGraph 的节点名就是你 add_node 时指定的名字（这里也是 "agent"）。
-    # 因此下面的过滤逻辑不需要改动。
+    # 3. 初始化状态
+    # 注意：只传 messages，summary 由 checkpoint 自动恢复（首次为空字符串）
+    # 如果传入 summary="" 会覆盖 checkpoint 中已有的摘要！
+    initial_state = {"messages": [HumanMessage(content=content)]}
+
+    # 4. LangGraph thread 配置
     config = {"configurable": {"thread_id": thread_id}}
+
+    # 5. 遍历 Graph 输出
     has_content = False
 
     for msg, metadata in graph.stream(
-        {"messages": messages}, config, stream_mode="messages"
+        initial_state, config, stream_mode="messages"
     ):
         msg_type = getattr(msg, "type", "")
         tool_calls = getattr(msg, "tool_calls", None)
@@ -309,7 +447,6 @@ async def stream_agent(
             continue
 
         # 跳过带有有效工具调用的 AIMessage（不暴露工具调用过程给用户）
-        # 只跳过 name 非空的 tool_calls；空列表或 name 为空的不会误过滤
         if tool_calls and any(tc.get("name") for tc in tool_calls if tc):
             continue
 
@@ -319,9 +456,9 @@ async def stream_agent(
             yield _sse_json({"content": sanitize_response(str(token))})
             await asyncio.sleep(0.01)
 
-    # 4. 兜底：如果模型没有生成任何内容，返回友好提示
+    # 6. 兜底：如果模型没有生成任何内容，返回友好提示
     if not has_content:
         yield _sse_json({"content": "抱歉，我暂时无法回答这个问题，请稍后重试。"})
 
-    # 5. 完成
+    # 7. 完成
     yield _sse_json({"done": True})

@@ -12,3 +12,12 @@ llm = init_chat_model(
     openai_api_base=config.AI_BASE_URL,
     streaming=True,
 )
+
+# 非流式 LLM 实例（专用于摘要生成，可独立配置以节省成本）
+summary_llm = init_chat_model(
+    model=config.SUMMARY_MODEL,
+    model_provider="openai",
+    openai_api_key=config.SUMMARY_API_KEY,
+    openai_api_base=config.SUMMARY_BASE_URL,
+    streaming=False,
+)

@@ -22,6 +22,7 @@ semantic_memory = get_memory(top_k=5)
 
 # ========== 请求模型 ==========
 
+
 class ChatRequest(BaseModel):
     message: str = ""
     conversationId: Optional[int] = None
@@ -36,6 +37,7 @@ def _sse_json(data: dict) -> str:
 
 
 # ========== 数据库持久化辅助函数 ==========
+
 
 def _persist_chat_result(
     conv_id: int, content: str, status: str, user_msg: str, attachments: str = "[]"
@@ -76,10 +78,14 @@ async def chat_message(
     # 验证会话存在且属于当前用户
     conv = None
     if req.conversationId:
-        conv = db.query(Conversation).filter(
-            Conversation.id == conversation_id,
-            Conversation.user_id == user_id,
-        ).first()
+        conv = (
+            db.query(Conversation)
+            .filter(
+                Conversation.id == conversation_id,
+                Conversation.user_id == user_id,
+            )
+            .first()
+        )
 
     if req.conversationId and not conv:
         raise HTTPException(404, "会话不存在或无权限")
@@ -88,13 +94,17 @@ async def chat_message(
     conv_db_id = conv.id if conv else None
 
     # 语义检索：跨会话召回与当前问题相关的长期记忆
-    memory_context = semantic_memory.format_memory_context(query=user_message, user_id=str(user_id))
+    memory_context = semantic_memory.format_memory_context(
+        query=user_message, user_id=str(user_id)
+    )
 
     # thread_id 用于 Checkpoint
     session_key = f"{user_id}:{conversation_id}" if user_id else conversation_id
 
     # 是否启用知识库工具（前端勾选知识库）
-    enable_knowledge = req.enable_knowledge if req.enable_knowledge is not None else False
+    enable_knowledge = (
+        req.enable_knowledge if req.enable_knowledge is not None else False
+    )
     # 是否启用联网搜索工具（前端勾选联网搜索）
     enable_search = req.enable_search if req.enable_search is not None else False
 
@@ -108,7 +118,7 @@ async def chat_message(
                 message=user_message,
                 thread_id=session_key,
                 user_id=str(user_id),
-                memory_context=memory_context,
+                memory_context=None,
                 image_url=req.image_url or "",
                 enable_knowledge=enable_knowledge,
                 enable_search=enable_search,
