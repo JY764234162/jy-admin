@@ -53,10 +53,30 @@ def search(query: str, top_k: int = 3, user_id: str = "") -> List[Dict]:
     ]
 
 
+def _table_exists(conn, table_name: str) -> bool:
+    """检查指定表是否存在。"""
+    result = conn.execute(
+        text("""
+            SELECT EXISTS (
+                SELECT 1 FROM information_schema.tables
+                WHERE table_schema = 'public' AND table_name = :name
+            )
+        """),
+        {"name": table_name},
+    )
+    return result.scalar() or False
+
+
 def list_documents(user_id: str = "") -> List[Dict]:
-    """列出已上传的文档（按 doc_id 去重，可按 user_id 过滤）"""
+    """列出已上传的文档（按 doc_id 去重，可按 user_id 过滤）。
+
+    若向量表尚未创建（首次使用前），返回空列表而非报错。
+    """
     engine = _get_engine()
     with engine.connect() as conn:
+        if not _table_exists(conn, "langchain_pg_embedding"):
+            return []
+
         user_filter = ""
         params = {"name": _collection_name}
         if user_id:
@@ -105,6 +125,9 @@ def clear_old_documents() -> bool:
     """清空没有 parse_at 字段的旧版向量数据，返回是否执行了清空"""
     engine = _get_engine()
     with engine.connect() as conn:
+        if not _table_exists(conn, "langchain_pg_embedding"):
+            return False
+
         result = conn.execute(
             text("""
                 SELECT COUNT(*) as cnt
@@ -136,6 +159,9 @@ def delete_document(doc_id: str, user_id: str = "") -> bool:
     """删除指定文档的所有片段"""
     engine = _get_engine()
     with engine.connect() as conn:
+        if not _table_exists(conn, "langchain_pg_embedding"):
+            return False
+
         user_filter = ""
         params = {"name": _collection_name, "doc_id": doc_id}
         if user_id:
