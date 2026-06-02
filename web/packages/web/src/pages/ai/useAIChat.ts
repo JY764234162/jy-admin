@@ -462,7 +462,8 @@ export function useAIChat(conversationId: number | null, options: UseAIChatOptio
       return;
     }
     if (suppressEmptyHydrateRef.current === conversationId) {
-      suppressEmptyHydrateRef.current = null;
+      // 不要在这里清空 suppressEmptyHydrateRef！
+      // 留给 loadMessagesFirstPage 去判断，避免后端返回数据时覆盖本地乐观消息
       setMessagePagination(null);
       setMessagesLoading(true);
       return;
@@ -548,7 +549,18 @@ export function useAIChat(conversationId: number | null, options: UseAIChatOptio
         live.current.streamingAiMsgId = null;
         if (snap.status === "done" && live.current.refreshSessionsAfterStream) {
           live.current.refreshSessionsAfterStream = false;
-          void loadSessions();
+          // 不调用 loadSessions() 全量刷新，避免侧边栏闪烁
+          // 只本地更新当前会话的 lastMsg，保持列表视觉稳定
+          const lastUserMsg = live.current.messages.findLast((m) => m.role === "user");
+          if (lastUserMsg) {
+            setSessions((prev) => {
+              const idx = prev.findIndex((s) => s.ID === conversationId);
+              if (idx === -1) return prev;
+              const next = prev.slice();
+              next[idx] = { ...next[idx]!, lastMsg: lastUserMsg.content };
+              return next;
+            });
+          }
         } else if (snap.status === "error") {
           live.current.refreshSessionsAfterStream = false;
         }
