@@ -104,7 +104,7 @@ func (a *Api) getMenusByAuthorityId(authorityId string, checkRoleEnable bool) []
 		return []MenuTreeItem{}
 	}
 
-	// 过滤掉禁用的菜单（无论是否检查角色状态，都要过滤禁用的菜单）
+	// 过滤掉禁用的菜单
 	var enabledMenus []system.SysBaseMenu
 	for _, menu := range menus {
 		if menu.Enable {
@@ -117,7 +117,7 @@ func (a *Api) getMenusByAuthorityId(authorityId string, checkRoleEnable bool) []
 		return []MenuTreeItem{}
 	}
 
-	// 按排序字段排序（使用更高效的排序方式）
+	// 按排序字段排序
 	sort.Slice(enabledMenus, func(i, j int) bool {
 		return enabledMenus[i].Sort < enabledMenus[j].Sort
 	})

@@ -188,13 +188,15 @@ export const Component = () => {
     }
   };
 
-  // 将菜单列表转换为树形数据
+  // 将菜单列表转换为树形数据（过滤掉禁用的菜单）
   const convertMenusToTreeData = (menus: Menu[]): any[] => {
-    return menus.map((menu) => ({
-      title: menu.meta?.title || "",
-      key: menu.ID,
-      children: menu.children && menu.children.length > 0 ? convertMenusToTreeData(menu.children) : undefined,
-    }));
+    return menus
+      .filter((menu) => menu.enable !== false)
+      .map((menu) => ({
+        title: menu.meta?.title || "",
+        key: menu.ID,
+        children: menu.children && menu.children.length > 0 ? convertMenusToTreeData(menu.children) : undefined,
+      }));
   };
 
   // 扩展Authority类型以支持树形结构
