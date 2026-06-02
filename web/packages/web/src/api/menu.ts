@@ -8,9 +8,7 @@ export interface Menu {
   ID?: number;
   parentId: string;
   path: string;
-  name: string;
   hidden?: boolean;
-  component?: string;
   sort?: number;
   meta?: {
     title: string;

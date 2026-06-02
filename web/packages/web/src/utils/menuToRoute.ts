@@ -24,7 +24,7 @@ export const convertMenusToRoutes = (menus: Menu[]): any[] => {
     const route: any = {
       path: menu.path.replace(/^\//, ""), // 移除开头的斜杠，因为路由是相对路径
       handle: {
-        menuTitle: menu.meta?.title || menu.name,
+        menuTitle: menu.meta?.title || "",
         icon: icon,
         hidden: menu.hidden || false,
       },

@@ -35,9 +35,7 @@ func (a *Api) UpdateMenu(c *gin.Context) {
 	updateData := map[string]interface{}{
 		"parent_id":    menu.ParentId,
 		"path":         menu.Path,
-		"name":         menu.Name,
 		"hidden":       menu.Hidden,
-		"component":    menu.Component,
 		"sort":         menu.Sort,
 		"enable":       menu.Enable,
 		"title":        menu.Title,

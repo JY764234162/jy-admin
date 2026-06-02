@@ -57,12 +57,10 @@ export const Component = () => {
     setEditingMenu(menu);
     form.setFieldsValue({
       path: menu.path,
-      name: menu.name,
-      component: menu.component,
       parentId: menu.parentId,
       sort: menu.sort || 0,
       hidden: menu.hidden || false,
-      enable: menu.enable !== false, // 保持原有状态
+      enable: menu.enable !== false,
       meta: {
         title: menu.meta?.title || "",
         icon: menu.meta?.icon || "",
@@ -81,12 +79,10 @@ export const Component = () => {
       if (modalType === "create") {
         const res = await menuApi.createMenu({
           path: values.path,
-          name: values.name,
-          component: values.component,
           parentId: values.parentId || "0",
           sort: values.sort || 0,
           hidden: values.hidden || false,
-          enable: true, // 默认启用
+          enable: values.enable !== false,
           meta: {
             title: values.meta.title,
             icon: values.meta.icon || "",
@@ -108,12 +104,10 @@ export const Component = () => {
         const res = await menuApi.updateMenu({
           ID: editingMenu.ID,
           path: values.path,
-          name: values.name,
-          component: values.component,
           parentId: values.parentId || "0",
           sort: values.sort || 0,
           hidden: values.hidden || false,
-          enable: editingMenu.enable !== false, // 保持原有状态
+          enable: values.enable !== false,
           meta: {
             title: values.meta.title,
             icon: values.meta.icon || "",
@@ -209,7 +203,7 @@ export const Component = () => {
           return menu.parentId === parentId;
         })
         .map((menu) => ({
-          title: `${menu.meta?.title || menu.name} (${menu.path})`,
+          title: `${menu.meta?.title || "-"} (${menu.path})`,
           value: menu.ID?.toString() || "0",
           key: menu.ID?.toString() || "0",
           children: buildTree(menu.ID?.toString() || "0"),
@@ -244,8 +238,8 @@ export const Component = () => {
       key: "title",
       width: 150,
       ellipsis: true,
-      render: (text: string, record: Menu) => {
-        return <span style={{ whiteSpace: "nowrap" }}>{text || record.name}</span>;
+      render: (text: string) => {
+        return <span style={{ whiteSpace: "nowrap" }}>{text || "-"}</span>;
       },
     },
     {
@@ -253,13 +247,6 @@ export const Component = () => {
       dataIndex: "path",
       key: "path",
       width: 150,
-    },
-
-    {
-      title: "组件路径",
-      dataIndex: "component",
-      key: "component",
-      width: 200,
     },
     {
       title: "图标",
@@ -273,7 +260,22 @@ export const Component = () => {
       dataIndex: "hidden",
       key: "hidden",
       width: 80,
-      render: (hidden: boolean) => (hidden ? "是" : "否"),
+      render: (hidden: boolean, record: Menu) => (
+        <Switch
+          checked={hidden === true}
+          onChange={async (checked) => {
+            try {
+              const res = await menuApi.updateMenu({ ...record, hidden: checked });
+              if (res.code === 0) {
+                window.$message?.success(checked ? "已设为隐藏" : "已设为显示");
+                fetchMenus();
+              }
+            } catch (error) {
+              console.error("更新隐藏状态失败:", error);
+            }
+          }}
+        />
+      ),
     },
     {
       title: "状态",
@@ -377,16 +379,8 @@ export const Component = () => {
             <Input placeholder="请输入路由路径（如：/system/user）" />
           </Form.Item>
 
-          <Form.Item name="name" label="路由名称" rules={[{ required: true, message: "请输入路由名称" }]}>
-            <Input placeholder="请输入路由名称（如：user）" />
-          </Form.Item>
-
-          <Form.Item name="component" label="组件路径">
-            <Input placeholder="请输入组件路径（如：@/pages/user/index）" />
-          </Form.Item>
-
-          <Form.Item name={["meta", "title"]} label="菜单标题" rules={[{ required: true, message: "请输入菜单标题" }]}>
-            <Input placeholder="请输入菜单标题" />
+          <Form.Item name={["meta", "title"]} label="菜单名称" rules={[{ required: true, message: "请输入菜单名称" }]}>
+            <Input placeholder="请输入菜单名称" />
           </Form.Item>
 
           <Form.Item name={["meta", "icon"]} label="菜单图标">
@@ -399,6 +393,10 @@ export const Component = () => {
 
           <Form.Item name="hidden" label="是否隐藏" valuePropName="checked" initialValue={false}>
             <Switch />
+          </Form.Item>
+
+          <Form.Item name="enable" label="状态" valuePropName="checked" initialValue={true}>
+            <Switch checkedChildren="启用" unCheckedChildren="禁用" />
           </Form.Item>
 
           <Form.Item name={["meta", "keepAlive"]} label="是否缓存" valuePropName="checked" initialValue={false}>

@@ -191,7 +191,7 @@ export const Component = () => {
   // 将菜单列表转换为树形数据
   const convertMenusToTreeData = (menus: Menu[]): any[] => {
     return menus.map((menu) => ({
-      title: menu.meta?.title || menu.name,
+      title: menu.meta?.title || "",
       key: menu.ID,
       children: menu.children && menu.children.length > 0 ? convertMenusToTreeData(menu.children) : undefined,
     }));
