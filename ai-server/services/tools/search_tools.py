@@ -35,16 +35,18 @@ def _format_results(results: dict) -> str:
 
     formatted = []
     for r in items:
-        formatted.append({
-            "answer": r.get("content", ""),
-            "citations": [
-                {
-                    "title": r.get("title", "未知标题"),
-                    "url": r.get("url", ""),
-                }
-            ],
-            "images": r.get("images", []) or [],
-        })
+        formatted.append(
+            {
+                "answer": r.get("content", ""),
+                "citations": [
+                    {
+                        "title": r.get("title", "未知标题"),
+                        "url": r.get("url", ""),
+                    }
+                ],
+                "images": r.get("images", []) or [],
+            }
+        )
 
     return json.dumps({"results": formatted}, ensure_ascii=False, indent=2)
 
@@ -53,9 +55,8 @@ def make_tavily_search_tool():
     """创建联网搜索工具。"""
     tavily = TavilySearch(
         tavily_api_key=config.TAVILY_API_KEY,
-        max_results=3,
-        search_depth="basic",
-        include_images=True,
+        max_results=5,
+        topic="general",
     )
 
     @tool
