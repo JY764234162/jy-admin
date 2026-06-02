@@ -11,8 +11,8 @@ class CloudEmbeddings:
     def __init__(self, model_name: str = None):
         self._embeddings = OpenAIEmbeddings(
             model=model_name or getattr(config, "EMBEDDING_MODEL", _DEFAULT_MODEL),
-            openai_api_key=config.AI_API_KEY,
-            openai_api_base=config.AI_BASE_URL,
+            openai_api_key=getattr(config, "EMBEDDING_API_KEY", config.AI_API_KEY),
+            openai_api_base=getattr(config, "EMBEDDING_BASE_URL", config.AI_BASE_URL),
             dimensions=1024,
             chunk_size=8,
             check_embedding_ctx_length=False,

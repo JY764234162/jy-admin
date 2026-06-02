@@ -19,6 +19,9 @@ SUMMARY_MODEL = os.getenv("SUMMARY_MODEL", AI_MODEL)
 
 # Embedding 配置（云端模型）
 EMBEDDING_MODEL = os.getenv("EMBEDDING_MODEL", "text-embedding-v3")
+# Embedding 独立 API 配置（默认 fallback 到主模型配置）
+EMBEDDING_API_KEY = os.getenv("EMBEDDING_API_KEY", AI_API_KEY)
+EMBEDDING_BASE_URL = os.getenv("EMBEDDING_BASE_URL", AI_BASE_URL)
 
 # PostgreSQL + pgvector 配置（优先）
 PG_HOST = os.getenv("PG_HOST", "localhost")
