@@ -161,7 +161,6 @@ services:
       COS_SECRET_KEY: ${COS_SECRET_KEY}
       COS_BUCKET: ${COS_BUCKET}
       COS_REGION: ${COS_REGION:-ap-beijing}
-      COS_PREFIX: ${COS_PREFIX:-ai-knowledge}
       PG_HOST: ${PG_HOST:-postgres-vector}
       PG_PORT: ${PG_PORT:-5432}
       PG_DB: ${PG_DB:-ai_vectors}

@@ -161,7 +161,7 @@ async def _process_document_async(task: ParseTask, file_bytes: bytes, user_id: s
 
         # 4. 上传 COS + 写入向量库（同步操作扔线程池）
         await task.emit("storing", "正在写入向量库...", 85)
-        cos_key = f"{config.COS_PREFIX}/{doc_id}_{task.filename}"
+        cos_key = f"ai-knowledge/{doc_id}_{task.filename}"
         cos_url = await asyncio.to_thread(_upload_to_cos, file_bytes, cos_key)
 
         documents = [
@@ -225,7 +225,7 @@ async def upload_document(file: UploadFile = File(...)):
         await asyncio.to_thread(embed_fn.embed_documents, batch)
 
     # 上传 COS
-    cos_key = f"{config.COS_PREFIX}/{doc_id}_{file.filename}"
+    cos_key = f"ai-knowledge/{doc_id}_{file.filename}"
     cos_url = await asyncio.to_thread(_upload_to_cos, file_bytes, cos_key)
 
     documents = [
