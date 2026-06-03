@@ -1,7 +1,8 @@
 export interface MessageAttachment {
   uid: string;
   filename: string;
-  url?: string;
+  url: string;
+  file_type: string;
 }
 
 export interface UiMessage {
@@ -21,6 +22,5 @@ export interface SendOptions {
   useSearch?: boolean;
   targetConversationId?: number;
   resume?: boolean;
-  imageBase64?: string;
   attachments?: MessageAttachment[];
 }

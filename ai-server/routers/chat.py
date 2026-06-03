@@ -98,6 +98,26 @@ async def chat_message(
         query=user_message, user_id=str(user_id)
     )
 
+    # 解析附件信息并注入 agent context
+    try:
+        attachments_list = json.loads(req.attachments or "[]")
+        if attachments_list:
+            attachment_desc = []
+            for att in attachments_list:
+                fname = att.get("filename", "未知文件")
+                ftype = att.get("file_type", "")
+                if ftype in (".jpg", ".jpeg", ".png", ".gif", ".webp"):
+                    attachment_desc.append(f"图片：{fname}")
+                else:
+                    attachment_desc.append(f"文件：{fname}")
+            attachment_context = "\n".join(attachment_desc)
+            memory_context = (
+                f"用户本次消息携带了以下附件（已上传至云端）：\n{attachment_context}\n\n"
+                f"{memory_context}" if memory_context else ""
+            )
+    except Exception:
+        pass
+
     # thread_id 用于 Checkpoint
     session_key = f"{user_id}:{conversation_id}" if user_id else conversation_id
 

@@ -312,7 +312,6 @@ export function useAIChat(conversationId: number | null, options: UseAIChatOptio
         useSearch,
         targetConversationId,
         resume,
-        imageBase64,
         attachments,
       } = options;
 
@@ -398,7 +397,7 @@ export function useAIChat(conversationId: number | null, options: UseAIChatOptio
         live.current.refreshSessionsAfterStream = true;
         const enableKnowledgeForStart = !!useKnowledge;
         const enableSearchForStart = !!useSearch;
-        aiChatStreamClient.start(cid, { content, imageBase64, attachments, enable_knowledge: enableKnowledgeForStart, enable_search: enableSearchForStart });
+        aiChatStreamClient.start(cid, { content, attachments, enable_knowledge: enableKnowledgeForStart, enable_search: enableSearchForStart });
         return true;
       } catch (error) {
         console.error("发送消息失败:", error);

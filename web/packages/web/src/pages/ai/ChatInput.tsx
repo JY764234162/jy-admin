@@ -15,9 +15,8 @@ import { layoutSlice } from "@/store/slice/layout";
 import { aiServerApi } from "@/api/aiApi";
 const Switch = Sender.Switch;
 
-const SUPPORTED_DOC_EXTS = new Set([".pdf", ".txt", ".md", ".docx", ".xlsx", ".xls", ".csv"]);
-const SUPPORTED_IMG_EXTS = new Set([".jpg", ".jpeg", ".png", ".gif", ".webp", ".bmp"]);
-const SUPPORTED_EXTS = new Set([...SUPPORTED_DOC_EXTS, ...SUPPORTED_IMG_EXTS]);
+// 聊天附件仅支持图片和 txt
+const SUPPORTED_EXTS = new Set([".jpg", ".jpeg", ".png", ".gif", ".webp", ".txt"]);
 
 function getFileExt(file: File): string {
   return file.name.slice(file.name.lastIndexOf(".")).toLowerCase();
@@ -28,28 +27,14 @@ function isSupportedFile(file: File): boolean {
 }
 
 function isImageFile(file: File): boolean {
-  return SUPPORTED_IMG_EXTS.has(getFileExt(file));
-}
-
-function fileToBase64(file: File): Promise<string> {
-  return new Promise((resolve, reject) => {
-    const reader = new FileReader();
-    reader.onload = () => {
-      const result = reader.result as string;
-      // result 是 data:image/jpeg;base64,/9j/4AAQ... 格式
-      resolve(result);
-    };
-    reader.onerror = reject;
-    reader.readAsDataURL(file);
-  });
+  return [".jpg", ".jpeg", ".png", ".gif", ".webp"].includes(getFileExt(file));
 }
 
 type SendFromInput = (options: {
   content: string;
   useKnowledge?: boolean;
   useSearch?: boolean;
-  imageBase64?: string;
-  attachments?: { uid: string; filename: string }[];
+  attachments?: { uid: string; filename: string; url: string; file_type: string }[];
 }) => Promise<boolean>;
 
 interface ChatInputProps {
@@ -64,13 +49,13 @@ interface UploadingFile {
   stage: "uploading" | "completed" | "failed";
   message: string;
   progress: number;
-  docId?: string;
   cosUrl?: string;
+  fileType?: string;
   error?: string;
 }
 
 const STAGE_LABEL: Record<UploadingFile["stage"], string> = {
-  uploading: "正在上传解析",
+  uploading: "正在上传",
   completed: "已就绪",
   failed: "失败",
 };
@@ -95,23 +80,22 @@ export const ChatInput = ({ loading, sendMessage }: ChatInputProps) => {
     };
   }, []);
 
-  /** 上传单个文件（同步），返回 doc_id（失败抛错） */
-  const uploadFileWithProgress = async (uid: string, file: File): Promise<string> => {
+  /** 上传单个文件到 COS（仅存储，不向量化） */
+  const uploadFileWithProgress = async (uid: string, file: File): Promise<void> => {
     setUploadingFiles((prev) => [
       ...prev.filter((f) => f.uid !== uid),
-      { uid, filename: file.name, stage: "uploading", message: "正在上传解析...", progress: 0 },
+      { uid, filename: file.name, stage: "uploading", message: "正在上传...", progress: 0 },
     ]);
 
     try {
-      const res = await aiServerApi.uploadKnowledge(file);
+      const res = await aiServerApi.uploadAttachment(file);
       setUploadingFiles((prev) =>
         prev.map((f) =>
           f.uid === uid
-            ? { ...f, stage: "completed", message: "已就绪", progress: 100, docId: res.knowledge_id, cosUrl: res.cos_url }
+            ? { ...f, stage: "completed", message: "已就绪", progress: 100, cosUrl: res.url, fileType: res.file_type }
             : f
         )
       );
-      return res.knowledge_id;
     } catch (e: any) {
       const errMsg = e?.message || "上传失败";
       setUploadingFiles((prev) => prev.map((f) => (f.uid === uid ? { ...f, stage: "failed", message: errMsg, error: errMsg, progress: 0 } : f)));
@@ -164,7 +148,7 @@ export const ChatInput = ({ loading, sendMessage }: ChatInputProps) => {
           });
           setItems(updatedFileList);
 
-          // 新增文件时立即开始上传解析（不等点击发送）
+          // 新增文件时立即开始上传（不等点击发送）
           if (file.status !== "removed" && file.originFileObj) {
             const alreadyStarted = uploadingFiles.some((u) => u.uid === file.uid);
             if (!alreadyStarted) {
@@ -198,75 +182,47 @@ export const ChatInput = ({ loading, sendMessage }: ChatInputProps) => {
     const text = value.trim();
     if (!text) return;
 
-    // 分离图片和文档
-    const imageItems = items.filter((it) => it.originFileObj && isImageFile(it.originFileObj));
-    const docItems = items.filter((it) => it.originFileObj && !isImageFile(it.originFileObj));
-
-    // 处理图片附件（转成 base64）
-    let imageBase64: string | undefined;
-    if (imageItems.length > 0) {
-      const firstImage = imageItems[0]!.originFileObj as File;
-      try {
-        imageBase64 = await fileToBase64(firstImage);
-      } catch (e: any) {
-        antdMessage.error(`图片处理失败：${e?.message || e}`);
-        return;
-      }
+    // 检查是否有上传失败的文件
+    const failedFiles = items.filter((it) => {
+      const cur = uploadingFiles.find((u) => u.uid === it.uid);
+      return cur?.stage === "failed";
+    });
+    if (failedFiles.length > 0) {
+      antdMessage.error(`${failedFiles.length} 个文件上传失败，请移除后重试`);
+      return;
     }
 
-    // 处理文档附件：先解析（向量化）
-    if (docItems.length > 0) {
-      const failedDocs = docItems.filter((it) => {
-        const cur = uploadingFiles.find((u) => u.uid === it.uid);
-        return cur?.stage === "failed";
-      });
-      if (failedDocs.length > 0) {
-        antdMessage.error(`${failedDocs.length} 个文件解析失败，请移除失败文件后重试`);
-        return;
+    // 检查是否有未完成的文件
+    const pendingFiles = items.filter((it) => {
+      const cur = uploadingFiles.find((u) => u.uid === it.uid);
+      return !cur || (cur.stage !== "completed" && cur.stage !== "failed");
+    });
+    try {
+      for (const it of pendingFiles) {
+        const fileObj = it.originFileObj as File | undefined;
+        if (!fileObj) continue;
+        await uploadFileWithProgress(it.uid, fileObj);
       }
-
-      const pending = docItems.filter((it) => {
-        const cur = uploadingFiles.find((u) => u.uid === it.uid);
-        return !cur || (cur.stage !== "completed" && cur.stage !== "failed");
-      });
-
-      try {
-        for (const it of pending) {
-          const fileObj = it.originFileObj as File | undefined;
-          if (!fileObj) continue;
-          await uploadFileWithProgress(it.uid, fileObj);
-        }
-      } catch (e: any) {
-        antdMessage.error(`文件解析失败：${e?.message || e}`);
-        return;
-      }
-
-      const stillFailed = docItems.filter((it) => {
-        const cur = uploadingFiles.find((u) => u.uid === it.uid);
-        return cur?.stage === "failed";
-      });
-      if (stillFailed.length > 0) {
-        antdMessage.error(`${stillFailed.length} 个文件解析失败，请移除后重试`);
-        return;
-      }
+    } catch (e: any) {
+      antdMessage.error(`文件上传失败：${e?.message || e}`);
+      return;
     }
 
-    // 合并所有附件元数据
+    // 合并所有附件元数据（使用 COS URL）
     const attachments = items.map((it) => {
       const uploadInfo = uploadingFiles.find((u) => u.uid === it.uid);
       return {
         uid: it.uid,
         filename: it.originFileObj?.name || "未知文件",
-        url: uploadInfo?.cosUrl || it.url || "",
+        url: uploadInfo?.cosUrl || "",
+        file_type: uploadInfo?.fileType || getFileExt(it.originFileObj as File),
       };
     });
 
-    // 统一发送（chat 接口已支持图片识别）
     const ok = await sendMessage({
       content: text,
       useKnowledge,
       useSearch,
-      imageBase64,
       attachments: attachments.length > 0 ? attachments : undefined,
     });
     if (ok) {

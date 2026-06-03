@@ -9,7 +9,7 @@ from fastapi.middleware.cors import CORSMiddleware
 
 import config
 from models.conversation import init_db
-from routers import knowledge, chat, conversation
+from routers import knowledge, chat, conversation, upload
 from services.middleware import AuthMiddleware
 from services.storage import setup_checkpoints
 from services.storage.long_term_memory import setup_store
@@ -33,6 +33,7 @@ app.add_middleware(
 app.include_router(knowledge.router)
 app.include_router(chat.router)
 app.include_router(conversation.router)
+app.include_router(upload.router)
 
 
 @app.get("/api/health")

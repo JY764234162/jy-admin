@@ -100,6 +100,14 @@ export interface ChatStreamHandle {
   abort: () => void;
 }
 
+/** 聊天附件上传响应 */
+export interface UploadAttachmentResponse {
+  url: string;
+  filename: string;
+  file_type: string;
+  file_id: string;
+}
+
 /** 知识库文档 */
 export interface KnowledgeDocument {
   doc_id: string;
@@ -266,6 +274,22 @@ export const aiServerApi = {
       body: formData,
     });
     return unwrap(res, "上传失败");
+  },
+
+  /** 上传聊天附件（仅存储 COS，不向量化） */
+  uploadAttachment: async (file: File): Promise<UploadAttachmentResponse> => {
+    const formData = new FormData();
+    formData.append("file", file);
+    const res = await fetch(`${AI_SERVER_URL}/api/ai/upload`, {
+      method: "POST",
+      headers: { Authorization: getHeaders().Authorization || "" },
+      body: formData,
+    });
+    const body = await res.json().catch(() => ({ code: -1, msg: "解析失败" }));
+    if (!res.ok || body.code !== 0) {
+      throw new Error(body.msg || "上传失败");
+    }
+    return body.data as UploadAttachmentResponse;
   },
 
   /** 删除知识库文档 */
