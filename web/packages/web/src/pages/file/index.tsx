@@ -15,7 +15,7 @@ import {
   Typography,
 } from "antd";
 import type { MenuProps } from "antd";
-import { UploadOutlined, MoreOutlined } from "@ant-design/icons";
+import { UploadOutlined, MoreOutlined, DownloadOutlined } from "@ant-design/icons";
 import type { ColumnsType } from "antd/es/table";
 import { uploadApi } from "@/api";
 import { getImageUrl } from "@/utils/image";
@@ -108,6 +108,21 @@ export const Component = () => {
     } else {
       window.$message?.warning("无法预览该文件");
     }
+  };
+
+  // 下载文件
+  const handleDownload = (file: FileInfo) => {
+    const url = getImageUrl(file.url || file.filePath);
+    if (!url) {
+      window.$message?.warning("无法下载该文件");
+      return;
+    }
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = file.name || file.fileName || "download";
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
   };
 
   // 判断是否为图片
@@ -204,6 +219,7 @@ export const Component = () => {
               ...(isImage(record.fileType, record.fileName, record.name)
                 ? [{ key: "preview", label: "预览", onClick: () => handlePreview(record) }]
                 : []),
+              { key: "download", label: "下载", onClick: () => handleDownload(record) },
               {
                 key: "delete",
                 label: "删除",
@@ -303,6 +319,9 @@ export const Component = () => {
                   预览
                 </Button>
               )}
+              <Button type="link" onClick={() => handleDownload(record)} size="small">
+                下载
+              </Button>
               <Popconfirm
                 title="确定要删除这个文件吗？"
                 onConfirm={() => handleDelete(record)}
