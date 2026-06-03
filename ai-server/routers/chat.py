@@ -10,7 +10,7 @@ from sqlalchemy.orm import Session
 
 from services.llm import llm
 from services.storage.long_term_memory import get_memory
-from services.llm import stream_agent
+from services.agent_graph import stream_agent
 from services.middleware import get_current_user, UserContext
 from models.conversation import Conversation, get_db, SessionLocal
 

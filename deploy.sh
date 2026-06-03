@@ -82,7 +82,10 @@ if [ ${#MISSING_VARS[@]} -gt 0 ]; then
     for var in "${MISSING_VARS[@]}"; do
         echo -e "${RED}  - $var${NC}"
     done
-    echo -e "${YELLOW}请在根目录 .env 文件中设置以上环境变量${NC}\n"
+    echo -e "${YELLOW}请通过以下任一方式设置这些环境变量：${NC}"
+    echo -e "${YELLOW}  1) 本地创建/编辑 .env 文件（可参考 .env.example）${NC}"
+    echo -e "${YELLOW}  2) 在执行脚本前导出环境变量（export XXX=...）${NC}"
+    echo -e "${YELLOW}  3) 在 CI/CD 中注入 Secrets/环境变量到服务器执行环境${NC}\n"
     exit 1
 fi
 
