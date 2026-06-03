@@ -10,36 +10,36 @@
 
 from langchain_core.messages import AIMessage, HumanMessage, SystemMessage
 from langchain_core.runnables import RunnableConfig
+from pydantic import BaseModel, Field
 
 from services.llm.llm import llm, summary_llm
 
 from .prompts import (
+    ANALYZE_SYSTEM_PROMPT,
     CHAT_SYSTEM_PROMPT,
-    INTENT_SYSTEM_PROMPT,
-    REWRITE_SYSTEM_PROMPT,
     SUMMARY_SYSTEM_PROMPT,
     build_system_prompt,
 )
 from .state import MAX_RAW_MESSAGES, AgentState
 
 
-# ========== 意图识别节点 ==========
+# ========== Pydantic 结构化输出模型 ==========
 
-def intent_node(state: AgentState) -> dict:
-    """意图识别节点：分类用户意图，决定后续执行路径。
+class AnalyzeResult(BaseModel):
+    """分析节点输出：意图标签 + 查询改写"""
+    intent: str = Field(
+        description="用户意图：chat(闲聊) / knowledge(知识库) / search(联网搜索) / mixed(混合) / other(其他)",
+    )
+    rewrite_query: str = Field(
+        description="改写后的检索查询（仅 knowledge/mixed 时有效，其他情况为空字符串）",
+    )
 
-    同时重置 iterations 计数器，确保每轮新对话从零开始。
-    """
-    messages = state["messages"]
-    if not messages:
-        return {"intent": "other", "iterations": 0}
 
-    last_message = messages[-1]
-    if not hasattr(last_message, "content") or not last_message.content:
-        return {"intent": "other", "iterations": 0}
+# ========== 意图识别 + 查询改写合并节点 ==========
 
-    # 提取文本内容（支持多模态消息）
-    content = last_message.content
+def _extract_text_content(message) -> str:
+    """从消息中提取纯文本内容（支持多模态消息）。"""
+    content = message.content if hasattr(message, "content") else str(message)
     if isinstance(content, list):
         text_parts = [
             item.get("text", "")
@@ -47,68 +47,52 @@ def intent_node(state: AgentState) -> dict:
             if isinstance(item, dict) and item.get("type") == "text"
         ]
         content = " ".join(text_parts) or str(content)
+    return content
 
-    prompt = f"{INTENT_SYSTEM_PROMPT}\n\n用户消息：{content}\n\n意图标签："
+
+def analyze_node(state: AgentState) -> dict:
+    """分析节点：一次 LLM 调用同时完成意图识别 + 查询改写。
+
+    把原本串行的两次 LLM 调用（intent_node + query_rewrite_node）合并为一次，
+    显著缩短首 token 时间（TTFT）。
+
+    返回：
+      - intent: chat/knowledge/search/mixed/other
+      - rewrite_query: 优化后的检索查询（knowledge/mixed 时有效）
+      - iterations: 0（重置迭代计数器）
+    """
+    messages = state["messages"]
+    if not messages:
+        return {"intent": "other", "rewrite_query": "", "iterations": 0}
+
+    last_message = messages[-1]
+    content = _extract_text_content(last_message)
+    if not content:
+        return {"intent": "other", "rewrite_query": "", "iterations": 0}
+
+    prompt = f"{ANALYZE_SYSTEM_PROMPT}\n\n用户消息：{content}"
 
     try:
-        # 关键：传入空 callbacks，阻断 graph stream 的旁路捕获，防止意图标签泄漏到前端
-        response = llm.invoke(
+        # 使用 Pydantic 结构化输出，强制 LLM 返回符合 AnalyzeResult  schema 的 JSON
+        # 底层利用 OpenAI 兼容接口的 function calling / JSON mode，比 prompt 约束更可靠
+        structured_llm = llm.with_structured_output(AnalyzeResult)
+        result: AnalyzeResult = structured_llm.invoke(
             [HumanMessage(content=prompt)],
             config=RunnableConfig(callbacks=[]),
         )
-        intent = response.content.strip().lower()
+        intent = result.intent.strip().lower()
+        rewrite_query = result.rewrite_query.strip()
     except Exception as e:
-        print(f"[AGENT] 意图识别异常: {e}")
+        print(f"[AGENT] 分析异常: {e}")
         intent = "other"
+        rewrite_query = ""
 
     # 验证并规范化
     valid_intents = {"chat", "knowledge", "search", "mixed", "other"}
     intent = intent if intent in valid_intents else "other"
 
-    print(f"[AGENT] 意图识别: '{content[:40]}...' → {intent}")
-    return {"intent": intent, "iterations": 0}
-
-
-# ========== 查询改写节点 ==========
-
-def query_rewrite_node(state: AgentState) -> dict:
-    """查询改写节点：将用户问题改写为更适合向量检索的查询。
-
-    仅在 intent 为 knowledge 时触发。改写结果存入 state.rewrite_query，
-    后续 agent_node 会在 system prompt 中注入改写建议。
-    """
-    messages = state["messages"]
-    if not messages:
-        return {"rewrite_query": ""}
-
-    last_message = messages[-1]
-    if not hasattr(last_message, "content") or not last_message.content:
-        return {"rewrite_query": ""}
-
-    content = last_message.content
-    if isinstance(content, list):
-        text_parts = [
-            item.get("text", "")
-            for item in content
-            if isinstance(item, dict) and item.get("type") == "text"
-        ]
-        content = " ".join(text_parts) or str(content)
-
-    prompt = f"{REWRITE_SYSTEM_PROMPT}\n\n用户原始问题：{content}\n\n改写后的查询："
-
-    try:
-        # 关键：传入空 callbacks，阻断 graph stream 的旁路捕获，防止改写查询泄漏到前端
-        response = llm.invoke(
-            [HumanMessage(content=prompt)],
-            config=RunnableConfig(callbacks=[]),
-        )
-        rewrite = response.content.strip()
-    except Exception as e:
-        print(f"[AGENT] 查询改写异常: {e}")
-        rewrite = ""
-
-    print(f"[AGENT] 查询改写: '{content[:40]}...' → '{rewrite[:50]}...'")
-    return {"rewrite_query": rewrite}
+    print(f"[AGENT] 分析结果: intent={intent}, rewrite='{rewrite_query[:30]}...'")
+    return {"intent": intent, "rewrite_query": rewrite_query, "iterations": 0}
 
 
 # ========== 闲聊节点 ==========

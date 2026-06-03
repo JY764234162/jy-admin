@@ -1,7 +1,7 @@
 """所有 LangGraph 条件路由函数。
 
 职责：根据当前 state 决定 Graph 的下一步走向，
-      包括意图路由（intent_router）和 Agent 后路由（agent_router）。
+      包括分析后路由（analyze_router）和 Agent 后路由（agent_router）。
 """
 
 from langgraph.graph import END
@@ -9,34 +9,27 @@ from langgraph.graph import END
 from .state import MAX_ITERATIONS, MAX_RAW_MESSAGES, AgentState
 
 
-# ========== 意图路由 ==========
+# ========== 分析后路由 ==========
 
-def _make_intent_router(enable_knowledge: bool, enable_search: bool):
-    """创建意图路由函数的工厂。
+def _make_analyze_router():
+    """创建分析后路由函数的工厂。
 
-    根据 intent 和工具可用性决定下一步节点：
-      - chat        → chat_node（不走工具）
-      - knowledge   → 如果 enable_knowledge → rewrite_query → agent_node
-                     否则 → agent_node（fallback）
-      - search/mixed/other → agent_node（带工具的 ReAct 循环）
+    analyze_node 同时完成了意图识别 + 查询改写，路由逻辑简化：
+      - chat  → chat_node（不走工具，直接闲聊回复）
+      - 其他  → agent_node（带工具的 ReAct 循环）
     """
 
-    def intent_router(state: AgentState) -> str:
+    def analyze_router(state: AgentState) -> str:
         intent = state.get("intent", "other")
 
         if intent == "chat":
-            print(f"[AGENT] 意图路由 → chat_node（闲聊模式）")
+            print(f"[AGENT] 分析路由 → chat_node（闲聊模式）")
             return "chat"
 
-        if intent == "knowledge" and enable_knowledge:
-            print(f"[AGENT] 意图路由 → rewrite_query（知识库模式）")
-            return "rewrite"
-
-        # search / mixed / other / knowledge 但 knowledge 未启用
-        print(f"[AGENT] 意图路由 → agent_node（Agent 模式, intent={intent}）")
+        print(f"[AGENT] 分析路由 → agent_node（Agent 模式, intent={intent}）")
         return "agent"
 
-    return intent_router
+    return analyze_router
 
 
 # ========== Agent 后路由 ==========

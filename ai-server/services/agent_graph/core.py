@@ -10,8 +10,8 @@
 具体节点实现见：
   - state.py      → AgentState 定义
   - prompts.py    → 所有 system prompt 模板
-  - nodes.py      → intent_node, query_rewrite_node, chat_node, agent_node, summarize_node
-  - router.py     → intent_router, agent_router
+  - nodes.py      → analyze_node, chat_node, agent_node, summarize_node
+  - router.py     → analyze_router, agent_router
   - tools_node.py → make_tools, _make_tool_node
 --------------------------------------------------------------------------------
 """
@@ -27,13 +27,12 @@ from services.llm.response_filter import sanitize_response
 from services.storage.checkpoint_store import get_saver
 
 from .nodes import (
-    intent_node,
-    query_rewrite_node,
+    analyze_node,
     summarize_node,
     _make_chat_node,
     _make_agent_node,
 )
-from .router import _make_agent_router, _make_intent_router
+from .router import _make_agent_router, _make_analyze_router
 from .state import AgentState
 from .tools_node import make_tools, _make_tool_node
 
@@ -54,11 +53,10 @@ _graph_cache: dict = {}
 def _build_graph(
     user_id: str, enable_knowledge: bool, enable_search: bool, system_prompt: str = ""
 ):
-    """构建并编译 StateGraph（含意图路由 + 自动摘要机制）。
+    """构建并编译 StateGraph（含分析节点 + 自动摘要机制）。
 
     与标准 StateGraph 的区别：
-      - 增加 intent_node 做意图识别和路由
-      - 增加 query_rewrite_node 优化 RAG 查询
+      - 增加 analyze_node，一次 LLM 调用完成意图识别 + 查询改写
       - 增加 chat_node 处理纯闲聊（不走工具）
       - agent 节点使用滑动窗口，只传入近期消息到 LLM
       - 增加迭代保护（MAX_ITERATIONS），防止工具调用无限循环
@@ -74,7 +72,7 @@ def _build_graph(
     )
 
     # 2. 创建各节点（闭包捕获配置）
-    intent_router = _make_intent_router(enable_knowledge, enable_search)
+    analyze_router = _make_analyze_router()
     chat_node = _make_chat_node(system_prompt)
     agent_node = _make_agent_node(enable_knowledge, enable_search, system_prompt, tools)
     agent_router = _make_agent_router(tools)
@@ -82,36 +80,32 @@ def _build_graph(
     # 3. 构图
     builder = StateGraph(AgentState)
 
-    # 3.1 入口节点：意图识别
-    builder.add_node("intent", intent_node)
-    builder.set_entry_point("intent")
+    # 3.1 入口节点：分析（意图识别 + 查询改写）
+    builder.add_node("analyze", analyze_node)
+    builder.set_entry_point("analyze")
 
     # 3.2 条件边：根据意图分流
-    intent_routing_map = {"chat": "chat", "rewrite": "rewrite", "agent": "agent"}
-    builder.add_conditional_edges("intent", intent_router, intent_routing_map)
+    analyze_routing_map = {"chat": "chat", "agent": "agent"}
+    builder.add_conditional_edges("analyze", analyze_router, analyze_routing_map)
 
     # 3.3 闲聊节点（不走工具）
     builder.add_node("chat", chat_node)
     builder.add_edge("chat", END)
 
-    # 3.4 查询改写节点（knowledge 意图专用）
-    builder.add_node("rewrite", query_rewrite_node)
-    builder.add_edge("rewrite", "agent")
-
-    # 3.5 Agent 节点（带工具的 ReAct 循环）
+    # 3.4 Agent 节点（带工具的 ReAct 循环）
     builder.add_node("agent", agent_node)
 
-    # 3.6 工具节点（如果有工具）
+    # 3.5 工具节点（如果有工具）
     if tools:
         tool_node = _make_tool_node(tools)
         builder.add_node("tools", tool_node)
         builder.add_edge("tools", "agent")  # 工具执行完后回到 agent 继续思考
 
-    # 3.7 摘要节点
+    # 3.6 摘要节点
     builder.add_node("summarize", summarize_node)
     builder.add_edge("summarize", END)  # 摘要完成后结束
 
-    # 3.8 Agent 后的统一条件边
+    # 3.7 Agent 后的统一条件边
     routing_map = {"summarize": "summarize", END: END}
     if tools:
         routing_map["tools"] = "tools"
@@ -180,9 +174,6 @@ async def stream_agent(
         content = message
 
     # 3. 初始化状态
-    # 注意：只传 messages，summary 由 checkpoint 自动恢复（首次为空字符串）
-    # 如果传入 summary="" 会覆盖 checkpoint 中已有的摘要！
-    # iterations=0 确保每轮对话从零开始计数
     initial_state = {
         "messages": [HumanMessage(content=content)],
         "iterations": 0,
