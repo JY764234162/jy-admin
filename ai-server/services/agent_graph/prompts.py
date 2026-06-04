@@ -72,7 +72,7 @@ def build_system_prompt(enable_knowledge: bool = True, enable_search: bool = Fal
 # 引用规范
 - 知识库内容标注：`【来源：文件名】`
 - 联网搜索内容标注：正文中用 `[index]` 上标引用（如 `OpenAI 发布了新模型[1]`），回答末尾列出完整来源：`[index] [网页标题](URL)`
-- 搜索结果中的图片可以用 `![描述](URL)` 展示
+- 搜索结果 JSON 中若包含 `images` 字段，必须用 Markdown 图片语法 `![描述](URL)` 直接展示，不要只贴网页链接
 
 # 格式要求
 - 使用 Markdown 格式输出

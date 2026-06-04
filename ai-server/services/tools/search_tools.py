@@ -8,6 +8,19 @@ from langchain_tavily import TavilySearch
 import config
 
 
+def _normalize_image_urls(images: list) -> list[str]:
+    """将 Tavily 返回的图片（字符串或 {url, description}）统一为 URL 列表。"""
+    urls: list[str] = []
+    for item in images or []:
+        if isinstance(item, str) and item.strip():
+            urls.append(item.strip())
+        elif isinstance(item, dict):
+            url = (item.get("url") or "").strip()
+            if url:
+                urls.append(url)
+    return urls
+
+
 def _format_results(results: dict) -> str:
     """将 Tavily 搜索结果格式化为结构化 JSON 文本。
 
@@ -33,8 +46,11 @@ def _format_results(results: dict) -> str:
     if not items:
         return json.dumps({"results": []}, ensure_ascii=False)
 
+    top_images = _normalize_image_urls(results.get("images", []))
+
     formatted = []
     for r in items:
+        result_images = _normalize_image_urls(r.get("images", []))
         formatted.append(
             {
                 "answer": r.get("content", ""),
@@ -44,11 +60,14 @@ def _format_results(results: dict) -> str:
                         "url": r.get("url", ""),
                     }
                 ],
-                "images": r.get("images", []) or [],
+                "images": result_images,
             }
         )
 
-    return json.dumps({"results": formatted}, ensure_ascii=False, indent=2)
+    payload: dict = {"results": formatted}
+    if top_images:
+        payload["images"] = top_images
+    return json.dumps(payload, ensure_ascii=False, indent=2)
 
 
 def make_tavily_search_tool():
@@ -57,6 +76,7 @@ def make_tavily_search_tool():
         tavily_api_key=config.TAVILY_API_KEY,
         max_results=5,
         topic="general",
+        include_images=True,
     )
 
     @tool
@@ -81,7 +101,7 @@ def make_tavily_search_tool():
         """
         print(f"[TAVILY] 调用搜索: query={query}")
         try:
-            raw = tavily.invoke({"query": query})
+            raw = tavily.invoke({"query": query, "include_images": True})
             formatted = _format_results(raw)
             print(f"[TAVILY] 搜索完成，结果长度: {len(formatted)}")
             return formatted
