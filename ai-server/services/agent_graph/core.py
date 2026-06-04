@@ -25,7 +25,7 @@ from langgraph.graph import END, StateGraph
 
 from services.chat_attachments import build_human_message_content
 from services.llm.response_filter import sanitize_response
-from services.storage.checkpoint_store import get_saver
+from services.storage.checkpoint_store import get_async_saver
 
 from .nodes import (
     analyze_node,
@@ -52,7 +52,11 @@ _graph_cache: dict = {}
 
 
 def _build_graph(
-    user_id: str, enable_knowledge: bool, enable_search: bool, system_prompt: str = ""
+    user_id: str,
+    enable_knowledge: bool,
+    enable_search: bool,
+    system_prompt: str = "",
+    checkpointer=None,
 ):
     """构建并编译 StateGraph（含分析节点 + 自动摘要机制）。
 
@@ -114,21 +118,25 @@ def _build_graph(
     builder.add_conditional_edges("agent", agent_router, routing_map)
 
     # 4. 编译，附加 checkpoint（对话记忆持久化）
-    return builder.compile(checkpointer=get_saver())
+    if checkpointer is None:
+        raise ValueError("checkpointer is required")
+    return builder.compile(checkpointer=checkpointer)
 
 
-def _get_graph(
+async def _get_graph(
     user_id: str, enable_knowledge: bool, enable_search: bool, system_prompt: str = ""
 ):
-    """获取或编译 Graph 实例（按参数缓存，避免重复创建）。"""
+    """获取或编译 Graph 实例（按参数缓存；使用 AsyncPostgresSaver 供 astream 使用）。"""
     key = (user_id, enable_knowledge, enable_search, system_prompt)
     if key not in _graph_cache:
         print(f"[AGENT] 创建新 Graph: key={key}")
+        saver = await get_async_saver()
         _graph_cache[key] = _build_graph(
             user_id=user_id,
             enable_knowledge=enable_knowledge,
             enable_search=enable_search,
             system_prompt=system_prompt,
+            checkpointer=saver,
         )
     else:
         print(f"[AGENT] 命中缓存 Graph: key={key}")
@@ -159,8 +167,8 @@ async def stream_agent(
         f"enable_search={enable_search}, user_id={user_id}"
     )
 
-    # 1. 获取缓存的 Graph 实例
-    graph = _get_graph(
+    # 1. 获取缓存的 Graph 实例（异步 checkpoint，配合 astream）
+    graph = await _get_graph(
         user_id=user_id,
         enable_knowledge=enable_knowledge,
         enable_search=enable_search,
@@ -184,10 +192,15 @@ async def stream_agent(
     # 4. LangGraph thread 配置
     config = {"configurable": {"thread_id": thread_id}}
 
-    # 5. 遍历 Graph 输出
+    # 5. 遍历 Graph 输出（astream 避免同步 stream 阻塞事件循环）
     has_content = False
 
-    for msg, metadata in graph.stream(initial_state, config, stream_mode="messages"):
+    async for chunk in graph.astream(initial_state, config, stream_mode="messages"):
+        if isinstance(chunk, tuple) and len(chunk) >= 2:
+            msg, _metadata = chunk[0], chunk[1]
+        else:
+            msg = chunk
+
         msg_type = getattr(msg, "type", "")
         tool_calls = getattr(msg, "tool_calls", None)
 

@@ -1,14 +1,13 @@
 import asyncio
 import json
+import traceback
 import uuid
 from typing import Optional
 
-from fastapi import APIRouter, HTTPException, Header, Depends
+from fastapi import APIRouter, HTTPException, Depends
 from pydantic import BaseModel
 from starlette.responses import StreamingResponse
-from sqlalchemy.orm import Session
 
-from services.llm import llm
 from services.storage.long_term_memory import get_memory
 from services.agent_graph import stream_agent
 from services.chat_attachments import (
@@ -16,7 +15,7 @@ from services.chat_attachments import (
     fetch_text_attachment,
 )
 from services.middleware import get_current_user, UserContext
-from models.conversation import Conversation, get_db, SessionLocal
+from models.conversation import Conversation, SessionLocal
 
 router = APIRouter(prefix="/api/ai/chat", tags=["chat"])
 
@@ -43,6 +42,48 @@ def _sse_json(data: dict) -> str:
 # ========== 数据库持久化辅助函数 ==========
 
 
+def _get_conversation(conv_id: int, user_id: str) -> Conversation | None:
+    """在独立 DB 会话中查询会话（供线程池调用，避免阻塞事件循环）。"""
+    db = SessionLocal()
+    try:
+        return (
+            db.query(Conversation)
+            .filter(Conversation.id == conv_id, Conversation.user_id == user_id)
+            .first()
+        )
+    finally:
+        db.close()
+
+
+def _prepare_memory_and_attachments(
+    user_message: str, user_id: str, attachments_json: str
+) -> tuple[str, list, list[tuple[str, str]]]:
+    """长期记忆检索 + 附件解析（含同步 HTTP 拉取 txt）。"""
+    memory_context = semantic_memory.format_memory_context(
+        query=user_message, user_id=user_id
+    )
+    attachments_list: list = []
+    text_supplements: list[tuple[str, str]] = []
+    try:
+        attachments_list = json.loads(attachments_json or "[]")
+        if not isinstance(attachments_list, list):
+            attachments_list = []
+        memory_context = build_attachment_memory_context(
+            attachments_list, memory_context
+        )
+        for att in attachments_list:
+            if att.get("file_type") == ".txt" and att.get("url"):
+                body = fetch_text_attachment(att["url"])
+                if body:
+                    text_supplements.append(
+                        (att.get("filename", "file.txt"), body)
+                    )
+    except Exception as e:
+        print(f"[chat] 解析附件失败: {e}")
+        attachments_list = []
+    return memory_context, attachments_list, text_supplements
+
+
 def _persist_chat_result(
     conv_id: int, content: str, status: str, user_msg: str, attachments: str = "[]"
 ):
@@ -67,7 +108,6 @@ def _persist_chat_result(
 async def chat_message(
     req: ChatRequest,
     user: UserContext = Depends(get_current_user),
-    db: Session = Depends(get_db),
 ):
     user_message = req.message.strip()
     if not user_message:
@@ -79,49 +119,24 @@ async def chat_message(
 
     conversation_id = req.conversationId or uuid.uuid4().hex[:16]
 
-    # 验证会话存在且属于当前用户
+    # 验证会话、记忆检索、附件拉取：同步 I/O 放入线程池，避免阻塞其他 API
     conv = None
     if req.conversationId:
-        conv = (
-            db.query(Conversation)
-            .filter(
-                Conversation.id == conversation_id,
-                Conversation.user_id == user_id,
-            )
-            .first()
+        conv = await asyncio.to_thread(
+            _get_conversation, conversation_id, user_id
         )
 
     if req.conversationId and not conv:
         raise HTTPException(404, "会话不存在或无权限")
 
-    # 会话数据库 ID（用于保存元数据）
     conv_db_id = conv.id if conv else None
 
-    # 语义检索：跨会话召回与当前问题相关的长期记忆
-    memory_context = semantic_memory.format_memory_context(
-        query=user_message, user_id=str(user_id)
+    memory_context, attachments_list, text_supplements = await asyncio.to_thread(
+        _prepare_memory_and_attachments,
+        user_message,
+        str(user_id),
+        req.attachments or "[]",
     )
-
-    # 解析附件：注入 system 上下文，并拉取 .txt 正文供多模态消息使用
-    attachments_list: list = []
-    text_supplements: list[tuple[str, str]] = []
-    try:
-        attachments_list = json.loads(req.attachments or "[]")
-        if not isinstance(attachments_list, list):
-            attachments_list = []
-        memory_context = build_attachment_memory_context(
-            attachments_list, memory_context
-        )
-        for att in attachments_list:
-            if att.get("file_type") == ".txt" and att.get("url"):
-                body = fetch_text_attachment(att["url"])
-                if body:
-                    text_supplements.append(
-                        (att.get("filename", "file.txt"), body)
-                    )
-    except Exception as e:
-        print(f"[chat] 解析附件失败: {e}")
-        attachments_list = []
 
     # thread_id 用于 Checkpoint
     session_key = f"{user_id}:{conversation_id}" if user_id else conversation_id
@@ -159,24 +174,24 @@ async def chat_message(
                     pass
                 yield event
 
-            # 流式结束后，保存本轮交互到语义记忆（长期记忆）
             if full_response.strip():
-                semantic_memory.save_interaction(
-                    user_msg=user_message,
-                    ai_msg=full_response,
-                    session_id=conversation_id,
-                    user_id=str(user_id),
+                await asyncio.to_thread(
+                    semantic_memory.save_interaction,
+                    user_message,
+                    full_response,
+                    str(conversation_id),
+                    str(user_id),
                 )
         except Exception as e:
-            error_msg = str(e)
+            error_msg = str(e) or repr(e) or type(e).__name__
+            print(f"[chat] 流式生成异常: {error_msg}", flush=True)
+            traceback.print_exc()
             yield _sse_json({"content": "", "done": True, "error": error_msg})
         finally:
             # 持久化会话元数据
             if conv_db_id:
                 status = "error" if error_msg else "success"
-                loop = asyncio.get_event_loop()
-                await loop.run_in_executor(
-                    None,
+                await asyncio.to_thread(
                     _persist_chat_result,
                     conv_db_id,
                     full_response,
