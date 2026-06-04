@@ -73,10 +73,9 @@ def build_attachment_memory_context(
 def build_human_message_content(
     message: str,
     attachments_list: list[dict[str, Any]] | None = None,
-    image_url: str = "",
     text_supplements: list[tuple[str, str]] | None = None,
 ) -> str | list[dict[str, Any]]:
-    """构造 HumanMessage.content：文本 + 图片 URL（OpenAI 多模态格式）。"""
+    """构造 HumanMessage.content：文本 + 附件图片 URL（OpenAI 多模态格式）。"""
     text = message.strip()
     extra_parts: list[str] = []
 
@@ -88,9 +87,6 @@ def build_human_message_content(
         text = f"{text}\n\n" + "\n\n".join(extra_parts) if text else "\n\n".join(extra_parts)
 
     image_urls: list[str] = []
-    if image_url:
-        image_urls.append(image_url)
-
     for att in attachments_list or []:
         url = (att.get("url") or "").strip()
         ftype = (att.get("file_type") or "").lower()

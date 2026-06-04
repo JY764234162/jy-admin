@@ -8,6 +8,7 @@ from models.conversation import Conversation, get_db
 from services.middleware import get_current_user, UserContext
 from services.chat_attachments import content_to_display_text
 from services.llm.response_filter import sanitize_response
+from services.chat_resume import analyze_thread_for_resume
 from services.storage import (
     get_thread_messages,
     thread_exists,
@@ -91,10 +92,14 @@ def _messages_from_checkpoint(conv_id: int, user_id: int, conv: Conversation) ->
                 else content_to_display_text(msg.content)
             ),
             "userId": user_id,
-            "status": conv.latest_status,
+            "status": "success",
             "attachments": conv.latest_attachments,
             "createdAt": "",
         })
+
+    # 仅最后一条消息可携带 loading，避免历史 AI 条被误判为未完成
+    if result and conv.latest_status == "loading":
+        result[-1]["status"] = "loading"
 
     return result
 
@@ -233,6 +238,12 @@ async def get_message_list(
         raise HTTPException(404, "会话不存在或无权限")
 
     thread_id = f"{user.id}:{conv_id}"
+    if conv.latest_status == "loading":
+        ctx = analyze_thread_for_resume(thread_id, conv.latest_status)
+        if not ctx.get("needs_continue"):
+            conv.latest_status = "success"
+            db.commit()
+
     items = _messages_from_checkpoint(conv_id=conv_id, user_id=user.id, conv=conv)
     # 倒序（最新的在前），内存分页
     items.reverse()
@@ -248,6 +259,7 @@ async def get_message_list(
             "total": total,
             "page": page,
             "pageSize": page_size,
+            "latestStatus": conv.latest_status,
         },
         "msg": "获取成功",
     }

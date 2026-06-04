@@ -143,59 +143,37 @@ async def _get_graph(
     return _graph_cache[key]
 
 
-# ========== 主函数：流式 SSE 输出 ==========
+# ========== 流式遍历 Graph ==========
 
 
-async def stream_agent(
-    message: str,
-    thread_id: str,
-    user_id: str = "",
-    memory_context: str = "",
-    image_url: str = "",
-    attachments_list: list | None = None,
-    text_supplements: list[tuple[str, str]] | None = None,
-    enable_knowledge: bool = True,
-    enable_search: bool = False,
+async def persist_human_turn(
+    graph,
+    config: dict,
+    human_message: HumanMessage,
+) -> None:
+    """将用户消息立即写入 checkpoint（刷新列表可见），并标记从入口重新执行。"""
+    await graph.aupdate_state(
+        config,
+        {"messages": [human_message], "iterations": 0},
+        as_node="__start__",
+    )
+
+
+async def _stream_graph_messages(
+    graph,
+    config: dict,
+    graph_input,
+    *,
+    content_prefix: str = "",
 ) -> AsyncIterator[str]:
-    """Agent 流式 SSE 输出。
+    """遍历 astream(messages)，输出 SSE 行；content 按增量片段下发。"""
+    has_content = bool(content_prefix.strip())
+    emitted_text = content_prefix
 
-    所有对话统一走 Agent 模式，根据 enable_knowledge 和 enable_search 动态挂载工具。
-    短期记忆由 LangGraph checkpoint 自动管理，超出阈值时自动触发摘要。
-    """
-    print(
-        f"[AGENT] stream_agent 参数: enable_knowledge={enable_knowledge}, "
-        f"enable_search={enable_search}, user_id={user_id}"
-    )
+    if content_prefix.strip():
+        yield _sse_json({"content": sanitize_response(content_prefix)})
 
-    # 1. 获取缓存的 Graph 实例（异步 checkpoint，配合 astream）
-    graph = await _get_graph(
-        user_id=user_id,
-        enable_knowledge=enable_knowledge,
-        enable_search=enable_search,
-        system_prompt=memory_context,
-    )
-
-    # 2. 构造当前用户消息（附件图片走 image_url 块，.txt 正文拼入文本）
-    content = build_human_message_content(
-        message=message,
-        attachments_list=attachments_list,
-        image_url=image_url,
-        text_supplements=text_supplements,
-    )
-
-    # 3. 初始化状态
-    initial_state = {
-        "messages": [HumanMessage(content=content)],
-        "iterations": 0,
-    }
-
-    # 4. LangGraph thread 配置
-    config = {"configurable": {"thread_id": thread_id}}
-
-    # 5. 遍历 Graph 输出（astream 避免同步 stream 阻塞事件循环）
-    has_content = False
-
-    async for chunk in graph.astream(initial_state, config, stream_mode="messages"):
+    async for chunk in graph.astream(graph_input, config, stream_mode="messages"):
         if isinstance(chunk, tuple) and len(chunk) >= 2:
             msg, _metadata = chunk[0], chunk[1]
         else:
@@ -204,23 +182,147 @@ async def stream_agent(
         msg_type = getattr(msg, "type", "")
         tool_calls = getattr(msg, "tool_calls", None)
 
-        # 跳过 ToolMessage（tools 节点的输出）
         if msg_type == "tool":
             continue
 
-        # 跳过带有有效工具调用的 AIMessage（不暴露工具调用过程给用户）
         if tool_calls and any(tc.get("name") for tc in tool_calls if tc):
             continue
 
         token = getattr(msg, "content", "")
-        if token:
+        if not token:
+            continue
+
+        piece = sanitize_response(str(token))
+        if not piece:
+            continue
+
+        # messages 模式下可能是增量 token，也可能是累积全文
+        if emitted_text and piece.startswith(emitted_text) and len(piece) > len(emitted_text):
+            delta = piece[len(emitted_text) :]
+            emitted_text = piece
+        else:
+            delta = piece
+            emitted_text += piece
+
+        if delta:
             has_content = True
-            yield _sse_json({"content": sanitize_response(str(token))})
+            yield _sse_json({"content": delta})
             await asyncio.sleep(0.01)
 
-    # 6. 兜底：如果模型没有生成任何内容，返回友好提示
     if not has_content:
         yield _sse_json({"content": "抱歉，我暂时无法回答这个问题，请稍后重试。"})
 
-    # 7. 完成
     yield _sse_json({"done": True})
+
+
+# ========== 主函数：流式 SSE 输出 ==========
+
+
+def build_user_human_message(
+    message: str,
+    *,
+    attachments_list: list | None = None,
+    text_supplements: list[tuple[str, str]] | None = None,
+) -> HumanMessage:
+    """构造当前轮用户 HumanMessage（含附件多模态）。"""
+    content = build_human_message_content(
+        message=message,
+        attachments_list=attachments_list,
+        text_supplements=text_supplements,
+    )
+    return HumanMessage(content=content)
+
+
+async def prepare_human_turn(
+    *,
+    message: str,
+    thread_id: str,
+    user_id: str = "",
+    memory_context: str = "",
+    attachments_list: list | None = None,
+    text_supplements: list[tuple[str, str]] | None = None,
+    enable_knowledge: bool = True,
+    enable_search: bool = False,
+) -> None:
+    """在流式开始前将用户消息写入 checkpoint（刷新消息列表可立即看到）。"""
+    graph = await _get_graph(
+        user_id=user_id,
+        enable_knowledge=enable_knowledge,
+        enable_search=enable_search,
+        system_prompt=memory_context,
+    )
+    config = {"configurable": {"thread_id": thread_id}}
+    human_message = build_user_human_message(
+        message,
+        attachments_list=attachments_list,
+        text_supplements=text_supplements,
+    )
+    await persist_human_turn(graph, config, human_message)
+
+
+async def stream_agent(
+    thread_id: str,
+    user_id: str = "",
+    memory_context: str = "",
+    enable_knowledge: bool = True,
+    enable_search: bool = False,
+) -> AsyncIterator[str]:
+    """Agent 流式 SSE 输出。
+
+    调用前须先 `prepare_human_turn` 写入用户消息；本函数从 checkpoint 继续执行图。
+    短期记忆由 LangGraph checkpoint 自动管理，超出阈值时自动触发摘要。
+    """
+    print(
+        f"[AGENT] stream_agent 参数: enable_knowledge={enable_knowledge}, "
+        f"enable_search={enable_search}, user_id={user_id}"
+    )
+
+    graph = await _get_graph(
+        user_id=user_id,
+        enable_knowledge=enable_knowledge,
+        enable_search=enable_search,
+        system_prompt=memory_context,
+    )
+    config = {"configurable": {"thread_id": thread_id}}
+
+    async for event in _stream_graph_messages(graph, config, None):
+        yield event
+
+
+async def stream_agent_resume(
+    thread_id: str,
+    user_id: str = "",
+    memory_context: str = "",
+    enable_knowledge: bool = False,
+    enable_search: bool = False,
+    existing_prefix: str = "",
+    *,
+    turn_complete: bool = False,
+) -> AsyncIterator[str]:
+    """从 Checkpoint 恢复流式输出（不追加新的用户消息）。"""
+    print(
+        f"[AGENT] stream_agent_resume: user_id={user_id}, "
+        f"turn_complete={turn_complete}, prefix_len={len(existing_prefix)}"
+    )
+
+    graph = await _get_graph(
+        user_id=user_id,
+        enable_knowledge=enable_knowledge,
+        enable_search=enable_search,
+        system_prompt=memory_context,
+    )
+    config = {"configurable": {"thread_id": thread_id}}
+
+    if turn_complete and existing_prefix.strip():
+        yield _sse_json({"content": sanitize_response(existing_prefix)})
+        yield _sse_json({"done": True})
+        return
+
+    # None 表示从 checkpoint 继续执行，不注入新 HumanMessage
+    async for event in _stream_graph_messages(
+        graph,
+        config,
+        None,
+        content_prefix=existing_prefix,
+    ):
+        yield event
