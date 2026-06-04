@@ -1,31 +1,19 @@
-from datetime import datetime, timedelta, timezone
-from typing import Optional
+"""Conversation 路由：会话 CRUD 与消息列表。"""
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
 from models.conversation import Conversation, get_db
-from services.middleware import get_current_user, UserContext
-from services.chat_attachments import content_to_display_text
-from services.llm.response_filter import sanitize_response
-from services.agent_graph.message_helpers import (
-    is_placeholder_assistant,
-    message_created_at_iso,
-)
 from services.chat_resume import analyze_thread_for_resume
-from services.streaming.stream_buffer import get_buffer
+from services.conversation import conv_to_dict, messages_from_checkpoint
+from services.middleware import get_current_user, UserContext
 from services.streaming.graph_executor import get_graph_task
-from services.storage import (
-    get_thread_messages,
-    thread_exists,
-    delete_thread,
-)
+from services.streaming.stream_buffer import get_buffer
+from services.storage import delete_thread
 
 router = APIRouter(prefix="/api/ai/conversation", tags=["conversation"])
 
-
-# ========== 请求/响应模型 ==========
 
 class CreateConversationRequest(BaseModel):
     title: str
@@ -35,116 +23,37 @@ class UpdateTitleRequest(BaseModel):
     title: str
 
 
-class ConversationResponse(BaseModel):
-    id: int
-    user_id: int
-    title: str
-    last_msg: str
-    message_count: int
-    created_at: str
-    updated_at: str
-
-    class Config:
-        from_attributes = True
+def _require_user(user: UserContext | None) -> UserContext:
+    if not user:
+        raise HTTPException(401, "未登录")
+    return user
 
 
-class PageResult(BaseModel):
-    list: list
-    total: int
-    page: int
-    page_size: int
+def _get_owned_conversation(
+    db: Session, conv_id: int, user_id: str
+) -> Conversation:
+    conv = (
+        db.query(Conversation)
+        .filter(Conversation.id == conv_id, Conversation.user_id == user_id)
+        .first()
+    )
+    if not conv:
+        raise HTTPException(404, "会话不存在或无权限")
+    return conv
 
 
-# ========== 辅助函数 ==========
+def _sync_loading_status(db: Session, conv: Conversation, thread_id: str) -> None:
+    """Graph 已结束但 DB 仍为 loading 时，修正 latest_status。"""
+    if conv.latest_status != "loading":
+        return
+    if get_buffer(thread_id) is not None or get_graph_task(thread_id) is not None:
+        return
 
-def _conv_to_dict(c: Conversation) -> dict:
-    return {
-        "ID": c.id,
-        "userId": c.user_id,
-        "title": c.title,
-        "lastMsg": c.last_msg,
-        "message_count": c.message_count,
-        "latestStatus": c.latest_status,
-        "createdAt": c.created_at.isoformat() if c.created_at else "",
-        "updatedAt": c.updated_at.isoformat() if c.updated_at else "",
-    }
+    ctx = analyze_thread_for_resume(thread_id, conv.latest_status)
+    if not ctx.get("needs_continue"):
+        conv.latest_status = "success"
+        db.commit()
 
-
-def _messages_from_checkpoint(conv_id: int, user_id: int, conv: Conversation) -> list[dict]:
-    """从 Checkpoint 读取消息；仅列表末条携带 loading/error（用户消息恒为 success）。"""
-    thread_id = f"{user_id}:{conv_id}"
-    raw_messages = get_thread_messages(thread_id)
-    conv_status = conv.latest_status or "success"
-
-    visible: list[tuple[str, object]] = []
-    for msg in raw_messages:
-        if msg.type == "human":
-            visible.append(("user", msg))
-            continue
-        if msg.type not in ("assistant", "ai"):
-            continue
-        tool_calls = getattr(msg, "tool_calls", None)
-        if tool_calls:
-            visible.append(("assistant_pending", msg))
-            continue
-        if is_placeholder_assistant(msg) or content_to_display_text(msg.content).strip():
-            visible.append(("assistant", msg))
-
-    base_dt = conv.created_at or conv.updated_at or datetime.now(timezone.utc)
-    if base_dt.tzinfo is None:
-        base_dt = base_dt.replace(tzinfo=timezone.utc)
-
-    result: list[dict] = []
-    last_idx = len(visible) - 1
-    last_user_idx = -1
-    for i, (kind, _) in enumerate(visible):
-        if kind == "user":
-            last_user_idx = i
-
-    for idx, (kind, msg) in enumerate(visible):
-        is_last = idx == last_idx
-        role = "user" if kind == "user" else "assistant"
-        if kind == "assistant_pending":
-            content = "正在处理..."
-        elif role == "assistant":
-            content = sanitize_response(content_to_display_text(msg.content))
-        else:
-            content = content_to_display_text(msg.content)
-
-        if kind == "assistant_pending" and not is_last:
-            continue
-
-        status = "success"
-        if role == "user":
-            status = "success"
-        elif is_last:
-            if conv_status == "loading":
-                status = "loading"
-            elif conv_status == "error":
-                status = "error"
-
-        result.append(
-            {
-                "ID": idx + 1,
-                "conversationId": conv_id,
-                "role": role,
-                "content": content,
-                "userId": user_id,
-                "status": status,
-                "attachments": (
-                    conv.latest_attachments if role == "user" and idx == last_user_idx else None
-                ),
-                "createdAt": message_created_at_iso(
-                    msg,
-                    fallback=base_dt + timedelta(seconds=idx),
-                ),
-            }
-        )
-
-    return result
-
-
-# ========== API 端点 ==========
 
 @router.post("")
 async def create_conversation(
@@ -152,16 +61,12 @@ async def create_conversation(
     user: UserContext = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
-    """创建新会话"""
-    if not user:
-        raise HTTPException(401, "未登录")
-
+    user = _require_user(user)
     conv = Conversation(user_id=user.id, title=req.title.strip())
     db.add(conv)
     db.commit()
     db.refresh(conv)
-
-    return {"code": 0, "data": _conv_to_dict(conv), "msg": "创建成功"}
+    return {"code": 0, "data": conv_to_dict(conv), "msg": "创建成功"}
 
 
 @router.get("/list")
@@ -171,24 +76,19 @@ async def get_conversation_list(
     user: UserContext = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
-    """获取当前用户的会话列表（按更新时间倒序）"""
-    if not user:
-        raise HTTPException(401, "未登录")
-
+    user = _require_user(user)
     query = db.query(Conversation).filter(Conversation.user_id == user.id)
     total = query.count()
-
     conversations = (
         query.order_by(Conversation.updated_at.desc())
         .offset((page - 1) * page_size)
         .limit(page_size)
         .all()
     )
-
     return {
         "code": 0,
         "data": {
-            "list": [_conv_to_dict(c) for c in conversations],
+            "list": [conv_to_dict(c) for c in conversations],
             "total": total,
             "page": page,
             "pageSize": page_size,
@@ -203,22 +103,11 @@ async def delete_conversation(
     user: UserContext = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
-    """删除会话及其 checkpoint 数据"""
-    if not user:
-        raise HTTPException(401, "未登录")
-
-    conv = (
-        db.query(Conversation)
-        .filter(Conversation.id == conv_id, Conversation.user_id == user.id)
-        .first()
-    )
-    if not conv:
-        raise HTTPException(404, "会话不存在或无权限")
-
+    user = _require_user(user)
+    conv = _get_owned_conversation(db, conv_id, user.id)
     db.delete(conv)
     db.commit()
 
-    # 同时删除 checkpoint thread
     thread_id = f"{user.id}:{conv_id}"
     try:
         delete_thread(thread_id)
@@ -235,17 +124,8 @@ async def update_conversation_title(
     user: UserContext = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
-    """更新会话标题"""
-    if not user:
-        raise HTTPException(401, "未登录")
-
-    conv = (
-        db.query(Conversation)
-        .filter(Conversation.id == conv_id, Conversation.user_id == user.id)
-        .first()
-    )
-    if not conv:
-        raise HTTPException(404, "会话不存在或无权限")
+    user = _require_user(user)
+    conv = _get_owned_conversation(db, conv_id, user.id)
 
     new_title = req.title.strip()
     if not new_title:
@@ -253,7 +133,6 @@ async def update_conversation_title(
 
     conv.title = new_title
     db.commit()
-
     return {"code": 0, "msg": "更新成功"}
 
 
@@ -265,35 +144,18 @@ async def get_message_list(
     user: UserContext = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
-    """获取会话消息列表（从 Checkpoint 读取）。"""
-    if not user:
-        raise HTTPException(401, "未登录")
-
-    conv = (
-        db.query(Conversation)
-        .filter(Conversation.id == conv_id, Conversation.user_id == user.id)
-        .first()
-    )
-    if not conv:
-        raise HTTPException(404, "会话不存在或无权限")
+    user = _require_user(user)
+    conv = _get_owned_conversation(db, conv_id, user.id)
 
     thread_id = f"{user.id}:{conv_id}"
-    if conv.latest_status == "loading":
-        # 新架构：后台 Graph 独立运行，若 Buffer 仍存在或任务仍在执行，
-        # 不能仅凭 checkpoint 分析就把状态改为 success。
-        if get_buffer(thread_id) is None and get_graph_task(thread_id) is None:
-            ctx = analyze_thread_for_resume(thread_id, conv.latest_status)
-            if not ctx.get("needs_continue"):
-                conv.latest_status = "success"
-                db.commit()
+    _sync_loading_status(db, conv, thread_id)
 
-    items = _messages_from_checkpoint(conv_id=conv_id, user_id=user.id, conv=conv)
-    # 倒序（最新的在前），内存分页
+    items = messages_from_checkpoint(conv_id=conv_id, user_id=user.id, conv=conv)
     items.reverse()
+
     total = len(items)
     start = (page - 1) * page_size
-    end = start + page_size
-    page_items = items[start:end]
+    page_items = items[start : start + page_size]
 
     return {
         "code": 0,
