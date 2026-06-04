@@ -136,7 +136,6 @@ export const aiChatStreamClient = {
     options: {
       content: string;
       resume?: boolean;
-      imageBase64?: string;
       attachments?: { uid: string; filename: string; url?: string }[];
       enable_knowledge?: boolean;
       enable_search?: boolean;
@@ -145,7 +144,6 @@ export const aiChatStreamClient = {
     const {
       content,
       resume = false,
-      imageBase64,
       attachments,
       enable_knowledge = false,
       enable_search = false,
@@ -161,7 +159,6 @@ export const aiChatStreamClient = {
         conversationId,
         content,
         resume,
-        imageBase64,
         attachments,
         enable_knowledge,
         enable_search,

@@ -15,8 +15,6 @@ type StartPayload = {
   knowledgeConfig?: { top_k?: number };
   /** 是否为恢复模式（刷新后重连，不重复保存用户消息） */
   resume?: boolean;
-  /** 多模态图片 base64 */
-  imageBase64?: string;
   /** 用户消息携带的附件元数据 */
   attachments?: { uid: string; filename: string; url?: string }[];
 };
@@ -158,11 +156,14 @@ async function startStream(p: StartPayload) {
 
     // resume 模式走 /ai/chat/resume，仅传 conversationId；正常聊天走 /ai/chat
     const body: Record<string, unknown> = p.resume
-      ? { conversationId: p.conversationId }
+      ? {
+          conversationId: p.conversationId,
+          enable_knowledge: p.enable_knowledge ?? false,
+          enable_search: p.enable_search ?? false,
+        }
       : {
           conversationId: p.conversationId,
           message: p.content,
-          image_url: p.imageBase64 ?? "",
           enable_knowledge: p.enable_knowledge ?? false,
           enable_search: p.enable_search ?? false,
           attachments: p.attachments ? JSON.stringify(p.attachments) : undefined,

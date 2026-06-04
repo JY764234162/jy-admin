@@ -167,7 +167,10 @@ export const aiApi = {
   },
 
   /** 获取会话消息列表 */
-  getMessageList: (conversationId: number, params?: MessageListParams): Promise<AIServerResponse<{ list: AIMessage[]; total: number; page: number; pageSize: number }>> => {
+  getMessageList: (
+    conversationId: number,
+    params?: MessageListParams
+  ): Promise<AIServerResponse<{ list: AIMessage[]; total: number; page: number; pageSize: number; latestStatus?: string }>> => {
     const url = aiUrl(`/api/ai/conversation/${conversationId}/messages`);
     if (params?.page) url.searchParams.set("page", String(params.page));
     if (params?.pageSize) url.searchParams.set("page_size", String(params.pageSize));

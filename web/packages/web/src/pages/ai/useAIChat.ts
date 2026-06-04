@@ -90,28 +90,34 @@ export function useAIChat(conversationId: number | null, options: UseAIChatOptio
   live.current.sessions = sessions;
   live.current.messages = messages;
 
-  const toDisplayOrder = useCallback(
-    (list: AIMessage[]): UiMessage[] =>
-      [...list].reverse().map((msg) => {
-        let parsedAttachments: UiMessage["attachments"];
-        if (msg.attachments) {
-          try {
-            parsedAttachments = JSON.parse(msg.attachments) as UiMessage["attachments"];
-          } catch {
-            parsedAttachments = undefined;
-          }
+  /** 仅会话级 latestStatus=loading 时，本批里时间最新的一条可保留 loading（兼容旧接口给每条都标 loading） */
+  const toDisplayOrder = useCallback((list: AIMessage[], latestStatus?: string): UiMessage[] => {
+    const ordered = [...list].reverse();
+    return ordered.map((msg, idx) => {
+      let parsedAttachments: UiMessage["attachments"];
+      if (msg.attachments) {
+        try {
+          parsedAttachments = JSON.parse(msg.attachments) as UiMessage["attachments"];
+        } catch {
+          parsedAttachments = undefined;
         }
-        return {
-          id: `msg-${msg.ID}`,
-          content: normalizeMessageContent(msg.content),
-          role: msg.role === "user" ? "user" : "ai",
-          status: (msg.status === "loading" ? "loading" : msg.status === "error" ? "error" : "success") as UiMessage["status"],
-          timestamp: new Date(msg.createdAt).getTime(),
-          attachments: parsedAttachments,
-        };
-      }),
-    []
-  );
+      }
+      const isNewestInBatch = idx === ordered.length - 1;
+      let status: UiMessage["status"] =
+        msg.status === "error" ? "error" : msg.status === "loading" ? "loading" : "success";
+      if (status === "loading" && (latestStatus !== "loading" || !isNewestInBatch)) {
+        status = "success";
+      }
+      return {
+        id: `msg-${msg.ID}`,
+        content: normalizeMessageContent(msg.content),
+        role: msg.role === "user" ? "user" : "ai",
+        status,
+        timestamp: new Date(msg.createdAt).getTime(),
+        attachments: parsedAttachments,
+      };
+    });
+  }, []);
 
   const navigateToConversation = useCallback(
     (id: number, replace = false) => {
@@ -147,6 +153,45 @@ export function useAIChat(conversationId: number | null, options: UseAIChatOptio
     [markConversationStreaming, markConversationStreamEnded]
   );
 
+  /** 仅在会话确有进行中的生成时续传，避免切页/刷新后误调 resume */
+  const tryResumeIfNeeded = useCallback(
+    (cid: number, messageList: UiMessage[]) => {
+      if (streamingConversationIdsRef.current.has(cid)) return;
+
+      const snap = aiChatStreamClient.getLatestSnapshot(cid);
+      if (snap?.status === "streaming" || snap?.status === "idle") return;
+      if (snap?.status === "done") return;
+
+      const last = messageList[messageList.length - 1];
+      if (!last) return;
+
+      if (last.role === "ai" && last.status === "loading") {
+        const prev = messageList[messageList.length - 2];
+        const userContent = prev?.role === "user" ? prev.content : "";
+        beginResumeStream(cid, last, userContent, false, false);
+        return;
+      }
+
+      if (last.role === "user" && last.status === "loading") {
+        const aiMsgId = `ai-resume-${Date.now()}`;
+        const loadingMsg: UiMessage = {
+          id: aiMsgId,
+          content: "",
+          role: "ai",
+          status: "loading",
+          timestamp: Date.now(),
+        };
+        live.current.streamingAiMsgId = aiMsgId;
+        setMessages((prev) => [...prev, loadingMsg]);
+        setTimeout(() => {
+          if (live.current.conversationId !== cid) return;
+          beginResumeStream(cid, loadingMsg, last.content, false, false);
+        }, 0);
+      }
+    },
+    [beginResumeStream]
+  );
+
   const loadSessions = useCallback(async () => {
     setLoadingSessions(true);
     try {
@@ -171,7 +216,7 @@ export function useAIChat(conversationId: number | null, options: UseAIChatOptio
         if (live.current.conversationId !== cid) return;
 
         if (res.code === 0 && res.data) {
-          const { list = [], total = 0 } = res.data;
+          const { list = [], total = 0, latestStatus } = res.data;
           const rows = (list || []) as AIMessage[];
 
           if (rows.length === 0 && suppressEmptyHydrateRef.current === cid) {
@@ -179,19 +224,12 @@ export function useAIChat(conversationId: number | null, options: UseAIChatOptio
             setMessagePagination({ page: 1, total: 0 });
             optionsRef.current.onAfterMessagesChange?.();
           } else {
-            const messageList = toDisplayOrder(rows);
+            const messageList = toDisplayOrder(rows, latestStatus);
             setMessages(messageList);
             setMessagePagination({ page: 1, total });
             optionsRef.current.onAfterMessagesChange?.();
 
-            const loadingMsg = messageList.find((m) => m.role === "ai" && m.status === "loading");
-            if (loadingMsg) {
-              const loadingIdx = messageList.indexOf(loadingMsg);
-              const userMsg = loadingIdx > 0 ? messageList[loadingIdx - 1] : null;
-              setTimeout(() => {
-                beginResumeStream(cid, loadingMsg, userMsg?.content || "", false, false);
-              }, 0);
-            }
+            setTimeout(() => tryResumeIfNeeded(cid, messageList), 0);
           }
         } else {
           antdMessage.error(res.msg || "加载消息失败");
@@ -211,7 +249,7 @@ export function useAIChat(conversationId: number | null, options: UseAIChatOptio
         }
       }
     },
-    [PAGE_SIZE, toDisplayOrder, beginResumeStream]
+    [PAGE_SIZE, toDisplayOrder, tryResumeIfNeeded]
   );
 
   const loadMoreHistory = useCallback(async () => {
@@ -228,7 +266,7 @@ export function useAIChat(conversationId: number | null, options: UseAIChatOptio
       if (live.current.conversationId !== cid) return;
       if (res.code === 0 && res.data) {
         const { list = [] } = res.data;
-        const olderMessages = toDisplayOrder((list || []) as AIMessage[]);
+        const olderMessages = toDisplayOrder((list || []) as AIMessage[], "success");
         setMessages((prev) => [...olderMessages, ...prev]);
         setMessagePagination({ page: nextPage, total });
       }
