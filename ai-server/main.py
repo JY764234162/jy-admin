@@ -13,6 +13,7 @@ from routers import knowledge, chat, conversation, upload
 from services.middleware import AuthMiddleware
 from services.storage import setup_checkpoints
 from services.storage.long_term_memory import setup_store
+from services.streaming import clear_all_graph_tasks, clear_all_buffers
 
 app = FastAPI(
     title="AI Server", description="RAG 知识库问答 + AI 对话服务", version="2.0.0"
@@ -71,6 +72,14 @@ async def check_config():
     #         print("Old vector data cleared (metadata format changed)")
     # except Exception as e:
     #     print(f"Vector data clear skipped: {e}")
+
+
+@app.on_event("shutdown")
+async def cleanup():
+    """清理所有后台 Graph 任务和 StreamBuffer。"""
+    clear_all_graph_tasks()
+    clear_all_buffers()
+    print("All background tasks and buffers cleaned up")
 
 
 if __name__ == "__main__":
