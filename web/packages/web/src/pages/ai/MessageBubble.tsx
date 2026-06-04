@@ -7,6 +7,7 @@ import { getImageUrl } from "@/utils/image";
 import { userSlice } from "@/store/slice/user";
 import styles from "./index.module.css";
 import { StreamingMarkdown } from "./StreamingMarkdown";
+import { normalizeMessageContent } from "./messageContent";
 import type { MessageAttachment, UiMessage } from "./types";
 
 const IMAGE_EXTS = new Set([".jpg", ".jpeg", ".png", ".gif", ".webp", ".bmp"]);
@@ -47,6 +48,8 @@ interface MessageBubbleProps {
 }
 
 const MessageBubbleInner: React.FC<MessageBubbleProps> = ({ msg }) => {
+  const displayContent = normalizeMessageContent(msg.content);
+
   const renderLoading = (text: string) => (
     <span
       style={{
@@ -65,7 +68,7 @@ const MessageBubbleInner: React.FC<MessageBubbleProps> = ({ msg }) => {
   );
 
   // AI 正在生成且暂无内容时展示 loading 动画
-  if (msg.role === "ai" && msg.status === "loading" && !msg.content) {
+  if (msg.role === "ai" && msg.status === "loading" && !displayContent) {
     return renderLoading("AI 正在思考…");
   }
 
@@ -84,7 +87,7 @@ const MessageBubbleInner: React.FC<MessageBubbleProps> = ({ msg }) => {
         }}
       >
         <StreamingMarkdown
-          content={msg.content}
+          content={displayContent}
           streaming={msg.status === "loading"}
         />
       </div>
@@ -160,7 +163,7 @@ const MessageBubbleInner: React.FC<MessageBubbleProps> = ({ msg }) => {
           ))}
         </div>
       )}
-      {msg.content}
+      {displayContent}
     </div>
   );
 };

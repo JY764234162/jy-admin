@@ -12,6 +12,7 @@ import { message as antdMessage } from "antd";
 import { aiApi, type AIConversation, type AIMessage } from "@/api/aiApi";
 import { aiChatStreamClient } from "@/workers/aiChatStreamClient";
 import { conversationTitleFromFirstMessage } from "./conversationTitle";
+import { normalizeMessageContent } from "./messageContent";
 import type { UiMessage, SendOptions } from "./types";
 
 export type { UiMessage, SendOptions } from "./types";
@@ -102,7 +103,7 @@ export function useAIChat(conversationId: number | null, options: UseAIChatOptio
         }
         return {
           id: `msg-${msg.ID}`,
-          content: msg.content,
+          content: normalizeMessageContent(msg.content),
           role: msg.role === "user" ? "user" : "ai",
           status: (msg.status === "loading" ? "loading" : msg.status === "error" ? "error" : "success") as UiMessage["status"],
           timestamp: new Date(msg.createdAt).getTime(),
