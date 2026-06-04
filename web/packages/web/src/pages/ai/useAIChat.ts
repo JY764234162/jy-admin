@@ -1,16 +1,14 @@
 import {
-  startTransition,
   useCallback,
   useEffect,
   useLayoutEffect,
-  useMemo,
   useRef,
   useState,
 } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { message as antdMessage } from "antd";
 import { aiApi, type AIConversation, type AIMessage } from "@/api/aiApi";
-import { aiChatStreamClient } from "@/workers/aiChatStreamClient";
+import { localStg } from "@/utils/storage";
 import { conversationTitleFromFirstMessage } from "./conversationTitle";
 import { normalizeMessageContent } from "./messageContent";
 import type { UiMessage, SendOptions } from "./types";
@@ -46,29 +44,15 @@ export function useAIChat(conversationId: number | null, options: UseAIChatOptio
   const [messagePagination, setMessagePagination] = useState<{ page: number; total: number } | null>(null);
   const [messagesLoading, setMessagesLoading] = useState(false);
 
-  /** 正在流式生成中的会话 id（可多会话并行）；配合 tick 驱动当前会话 loading 重算 */
-  const streamingConversationIdsRef = useRef(new Set<number>());
-  const [streamingTick, setStreamingTick] = useState(0);
   const [loadingSessions, setLoadingSessions] = useState(false);
 
-  const markConversationStreaming = useCallback((cid: number) => {
-    const set = streamingConversationIdsRef.current;
-    if (!set.has(cid)) {
-      set.add(cid);
-      setStreamingTick((n) => n + 1);
-    }
-  }, []);
+  /** 当前活跃的 SSE AbortController（null 表示没有活跃流式） */
+  const sseAbortControllerRef = useRef<AbortController | null>(null);
+  /** 与 sseAbortControllerRef 绑定的会话 id */
+  const streamingConversationIdRef = useRef<number | null>(null);
 
-  const markConversationStreamEnded = useCallback((cid: number) => {
-    if (streamingConversationIdsRef.current.delete(cid)) {
-      setStreamingTick((n) => n + 1);
-    }
-  }, []);
-
-  const loading = useMemo(() => {
-    if (conversationId == null || !Number.isFinite(conversationId)) return false;
-    return streamingConversationIdsRef.current.has(conversationId);
-  }, [conversationId, streamingTick]);
+  /** loading 表示当前 URL 会话是否正在接收 SSE */
+  const [loading, setLoading] = useState(false);
 
   /** 并发保护：加载更多历史时避免重复请求 */
   const loadingMoreRef = useRef(false);
@@ -84,16 +68,16 @@ export function useAIChat(conversationId: number | null, options: UseAIChatOptio
     sessions: [] as AIConversation[],
     messages: [] as UiMessage[],
     streamingAiMsgId: null as string | null,
+    streamingConversationId: null as number | null,
     refreshSessionsAfterStream: false,
   });
   live.current.conversationId = conversationId;
   live.current.sessions = sessions;
   live.current.messages = messages;
 
-  /** 仅会话级 latestStatus=loading 时，本批里时间最新的一条可保留 loading（兼容旧接口给每条都标 loading） */
-  const toDisplayOrder = useCallback((list: AIMessage[], latestStatus?: string): UiMessage[] => {
+  const toDisplayOrder = useCallback((list: AIMessage[]): UiMessage[] => {
     const ordered = [...list].reverse();
-    return ordered.map((msg, idx) => {
+    return ordered.map((msg) => {
       let parsedAttachments: UiMessage["attachments"];
       if (msg.attachments) {
         try {
@@ -102,12 +86,8 @@ export function useAIChat(conversationId: number | null, options: UseAIChatOptio
           parsedAttachments = undefined;
         }
       }
-      const isNewestInBatch = idx === ordered.length - 1;
-      let status: UiMessage["status"] =
+      const status: UiMessage["status"] =
         msg.status === "error" ? "error" : msg.status === "loading" ? "loading" : "success";
-      if (status === "loading" && (latestStatus !== "loading" || !isNewestInBatch)) {
-        status = "success";
-      }
       return {
         id: `msg-${msg.ID}`,
         content: normalizeMessageContent(msg.content),
@@ -128,53 +108,217 @@ export function useAIChat(conversationId: number | null, options: UseAIChatOptio
     [navigate, location.pathname, location.search]
   );
 
-  /** 列表里存在未完成的 AI 条目标记为 loading 时，由 worker 续传；与 sendMessage(resume) 共用一套启动逻辑 */
-  const beginResumeStream = useCallback(
-    (cid: number, loadingMsg: UiMessage, resumeContent: string, enableKnowledge: boolean, enableSearch: boolean) => {
-      live.current.streamingAiMsgId = loadingMsg.id;
-      markConversationStreaming(cid);
-      try {
-        live.current.refreshSessionsAfterStream = true;
-        aiChatStreamClient.start(cid, { content: resumeContent, resume: true, enable_knowledge: enableKnowledge, enable_search: enableSearch });
-      } catch (error) {
-        console.error("恢复流式输出失败:", error);
-        antdMessage.error("恢复流式输出失败");
-        live.current.refreshSessionsAfterStream = false;
-        setMessages((msgs) => {
-          const idx = msgs.findIndex((m) => m.id === loadingMsg.id);
-          if (idx === -1) return msgs;
-          const next = msgs.slice();
-          next[idx] = { ...next[idx]!, content: "恢复失败，请重试", status: "error" };
-          return next;
-        });
-        markConversationStreamEnded(cid);
-      }
-    },
-    [markConversationStreaming, markConversationStreamEnded]
-  );
+  // ========== SSE 辅助 ==========
 
-  /** 仅在会话确有进行中的生成时续传，避免切页/刷新后误调 resume */
-  const tryResumeIfNeeded = useCallback(
-    (cid: number, messageList: UiMessage[]) => {
-      if (streamingConversationIdsRef.current.has(cid)) return;
+  function buildChatUrl(resume = false) {
+    const AI_SERVER_URL = import.meta.env.VITE_AI_SERVER_URL || "";
+    if (AI_SERVER_URL) {
+      return `${AI_SERVER_URL}/api/ai/chat${resume ? "/resume" : ""}`;
+    }
+    const base = `${import.meta.env.VITE_API_BASE_URL || ""}${import.meta.env.VITE_API_PREFIX || "/api"}`;
+    return `${base}/ai/chat${resume ? "/resume" : ""}`;
+  }
 
-      const snap = aiChatStreamClient.getLatestSnapshot(cid);
-      if (snap?.status === "streaming" || snap?.status === "idle") return;
-      if (snap?.status === "done") return;
+  async function readSSE(
+    url: string,
+    body: Record<string, unknown>,
+    onContent: (content: string, isFull: boolean) => void,
+    onDone: () => void,
+    onError: (err: string) => void,
+    signal: AbortSignal
+  ) {
+    const token = localStg.get("token");
+    try {
+      const resp = await fetch(url, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
+        body: JSON.stringify(body),
+        signal,
+      });
 
-      const last = messageList[messageList.length - 1];
-      if (!last) return;
-
-      if (last.role === "ai" && last.status === "loading") {
-        const prev = messageList[messageList.length - 2];
-        const userContent = prev?.role === "user" ? prev.content : "";
-        beginResumeStream(cid, last, userContent, false, false);
+      if (!resp.ok || !resp.body) {
+        const text = await resp.text().catch(() => "");
+        onError(text || `HTTP ${resp.status}`);
         return;
       }
 
-      if (last.role === "user" && last.status === "loading") {
+      const reader = resp.body.getReader();
+      const decoder = new TextDecoder("utf-8");
+      let buffer = "";
+
+      while (true) {
+        const { value, done } = await reader.read();
+        if (done) break;
+
+        buffer += decoder.decode(value, { stream: true });
+
+        let sepIndex: number;
+        while ((sepIndex = buffer.indexOf("\n\n")) !== -1) {
+          const rawEvent = buffer.slice(0, sepIndex);
+          buffer = buffer.slice(sepIndex + 2);
+
+          const lines = rawEvent.split("\n");
+          for (const line of lines) {
+            const trimmed = line.trim();
+            if (!trimmed.startsWith("data:")) continue;
+            const data = trimmed.replace(/^data:\s?/, "");
+            if (!data) continue;
+            try {
+              const parsed = JSON.parse(data) as {
+                content?: string;
+                isFull?: boolean;
+                done?: boolean;
+                error?: string;
+              };
+              if (parsed.error) {
+                onError(parsed.error);
+                return;
+              }
+              if (parsed.content != null) {
+                onContent(parsed.content, !!parsed.isFull);
+              }
+              if (parsed.done) {
+                onDone();
+                return;
+              }
+            } catch {
+              continue;
+            }
+          }
+        }
+      }
+
+      onDone();
+    } catch (e: any) {
+      if (e?.name === "AbortError") return;
+      onError(String(e?.message || e));
+    }
+  }
+
+  const abortActiveSSE = useCallback(() => {
+    sseAbortControllerRef.current?.abort();
+    sseAbortControllerRef.current = null;
+    streamingConversationIdRef.current = null;
+    live.current.streamingConversationId = null;
+    live.current.streamingAiMsgId = null;
+    setLoading(false);
+  }, []);
+
+  /** 直接建立 SSE 连接并驱动 UI 更新 */
+  const startSSEStream = useCallback(
+    (
+      cid: number,
+      aiMsgId: string,
+      url: string,
+      body: Record<string, unknown>
+    ) => {
+      const ctrl = new AbortController();
+      sseAbortControllerRef.current = ctrl;
+      streamingConversationIdRef.current = cid;
+      live.current.streamingConversationId = cid;
+      live.current.streamingAiMsgId = aiMsgId;
+      setLoading(true);
+      live.current.refreshSessionsAfterStream = true;
+
+      const isCurrentStream = () =>
+        live.current.conversationId === cid && streamingConversationIdRef.current === cid;
+
+      readSSE(
+        url,
+        body,
+        (content, isFull) => {
+          if (!isCurrentStream()) return;
+          setMessages((prev) => {
+            const idx = prev.findIndex((m) => m.id === aiMsgId);
+            if (idx === -1) return prev;
+            const next = prev.slice();
+            next[idx] = {
+              ...next[idx]!,
+              content: isFull ? content : next[idx]!.content + content,
+            };
+            return next;
+          });
+        },
+        () => {
+          if (!isCurrentStream()) return;
+          sseAbortControllerRef.current = null;
+          streamingConversationIdRef.current = null;
+          live.current.streamingConversationId = null;
+          live.current.streamingAiMsgId = null;
+          setLoading(false);
+          setMessages((prev) => {
+            const idx = prev.findIndex((m) => m.id === aiMsgId);
+            if (idx === -1) return prev;
+            const next = prev.slice();
+            next[idx] = { ...next[idx]!, status: "success" };
+            return next;
+          });
+          optionsRef.current.onAfterMessagesChange?.();
+          // 更新侧边栏 lastMsg
+          const lastUserMsg = live.current.messages.findLast((m) => m.role === "user");
+          if (lastUserMsg) {
+            setSessions((prev) => {
+              const idx = prev.findIndex((s) => s.ID === cid);
+              if (idx === -1) return prev;
+              const next = prev.slice();
+              next[idx] = { ...next[idx]!, lastMsg: lastUserMsg.content };
+              return next;
+            });
+          }
+        },
+        (err) => {
+          if (!isCurrentStream()) return;
+          sseAbortControllerRef.current = null;
+          streamingConversationIdRef.current = null;
+          live.current.streamingConversationId = null;
+          live.current.streamingAiMsgId = null;
+          setLoading(false);
+          setMessages((prev) => {
+            const idx = prev.findIndex((m) => m.id === aiMsgId);
+            if (idx === -1) return prev;
+            const next = prev.slice();
+            next[idx] = { ...next[idx]!, content: err, status: "error" };
+            return next;
+          });
+          optionsRef.current.onAfterMessagesChange?.();
+          antdMessage.error(err);
+        },
+        ctrl.signal
+      );
+    },
+    []
+  );
+
+  /** 接口 list[0] 为最新一条；展示列表经 toDisplayOrder reverse 后最新在末尾 */
+  const tryResumeIfNeeded = useCallback(
+    (cid: number, apiRows: AIMessage[], displayList: UiMessage[]) => {
+      if (sseAbortControllerRef.current) return;
+      if (apiRows.length === 0) return;
+
+      const apiNewest = apiRows[0]!;
+      const session = live.current.sessions.find((s) => s.ID === cid);
+      const convStillLoading = session?.latestStatus === "loading";
+      const apiIsAssistant = apiNewest.role === "assistant";
+
+      const shouldResume =
+        (apiIsAssistant && apiNewest.status === "loading") ||
+        (convStillLoading && apiIsAssistant) ||
+        (convStillLoading && apiNewest.role === "user");
+
+      if (!shouldResume) return;
+
+      const mappedId = `msg-${apiNewest.ID}`;
+      let aiMsg =
+        displayList.find((m) => m.id === mappedId && m.role === "ai") ??
+        displayList.find((m) => m.role === "ai" && m.status === "loading") ??
+        null;
+
+      if (!aiMsg) {
         const aiMsgId = `ai-resume-${Date.now()}`;
-        const loadingMsg: UiMessage = {
+        aiMsg = {
           id: aiMsgId,
           content: "",
           role: "ai",
@@ -182,14 +326,18 @@ export function useAIChat(conversationId: number | null, options: UseAIChatOptio
           timestamp: Date.now(),
         };
         live.current.streamingAiMsgId = aiMsgId;
-        setMessages((prev) => [...prev, loadingMsg]);
-        setTimeout(() => {
-          if (live.current.conversationId !== cid) return;
-          beginResumeStream(cid, loadingMsg, last.content, false, false);
-        }, 0);
+        setMessages((prev) => [...prev, aiMsg!]);
+      } else {
+        live.current.streamingAiMsgId = aiMsg.id;
       }
+
+      startSSEStream(cid, aiMsg.id, buildChatUrl(true), {
+        conversationId: cid,
+        enable_knowledge: false,
+        enable_search: false,
+      });
     },
-    [beginResumeStream]
+    [startSSEStream]
   );
 
   const loadSessions = useCallback(async () => {
@@ -216,7 +364,7 @@ export function useAIChat(conversationId: number | null, options: UseAIChatOptio
         if (live.current.conversationId !== cid) return;
 
         if (res.code === 0 && res.data) {
-          const { list = [], total = 0, latestStatus } = res.data;
+          const { list = [], total = 0 } = res.data;
           const rows = (list || []) as AIMessage[];
 
           if (rows.length === 0 && suppressEmptyHydrateRef.current === cid) {
@@ -224,12 +372,14 @@ export function useAIChat(conversationId: number | null, options: UseAIChatOptio
             setMessagePagination({ page: 1, total: 0 });
             optionsRef.current.onAfterMessagesChange?.();
           } else {
-            const messageList = toDisplayOrder(rows, latestStatus);
+            const messageList = toDisplayOrder(rows);
             setMessages(messageList);
             setMessagePagination({ page: 1, total });
             optionsRef.current.onAfterMessagesChange?.();
 
-            setTimeout(() => tryResumeIfNeeded(cid, messageList), 0);
+            setTimeout(() => {
+              tryResumeIfNeeded(cid, rows, messageList);
+            }, 0);
           }
         } else {
           antdMessage.error(res.msg || "加载消息失败");
@@ -266,7 +416,7 @@ export function useAIChat(conversationId: number | null, options: UseAIChatOptio
       if (live.current.conversationId !== cid) return;
       if (res.code === 0 && res.data) {
         const { list = [] } = res.data;
-        const olderMessages = toDisplayOrder((list || []) as AIMessage[], "success");
+        const olderMessages = toDisplayOrder((list || []) as AIMessage[]);
         setMessages((prev) => [...olderMessages, ...prev]);
         setMessagePagination({ page: nextPage, total });
       }
@@ -386,7 +536,10 @@ export function useAIChat(conversationId: number | null, options: UseAIChatOptio
         return false;
       }
 
-      if (streamingConversationIdsRef.current.has(cid)) {
+      if (
+        sseAbortControllerRef.current &&
+        streamingConversationIdRef.current === cid
+      ) {
         antdMessage.warning("该会话正在回复中，请稍后再试");
         return false;
       }
@@ -399,9 +552,11 @@ export function useAIChat(conversationId: number | null, options: UseAIChatOptio
           antdMessage.error("没有可恢复的 AI 消息");
           return false;
         }
-        const enableKnowledge = !!useKnowledge;
-        const enableSearch = false;
-        beginResumeStream(cid, loadingMsg, content, enableKnowledge, enableSearch);
+        startSSEStream(cid, loadingMsg.id, buildChatUrl(true), {
+          conversationId: cid,
+          enable_knowledge: !!useKnowledge,
+          enable_search: false,
+        });
         return true;
       }
 
@@ -430,68 +585,31 @@ export function useAIChat(conversationId: number | null, options: UseAIChatOptio
       });
       optionsRef.current.onAfterMessagesChange?.();
 
-      markConversationStreaming(cid);
-
-      try {
-        live.current.refreshSessionsAfterStream = true;
-        const enableKnowledgeForStart = !!useKnowledge;
-        const enableSearchForStart = !!useSearch;
-        aiChatStreamClient.start(cid, { content, attachments, enable_knowledge: enableKnowledgeForStart, enable_search: enableSearchForStart });
-        return true;
-      } catch (error) {
-        console.error("发送消息失败:", error);
-        antdMessage.error("发送消息失败");
-        live.current.refreshSessionsAfterStream = false;
-        setMessages((prev) => {
-          const withoutAi = prev.filter((m) => m.id !== aiMsgId);
-          return [
-            ...withoutAi,
-            {
-              id: aiMsgId,
-              content: "发送失败，请重试",
-              role: "ai",
-              status: "error",
-              timestamp: Date.now(),
-            },
-          ];
-        });
-        optionsRef.current.onAfterMessagesChange?.();
-        markConversationStreamEnded(cid);
-        return false;
-      }
+      startSSEStream(cid, aiMsgId, buildChatUrl(false), {
+        conversationId: cid,
+        message: content,
+        attachments: attachments ? JSON.stringify(attachments) : undefined,
+        enable_knowledge: !!useKnowledge,
+        enable_search: !!useSearch,
+      });
+      return true;
     },
-    [
-      conversationId,
-      beginResumeStream,
-      navigateToConversation,
-      markConversationStreaming,
-      markConversationStreamEnded,
-    ]
+    [conversationId, startSSEStream, navigateToConversation]
   );
-
-  useEffect(() => {
-    return aiChatStreamClient.subscribeStreamLifecycle((snap) => {
-      // 仅 done / error 视为结束；idle 可能出现在「同会话打断旧流」的竞态中，不能用来清 loading
-      if (snap.status === "done" || snap.status === "error") {
-        markConversationStreamEnded(snap.conversationId);
-      }
-    });
-  }, [markConversationStreamEnded]);
 
   useEffect(() => {
     void loadSessions();
   }, [loadSessions]);
 
-  /** 离开 AI 页时中止 Worker 内全部 SSE，避免旧连接未断又与下次 resume 并行 */
+  /** 离开 AI 页时取消当前 SSE */
   useEffect(() => {
-    return () => {
-      aiChatStreamClient.stopAllStreams();
-      streamingConversationIdsRef.current.clear();
-    };
-  }, []);
+    return () => abortActiveSSE();
+  }, [abortActiveSSE]);
 
   // 切换会话时在下一次绘制前清空旧消息；从草稿首次落盘到某会话时不清理（由首条 sendMessage 写入）
   useLayoutEffect(() => {
+    abortActiveSSE();
+
     if (conversationId == null || !Number.isFinite(conversationId)) {
       suppressEmptyHydrateRef.current = null;
       setMessages([]);
@@ -509,104 +627,12 @@ export function useAIChat(conversationId: number | null, options: UseAIChatOptio
     setMessages([]);
     setMessagePagination(null);
     setMessagesLoading(true);
-  }, [conversationId]);
+  }, [conversationId, abortActiveSSE]);
 
   useEffect(() => {
     if (conversationId == null || !Number.isFinite(conversationId)) return;
     void loadMessagesFirstPage(conversationId);
   }, [conversationId, loadMessagesFirstPage]);
-
-  // Worker 订阅：仅当前 URL 会话
-  useEffect(() => {
-    if (conversationId == null || !Number.isFinite(conversationId)) return;
-
-    const unsub = aiChatStreamClient.subscribe(conversationId, (snap) => {
-      if (live.current.conversationId !== conversationId) return;
-
-      const streamMsgId = live.current.streamingAiMsgId;
-
-      const findTargetIdx = (current: UiMessage[]): number => {
-        if (streamMsgId) {
-          const idx = current.findIndex((m) => m.id === streamMsgId);
-          if (idx !== -1) return idx;
-        }
-        return current.findIndex((m) => m.role === "ai" && m.status === "loading");
-      };
-
-      const isStreamingPhase = snap.status === "streaming" || snap.status === "idle";
-
-      if (snap.fullText && isStreamingPhase) {
-        setMessages((prev) => {
-          const idx = findTargetIdx(prev);
-          if (idx !== -1) {
-            const next = prev.slice();
-            next[idx] = {
-              ...next[idx]!,
-              content: snap.fullText,
-            };
-            return next;
-          }
-          return [
-            ...prev,
-            {
-              id: streamMsgId ?? `ai-${Date.now()}`,
-              content: snap.fullText,
-              role: "ai",
-              status: "loading",
-              timestamp: Date.now(),
-            },
-          ];
-        });
-      }
-
-      startTransition(() => {
-        setMessages((prev) => {
-          const idx = findTargetIdx(prev);
-          if (idx === -1) return prev;
-          const existingMsg = prev[idx];
-          if (!existingMsg) return prev;
-          const status: UiMessage["status"] =
-            snap.status === "error" ? "error" : snap.status === "done" ? "success" : "loading";
-          const nextContent = snap.fullText || existingMsg.content;
-          const contentChanged = existingMsg.content !== nextContent;
-          const statusChanged = existingMsg.status !== status;
-          if (!contentChanged && !statusChanged) {
-            return prev;
-          }
-          const next = prev.slice();
-          next[idx] = {
-            ...existingMsg,
-            content: nextContent,
-            status,
-          };
-          return next;
-        });
-      });
-
-      if (snap.status === "done" || snap.status === "error") {
-        live.current.streamingAiMsgId = null;
-        if (snap.status === "done" && live.current.refreshSessionsAfterStream) {
-          live.current.refreshSessionsAfterStream = false;
-          // 不调用 loadSessions() 全量刷新，避免侧边栏闪烁
-          // 只本地更新当前会话的 lastMsg，保持列表视觉稳定
-          const lastUserMsg = live.current.messages.findLast((m) => m.role === "user");
-          if (lastUserMsg) {
-            setSessions((prev) => {
-              const idx = prev.findIndex((s) => s.ID === conversationId);
-              if (idx === -1) return prev;
-              const next = prev.slice();
-              next[idx] = { ...next[idx]!, lastMsg: lastUserMsg.content };
-              return next;
-            });
-          }
-        } else if (snap.status === "error") {
-          live.current.refreshSessionsAfterStream = false;
-        }
-      }
-    });
-    aiChatStreamClient.requestSnapshot(conversationId);
-    return () => unsub();
-  }, [conversationId, loadSessions]);
 
   return {
     PAGE_SIZE,

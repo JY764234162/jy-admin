@@ -55,6 +55,8 @@ export interface AIConversation {
   title: string;
   lastMsg: string;
   messageCount: number;
+  /** 会话级生成状态（侧栏等）；消息页以列表末条 status 为准 */
+  latestStatus?: string;
   createdAt: string;
   updatedAt: string;
 }
@@ -170,7 +172,7 @@ export const aiApi = {
   getMessageList: (
     conversationId: number,
     params?: MessageListParams
-  ): Promise<AIServerResponse<{ list: AIMessage[]; total: number; page: number; pageSize: number; latestStatus?: string }>> => {
+  ): Promise<AIServerResponse<{ list: AIMessage[]; total: number; page: number; pageSize: number }>> => {
     const url = aiUrl(`/api/ai/conversation/${conversationId}/messages`);
     if (params?.page) url.searchParams.set("page", String(params.page));
     if (params?.pageSize) url.searchParams.set("page_size", String(params.pageSize));
