@@ -348,7 +348,7 @@ async def chat_resume(
 
     # 1. Graph 还在后台运行：直接订阅 Buffer
     buffer = get_buffer(session_key)
-    if buffer is not None:
+    if buffer is not None and buffer.status == "running":
         return StreamingResponse(
             _stream_from_buffer(buffer),
             media_type="text/event-stream",
