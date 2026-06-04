@@ -434,7 +434,16 @@ export function useAIChat(conversationId: number | null, options: UseAIChatOptio
   useEffect(() => () => abortActiveSSE(), [abortActiveSSE]);
 
   useLayoutEffect(() => {
-    abortActiveSSE();
+    // 首条消息 createConversation 会改 URL；同会话流式进行中也不应 abort
+    const keepStream =
+      (conversationId != null &&
+        suppressEmptyHydrateRef.current === conversationId) ||
+      (conversationId != null &&
+        streamingConversationIdRef.current === conversationId);
+
+    if (!keepStream) {
+      abortActiveSSE();
+    }
 
     if (conversationId == null || !Number.isFinite(conversationId)) {
       suppressEmptyHydrateRef.current = null;
