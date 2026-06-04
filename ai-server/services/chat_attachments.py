@@ -11,6 +11,25 @@ MAX_TEXT_FILE_CHARS = 8000
 TEXT_FETCH_TIMEOUT = 10
 
 
+def content_to_display_text(content: Any) -> str:
+    """将 LangChain 多模态 content（str 或 [{type,text}, ...]）转为前端可展示的纯文本。"""
+    if content is None:
+        return ""
+    if isinstance(content, str):
+        return content
+    if isinstance(content, list):
+        parts: list[str] = []
+        for item in content:
+            if isinstance(item, dict) and item.get("type") == "text":
+                text = item.get("text")
+                if text:
+                    parts.append(str(text))
+        return "\n".join(parts)
+    if isinstance(content, dict) and content.get("type") == "text":
+        return str(content.get("text") or "")
+    return str(content)
+
+
 def fetch_text_attachment(url: str, max_chars: int = MAX_TEXT_FILE_CHARS) -> str:
     """拉取 .txt 附件正文（失败时返回空字符串）。"""
     if not url:
