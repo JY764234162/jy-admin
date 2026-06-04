@@ -1,13 +1,36 @@
 import { memo } from "react";
 import { useSelector } from "react-redux";
 import { UserOutlined, FilePdfOutlined, FileTextOutlined, FileExcelOutlined, FileWordOutlined, FileImageOutlined, FileOutlined, DownloadOutlined } from "@ant-design/icons";
-import { Avatar, Button } from "antd";
+import { Avatar, Image } from "antd";
 import agentAvatar from "@/assets/agentAvatar.png";
 import { getImageUrl } from "@/utils/image";
 import { userSlice } from "@/store/slice/user";
 import styles from "./index.module.css";
 import { StreamingMarkdown } from "./StreamingMarkdown";
-import type { UiMessage } from "./types";
+import type { MessageAttachment, UiMessage } from "./types";
+
+const IMAGE_EXTS = new Set([".jpg", ".jpeg", ".png", ".gif", ".webp", ".bmp"]);
+
+function isImageAttachment(att: MessageAttachment): boolean {
+  const ext = att.file_type?.startsWith(".")
+    ? att.file_type.toLowerCase()
+    : att.filename.slice(att.filename.lastIndexOf(".")).toLowerCase();
+  return IMAGE_EXTS.has(ext);
+}
+
+function resolveAttachmentUrl(url: string): string {
+  return getImageUrl(url) || url;
+}
+
+function downloadAttachment(att: MessageAttachment): void {
+  if (!att.url) return;
+  const link = document.createElement("a");
+  link.href = resolveAttachmentUrl(att.url);
+  link.download = att.filename;
+  link.rel = "noopener noreferrer";
+  link.target = "_blank";
+  link.click();
+}
 
 function getFileTypeIcon(filename: string) {
   const ext = filename.slice(filename.lastIndexOf(".")).toLowerCase();
@@ -68,13 +91,10 @@ const MessageBubbleInner: React.FC<MessageBubbleProps> = ({ msg }) => {
     );
   }
 
-  // 判断是否为图片附件
-  const isImageAttachment = (filename: string) => {
-    const ext = filename.slice(filename.lastIndexOf(".")).toLowerCase();
-    return [".jpg", ".jpeg", ".png", ".gif", ".webp"].includes(ext);
-  };
+  const imageAttachments = msg.attachments?.filter(isImageAttachment) ?? [];
+  const fileAttachments = msg.attachments?.filter((att) => !isImageAttachment(att)) ?? [];
 
-  // 用户消息纯文本 + 附件列表
+  // 用户消息：附件放在内容前面，图片点击预览，其他文件点击下载
   return (
     <div
       style={{
@@ -83,94 +103,64 @@ const MessageBubbleInner: React.FC<MessageBubbleProps> = ({ msg }) => {
         overflowWrap: "anywhere",
       }}
     >
-      {msg.content}
-      {msg.attachments && msg.attachments.length > 0 && (
-        <div style={{ marginTop: 10, display: "flex", flexDirection: "column", gap: 8 }}>
-          {msg.attachments.map((att) => (
-            <div key={att.uid}>
-              {isImageAttachment(att.filename) && att.url ? (
-                // 图片附件：直接预览
-                <div style={{ borderRadius: 8, overflow: "hidden", maxWidth: 240, border: "1px solid rgba(0,0,0,0.08)" }}>
-                  <img
-                    src={att.url}
-                    alt={att.filename}
-                    style={{
-                      width: "100%",
-                      height: "auto",
-                      display: "block",
-                      cursor: "pointer",
-                    }}
-                    onClick={() => {
-                      const a = document.createElement("a");
-                      a.href = att.url;
-                      a.download = att.filename;
-                      a.click();
-                    }}
-                  />
-                  <div
-                    style={{
-                      padding: "4px 8px",
-                      fontSize: 11,
-                      color: "#666",
-                      background: "rgba(0,0,0,0.02)",
-                      display: "flex",
-                      alignItems: "center",
-                      justifyContent: "space-between",
-                    }}
-                  >
-                    <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-                      {att.filename}
-                    </span>
-                    <DownloadOutlined
-                      style={{ color: "#1677ff", cursor: "pointer", fontSize: 12 }}
-                      onClick={() => {
-                        const a = document.createElement("a");
-                        a.href = att.url;
-                        a.download = att.filename;
-                        a.click();
+      {(imageAttachments.length > 0 || fileAttachments.length > 0) && (
+        <div style={{ marginBottom: 10, display: "flex", flexDirection: "column", gap: 8 }}>
+          {imageAttachments.length > 0 && (
+            <Image.PreviewGroup>
+              <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
+                {imageAttachments.map((att) =>
+                  att.url ? (
+                    <Image
+                      key={att.uid}
+                      src={resolveAttachmentUrl(att.url)}
+                      alt={att.filename}
+                      style={{
+                        maxWidth: 240,
+                        borderRadius: 8,
+                        border: "1px solid rgba(0,0,0,0.08)",
+                        cursor: "pointer",
                       }}
                     />
-                  </div>
-                </div>
-              ) : (
-                // 非图片附件：显示文件名 + 下载按钮
-                <div
-                  style={{
-                    display: "flex",
-                    alignItems: "center",
-                    gap: 8,
-                    padding: "6px 10px",
-                    background: "rgba(0,0,0,0.04)",
-                    borderRadius: 6,
-                    fontSize: 12,
-                    color: "#444",
-                    maxWidth: "100%",
-                  }}
-                >
-                  <span style={{ color: "#1677ff", fontSize: 14 }}>{getFileTypeIcon(att.filename)}</span>
-                  <span style={{ flex: 1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-                    {att.filename}
-                  </span>
-                  {att.url && (
-                    <Button
-                      type="text"
-                      size="small"
-                      icon={<DownloadOutlined />}
-                      onClick={() => {
-                        const a = document.createElement("a");
-                        a.href = att.url;
-                        a.download = att.filename;
-                        a.click();
-                      }}
-                      style={{ color: "#1677ff", padding: 0, minWidth: 24 }}
-                    />
-                  )}
-                </div>
-              )}
+                  ) : null
+                )}
+              </div>
+            </Image.PreviewGroup>
+          )}
+          {fileAttachments.map((att) => (
+            <div
+              key={att.uid}
+              role={att.url ? "button" : undefined}
+              tabIndex={att.url ? 0 : undefined}
+              onClick={() => att.url && downloadAttachment(att)}
+              onKeyDown={(e) => {
+                if (att.url && (e.key === "Enter" || e.key === " ")) {
+                  e.preventDefault();
+                  downloadAttachment(att);
+                }
+              }}
+              style={{
+                display: "inline-flex",
+                alignItems: "center",
+                gap: 8,
+                padding: "6px 12px",
+                background: "rgba(0,0,0,0.04)",
+                borderRadius: 6,
+                fontSize: 13,
+                color: "#444",
+                maxWidth: "100%",
+                cursor: att.url ? "pointer" : "default",
+              }}
+            >
+              <span style={{ color: "#1677ff", fontSize: 16 }}>{getFileTypeIcon(att.filename)}</span>
+              <span style={{ flex: 1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                {att.filename}
+              </span>
+              {att.url && <DownloadOutlined style={{ color: "#1677ff", fontSize: 14, flexShrink: 0 }} />}
             </div>
           ))}
         </div>
       )}
+      {msg.content}
     </div>
   );
 };
