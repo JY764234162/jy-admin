@@ -18,9 +18,29 @@ from services.chat import (
     stream_from_buffer,
 )
 from services.middleware import get_current_user, UserContext
-from services.streaming.stream_buffer import create_buffer, get_buffer
+from services.streaming.stream_buffer import create_buffer, remove_buffer
 
 router = APIRouter(prefix="/api/ai/chat", tags=["chat"])
+
+# 跟踪每个 session_key 的活跃后台任务，便于发送新消息时取消旧任务
+_active_chat_tasks: dict[str, asyncio.Task] = {}
+
+
+def _cancel_old_task(session_key: str) -> None:
+    """取消指定会话的旧后台任务（不等待），避免新旧任务竞争 Buffer。"""
+    old_task = _active_chat_tasks.pop(session_key, None)
+    if old_task is not None and not old_task.done():
+        old_task.cancel()
+
+
+def _register_task(session_key: str, task: asyncio.Task) -> None:
+    """注册新任务，并在完成时自动清理。"""
+    _active_chat_tasks[session_key] = task
+
+    def _on_done(t: asyncio.Task) -> None:
+        _active_chat_tasks.pop(session_key, None)
+
+    task.add_done_callback(_on_done)
 
 
 def _thread_id(user_id: str, conversation_id) -> str:
@@ -98,7 +118,12 @@ async def chat_message(
         enable_search=enable_search,
     )
 
-    asyncio.create_task(
+    # 清理旧任务和旧 Buffer，避免新请求返回缓存数据
+    _cancel_old_task(session_key)
+    remove_buffer(session_key)
+    buffer = create_buffer(session_key)
+
+    task = asyncio.create_task(
         run_chat_background(
             thread_id=session_key,
             user_id=str(user_id),
@@ -111,8 +136,8 @@ async def chat_message(
             conversation_id=conversation_id,
         )
     )
+    _register_task(session_key, task)
 
-    buffer = get_buffer(session_key) or create_buffer(session_key)
     return StreamingResponse(
         stream_from_buffer(buffer),
         media_type="text/event-stream",
