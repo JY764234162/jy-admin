@@ -67,9 +67,9 @@ async def upload_chat_attachment(file: UploadFile = File(...)):
     if not file_bytes:
         raise HTTPException(400, "文件不能为空")
 
-    # 生成唯一 key，存储到 ai-chat-upload 目录
+    # 生成唯一 key，存储到 ai-chat-upload/{env}/ 目录，区分不同环境
     file_id = uuid.uuid4().hex[:12]
-    cos_key = f"ai-chat-upload/{file_id}_{file.filename}"
+    cos_key = f"ai-chat-upload/{config.DEPLOY_ENV}/{file_id}_{file.filename}"
     cos_url = _upload_to_cos(file_bytes, cos_key)
 
     if not cos_url:

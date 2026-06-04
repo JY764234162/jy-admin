@@ -52,6 +52,8 @@ COS_SECRET_ID = os.getenv("COS_SECRET_ID", "")
 COS_SECRET_KEY = os.getenv("COS_SECRET_KEY", "")
 COS_BUCKET = os.getenv("COS_BUCKET", "jiangyi-knowledge")
 COS_REGION = os.getenv("COS_REGION", "ap-beijing")
+# 部署环境标识（local/test/prod），用于区分不同环境的 COS 存储路径
+DEPLOY_ENV = os.getenv("DEPLOY_ENV", "local")
 
 # Tavily 搜索
 TAVILY_API_KEY = os.getenv("TAVILY_API_KEY", "")
