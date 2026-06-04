@@ -1,3 +1,4 @@
+from datetime import datetime, timedelta, timezone
 from typing import Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Query
@@ -8,7 +9,13 @@ from models.conversation import Conversation, get_db
 from services.middleware import get_current_user, UserContext
 from services.chat_attachments import content_to_display_text
 from services.llm.response_filter import sanitize_response
+from services.agent_graph.message_helpers import (
+    is_placeholder_assistant,
+    message_created_at_iso,
+)
 from services.chat_resume import analyze_thread_for_resume
+from services.streaming.stream_buffer import get_buffer
+from services.streaming.graph_executor import get_graph_task
 from services.storage import (
     get_thread_messages,
     thread_exists,
@@ -57,49 +64,82 @@ def _conv_to_dict(c: Conversation) -> dict:
         "title": c.title,
         "lastMsg": c.last_msg,
         "message_count": c.message_count,
+        "latestStatus": c.latest_status,
         "createdAt": c.created_at.isoformat() if c.created_at else "",
         "updatedAt": c.updated_at.isoformat() if c.updated_at else "",
     }
 
 
 def _messages_from_checkpoint(conv_id: int, user_id: int, conv: Conversation) -> list[dict]:
-    """从 Checkpoint 读取消息并转换为前端格式。"""
+    """从 Checkpoint 读取消息；仅列表末条携带 loading/error（用户消息恒为 success）。"""
     thread_id = f"{user_id}:{conv_id}"
     raw_messages = get_thread_messages(thread_id)
+    conv_status = conv.latest_status or "success"
 
-    result = []
-    for i, msg in enumerate(raw_messages):
-        role = "assistant"
+    visible: list[tuple[str, object]] = []
+    for msg in raw_messages:
         if msg.type == "human":
-            role = "user"
-        elif msg.type == "assistant" or msg.type == "ai":
-            # 跳过包含工具调用的 AI 消息（只保留最终回答）
-            tool_calls = getattr(msg, "tool_calls", None)
-            if tool_calls:
-                continue
-            role = "assistant"
+            visible.append(("user", msg))
+            continue
+        if msg.type not in ("assistant", "ai"):
+            continue
+        tool_calls = getattr(msg, "tool_calls", None)
+        if tool_calls:
+            visible.append(("assistant_pending", msg))
+            continue
+        if is_placeholder_assistant(msg) or content_to_display_text(msg.content).strip():
+            visible.append(("assistant", msg))
+
+    base_dt = conv.created_at or conv.updated_at or datetime.now(timezone.utc)
+    if base_dt.tzinfo is None:
+        base_dt = base_dt.replace(tzinfo=timezone.utc)
+
+    result: list[dict] = []
+    last_idx = len(visible) - 1
+    last_user_idx = -1
+    for i, (kind, _) in enumerate(visible):
+        if kind == "user":
+            last_user_idx = i
+
+    for idx, (kind, msg) in enumerate(visible):
+        is_last = idx == last_idx
+        role = "user" if kind == "user" else "assistant"
+        if kind == "assistant_pending":
+            content = "正在处理..."
+        elif role == "assistant":
+            content = sanitize_response(content_to_display_text(msg.content))
         else:
-            # system / tool 消息不展示在前端
+            content = content_to_display_text(msg.content)
+
+        if kind == "assistant_pending" and not is_last:
             continue
 
-        result.append({
-            "ID": i + 1,
-            "conversationId": conv_id,
-            "role": role,
-            "content": (
-                sanitize_response(content_to_display_text(msg.content))
-                if role == "assistant"
-                else content_to_display_text(msg.content)
-            ),
-            "userId": user_id,
-            "status": "success",
-            "attachments": conv.latest_attachments,
-            "createdAt": "",
-        })
+        status = "success"
+        if role == "user":
+            status = "success"
+        elif is_last:
+            if conv_status == "loading":
+                status = "loading"
+            elif conv_status == "error":
+                status = "error"
 
-    # 仅最后一条消息可携带 loading，避免历史 AI 条被误判为未完成
-    if result and conv.latest_status == "loading":
-        result[-1]["status"] = "loading"
+        result.append(
+            {
+                "ID": idx + 1,
+                "conversationId": conv_id,
+                "role": role,
+                "content": content,
+                "userId": user_id,
+                "status": status,
+                "attachments": (
+                    conv.latest_attachments if role == "user" and idx == last_user_idx else None
+                ),
+                "createdAt": message_created_at_iso(
+                    msg,
+                    fallback=base_dt + timedelta(seconds=idx),
+                ),
+            }
+        )
 
     return result
 
@@ -239,10 +279,13 @@ async def get_message_list(
 
     thread_id = f"{user.id}:{conv_id}"
     if conv.latest_status == "loading":
-        ctx = analyze_thread_for_resume(thread_id, conv.latest_status)
-        if not ctx.get("needs_continue"):
-            conv.latest_status = "success"
-            db.commit()
+        # 新架构：后台 Graph 独立运行，若 Buffer 仍存在或任务仍在执行，
+        # 不能仅凭 checkpoint 分析就把状态改为 success。
+        if get_buffer(thread_id) is None and get_graph_task(thread_id) is None:
+            ctx = analyze_thread_for_resume(thread_id, conv.latest_status)
+            if not ctx.get("needs_continue"):
+                conv.latest_status = "success"
+                db.commit()
 
     items = _messages_from_checkpoint(conv_id=conv_id, user_id=user.id, conv=conv)
     # 倒序（最新的在前），内存分页
@@ -259,7 +302,6 @@ async def get_message_list(
             "total": total,
             "page": page,
             "pageSize": page_size,
-            "latestStatus": conv.latest_status,
         },
         "msg": "获取成功",
     }

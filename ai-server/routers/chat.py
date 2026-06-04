@@ -3,15 +3,17 @@ import json
 import traceback
 import uuid
 from functools import partial
-from typing import Optional
+from typing import AsyncIterator, Optional
 
 from fastapi import APIRouter, HTTPException, Depends
 from pydantic import BaseModel
 from starlette.responses import StreamingResponse
 
 from services.storage.long_term_memory import get_memory
-from services.agent_graph import prepare_human_turn, stream_agent, stream_agent_resume
+from services.agent_graph import prepare_turn
 from services.chat_resume import analyze_thread_for_resume
+from services.streaming.graph_executor import get_graph_task, run_graph_background
+from services.streaming.stream_buffer import get_buffer
 from services.chat_attachments import (
     build_attachment_memory_context,
     fetch_text_attachment,
@@ -91,19 +93,6 @@ def _prepare_memory_and_attachments(
     return memory_context, attachments_list, text_supplements
 
 
-def _set_conversation_status(conv_id: int, status: str) -> None:
-    db = SessionLocal()
-    try:
-        conv = db.query(Conversation).filter(Conversation.id == conv_id).first()
-        if conv:
-            conv.latest_status = status
-            db.commit()
-    except Exception as e:
-        print(f"[chat] 更新状态失败: {e}")
-    finally:
-        db.close()
-
-
 def _on_user_message_received(
     conv_id: int, user_msg: str, attachments: str = "[]"
 ) -> None:
@@ -152,35 +141,58 @@ def _persist_chat_result(
         db.close()
 
 
-async def _run_chat_sse(
+async def _stream_from_buffer(buffer) -> AsyncIterator[str]:
+    """从 StreamBuffer 订阅事件并生成 SSE data: 行。
+
+    事件格式：
+      - full: {"content": "...", "isFull": true}  — 一次性推送已有全文
+      - delta: {"content": "..."}                  — 增量 token
+      - done: {"done": true} 或 {"done": true, "error": "..."}
+    """
+    q = await buffer.subscribe()
+    try:
+        while True:
+            event = await q.get()
+            event_type = event.get("type")
+            if event_type == "full":
+                yield _sse_json({"content": event["content"], "isFull": True})
+            elif event_type == "delta":
+                yield _sse_json({"content": event["content"]})
+            elif event_type == "done":
+                error = event.get("error")
+                if error:
+                    yield _sse_json({"content": "", "done": True, "error": error})
+                else:
+                    yield _sse_json({"done": True})
+                break
+    finally:
+        await buffer.unsubscribe(q)
+
+
+async def _chat_background(
     *,
-    conv_db_id: int | None,
-    conversation_id,
+    thread_id: str,
     user_id: str,
     user_message: str,
+    memory_context: str,
     attachments_json: str,
-    event_stream,
-    increment_count: bool = True,
-    record_user_received: bool = True,
-):
-    """统一 SSE 生成：累积全文、记忆写入、会话状态持久化。"""
-    if conv_db_id and not record_user_received:
-        await asyncio.to_thread(_set_conversation_status, conv_db_id, "loading")
-
+    enable_knowledge: bool,
+    enable_search: bool,
+    conv_db_id: int | None,
+    conversation_id,
+) -> None:
+    """后台执行 Graph 并在完成后持久化结果（与 SSE 推流生命周期解耦）。"""
     full_response = ""
     error_msg = None
 
     try:
-        async for event in event_stream:
-            data_str = event.removeprefix("data: ").strip()
-            try:
-                data = json.loads(data_str)
-                chunk = data.get("content")
-                if chunk:
-                    full_response += str(chunk)
-            except Exception:
-                pass
-            yield event
+        full_response = await run_graph_background(
+            thread_id=thread_id,
+            user_id=user_id,
+            memory_context=memory_context,
+            enable_knowledge=enable_knowledge,
+            enable_search=enable_search,
+        )
 
         if full_response.strip() and user_message.strip():
             await asyncio.to_thread(
@@ -190,11 +202,19 @@ async def _run_chat_sse(
                 str(conversation_id),
                 str(user_id),
             )
+    except asyncio.CancelledError:
+        # 正常取消（用户发送新消息等），尝试保留已生成内容
+        buf = get_buffer(thread_id)
+        if buf:
+            full_response = buf.full_text
+        raise
     except Exception as e:
         error_msg = str(e) or repr(e) or type(e).__name__
-        print(f"[chat] 流式生成异常: {error_msg}", flush=True)
+        print(f"[chat] 后台 Graph 执行异常: {error_msg}", flush=True)
         traceback.print_exc()
-        yield _sse_json({"content": "", "done": True, "error": error_msg})
+        buf = get_buffer(thread_id)
+        if buf:
+            full_response = buf.full_text
     finally:
         if conv_db_id:
             status = "error" if error_msg else "success"
@@ -207,7 +227,7 @@ async def _run_chat_sse(
                     status,
                     user_message,
                     attachments_json,
-                    increment_count=increment_count,
+                    increment_count=True,
                     last_msg_override=last_display,
                 )
             )
@@ -257,7 +277,7 @@ async def chat_message(
     # 是否启用联网搜索工具（前端勾选联网搜索）
     enable_search = req.enable_search if req.enable_search is not None else False
 
-    await prepare_human_turn(
+    await prepare_turn(
         message=user_message,
         thread_id=session_key,
         user_id=str(user_id),
@@ -276,27 +296,35 @@ async def chat_message(
             req.attachments or "[]",
         )
 
-    async def event_generator():
-        async for event in _run_chat_sse(
-            conv_db_id=conv_db_id,
-            conversation_id=conversation_id,
+    # 启动后台 Graph 任务（与 SSE 推流生命周期解耦）
+    asyncio.create_task(
+        _chat_background(
+            thread_id=session_key,
             user_id=str(user_id),
             user_message=user_message,
+            memory_context=memory_context,
             attachments_json=req.attachments or "[]",
-            event_stream=stream_agent(
-                thread_id=session_key,
-                user_id=str(user_id),
-                memory_context=memory_context,
-                enable_knowledge=enable_knowledge,
-                enable_search=enable_search,
-            ),
-            increment_count=True,
-            record_user_received=False,
-        ):
-            yield event
+            enable_knowledge=enable_knowledge,
+            enable_search=enable_search,
+            conv_db_id=conv_db_id,
+            conversation_id=conversation_id,
+        )
+    )
+
+    # 获取 Buffer（后台任务启动后会立即创建）
+    buffer = get_buffer(session_key)
+    if buffer is None:
+        # 极少数情况下后台任务启动失败，fallback 等待
+        for _ in range(10):
+            await asyncio.sleep(0.05)
+            buffer = get_buffer(session_key)
+            if buffer:
+                break
+        if buffer is None:
+            raise HTTPException(500, "启动流式生成失败")
 
     return StreamingResponse(
-        event_generator(),
+        _stream_from_buffer(buffer),
         media_type="text/event-stream",
         headers={"X-Conversation-Id": str(conversation_id)},
     )
@@ -307,7 +335,7 @@ async def chat_resume(
     req: ResumeRequest,
     user: UserContext = Depends(get_current_user),
 ):
-    """刷新/断线后恢复流式输出：从 Checkpoint 继续，不重复写入用户消息。"""
+    """刷新/断线后恢复流式输出：重新连接 StreamBuffer 或从 Checkpoint 回放。"""
     user_id = user.id if user else ""
     if not user_id:
         raise HTTPException(401, "未登录")
@@ -317,50 +345,47 @@ async def chat_resume(
         raise HTTPException(404, "会话不存在或无权限")
 
     session_key = f"{user_id}:{req.conversationId}"
+
+    # 1. Graph 还在后台运行：直接订阅 Buffer
+    buffer = get_buffer(session_key)
+    if buffer is not None:
+        return StreamingResponse(
+            _stream_from_buffer(buffer),
+            media_type="text/event-stream",
+            headers={"X-Conversation-Id": str(req.conversationId)},
+        )
+
+    # 2. Graph 正在执行但 Buffer 被清理了（极少见）
+    task = get_graph_task(session_key)
+    if task is not None and not task.done():
+        # 等待 Buffer 创建
+        for _ in range(20):
+            await asyncio.sleep(0.05)
+            buffer = get_buffer(session_key)
+            if buffer:
+                break
+        if buffer:
+            return StreamingResponse(
+                _stream_from_buffer(buffer),
+                media_type="text/event-stream",
+                headers={"X-Conversation-Id": str(req.conversationId)},
+            )
+        raise HTTPException(503, "Graph 正在初始化，请稍后重试")
+
+    # 3. Graph 已跑完 / 从未启动：从 Checkpoint 读取回放
     ctx = await asyncio.to_thread(
         analyze_thread_for_resume, session_key, conv.latest_status
     )
+    prefix = ctx.get("existing_assistant_prefix") or ""
+    if not prefix:
+        raise HTTPException(400, "当前会话没有可恢复的生成内容")
 
-    if not ctx.get("can_resume") and not ctx.get("existing_assistant_prefix"):
-        raise HTTPException(400, "当前会话没有可恢复的生成任务")
-
-    last_user = ctx.get("last_user_message") or ""
-    memory_context = ""
-    if last_user:
-        memory_context = await asyncio.to_thread(
-            semantic_memory.format_memory_context, last_user, str(user_id)
-        )
-
-    enable_knowledge = (
-        req.enable_knowledge if req.enable_knowledge is not None else False
-    )
-    enable_search = req.enable_search if req.enable_search is not None else False
-
-    async def event_generator():
-        async for event in _run_chat_sse(
-            conv_db_id=conv.id,
-            conversation_id=req.conversationId,
-            user_id=str(user_id),
-            user_message=last_user,
-            attachments_json=conv.latest_attachments or "[]",
-            event_stream=stream_agent_resume(
-                thread_id=session_key,
-                user_id=str(user_id),
-                memory_context=memory_context,
-                enable_knowledge=enable_knowledge,
-                enable_search=enable_search,
-                existing_prefix=ctx.get("existing_assistant_prefix") or "",
-                turn_complete=bool(
-                    ctx.get("turn_complete") and not ctx.get("needs_continue")
-                ),
-            ),
-            increment_count=False,
-            record_user_received=False,
-        ):
-            yield event
+    async def replay_generator():
+        yield _sse_json({"content": prefix})
+        yield _sse_json({"done": True})
 
     return StreamingResponse(
-        event_generator(),
+        replay_generator(),
         media_type="text/event-stream",
         headers={"X-Conversation-Id": str(req.conversationId)},
     )
