@@ -23,6 +23,7 @@ from typing import AsyncIterator
 from langchain_core.messages import HumanMessage
 from langgraph.graph import END, StateGraph
 
+from services.chat_attachments import build_human_message_content
 from services.llm.response_filter import sanitize_response
 from services.storage.checkpoint_store import get_saver
 
@@ -143,6 +144,8 @@ async def stream_agent(
     user_id: str = "",
     memory_context: str = "",
     image_url: str = "",
+    attachments_list: list | None = None,
+    text_supplements: list[tuple[str, str]] | None = None,
     enable_knowledge: bool = True,
     enable_search: bool = False,
 ) -> AsyncIterator[str]:
@@ -164,14 +167,13 @@ async def stream_agent(
         system_prompt=memory_context,
     )
 
-    # 2. 构造当前用户消息
-    if image_url:
-        content = [
-            {"type": "text", "text": message},
-            {"type": "image", "url": image_url},
-        ]
-    else:
-        content = message
+    # 2. 构造当前用户消息（附件图片走 image_url 块，.txt 正文拼入文本）
+    content = build_human_message_content(
+        message=message,
+        attachments_list=attachments_list,
+        image_url=image_url,
+        text_supplements=text_supplements,
+    )
 
     # 3. 初始化状态
     initial_state = {

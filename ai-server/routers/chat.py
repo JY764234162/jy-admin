@@ -11,6 +11,10 @@ from sqlalchemy.orm import Session
 from services.llm import llm
 from services.storage.long_term_memory import get_memory
 from services.agent_graph import stream_agent
+from services.chat_attachments import (
+    build_attachment_memory_context,
+    fetch_text_attachment,
+)
 from services.middleware import get_current_user, UserContext
 from models.conversation import Conversation, get_db, SessionLocal
 
@@ -98,25 +102,26 @@ async def chat_message(
         query=user_message, user_id=str(user_id)
     )
 
-    # 解析附件信息并注入 agent context
+    # 解析附件：注入 system 上下文，并拉取 .txt 正文供多模态消息使用
+    attachments_list: list = []
+    text_supplements: list[tuple[str, str]] = []
     try:
         attachments_list = json.loads(req.attachments or "[]")
-        if attachments_list:
-            attachment_desc = []
-            for att in attachments_list:
-                fname = att.get("filename", "未知文件")
-                ftype = att.get("file_type", "")
-                if ftype in (".jpg", ".jpeg", ".png", ".gif", ".webp"):
-                    attachment_desc.append(f"图片：{fname}")
-                else:
-                    attachment_desc.append(f"文件：{fname}")
-            attachment_context = "\n".join(attachment_desc)
-            memory_context = (
-                f"用户本次消息携带了以下附件（已上传至云端）：\n{attachment_context}\n\n"
-                f"{memory_context}" if memory_context else ""
-            )
-    except Exception:
-        pass
+        if not isinstance(attachments_list, list):
+            attachments_list = []
+        memory_context = build_attachment_memory_context(
+            attachments_list, memory_context
+        )
+        for att in attachments_list:
+            if att.get("file_type") == ".txt" and att.get("url"):
+                body = fetch_text_attachment(att["url"])
+                if body:
+                    text_supplements.append(
+                        (att.get("filename", "file.txt"), body)
+                    )
+    except Exception as e:
+        print(f"[chat] 解析附件失败: {e}")
+        attachments_list = []
 
     # thread_id 用于 Checkpoint
     session_key = f"{user_id}:{conversation_id}" if user_id else conversation_id
@@ -138,8 +143,10 @@ async def chat_message(
                 message=user_message,
                 thread_id=session_key,
                 user_id=str(user_id),
-                memory_context=None,
+                memory_context=memory_context,
                 image_url=req.image_url or "",
+                attachments_list=attachments_list,
+                text_supplements=text_supplements,
                 enable_knowledge=enable_knowledge,
                 enable_search=enable_search,
             ):
