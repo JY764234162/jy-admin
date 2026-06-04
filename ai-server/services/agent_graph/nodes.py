@@ -20,6 +20,13 @@ from .prompts import (
     SUMMARY_SYSTEM_PROMPT,
     build_system_prompt,
 )
+from .message_helpers import (
+    build_assistant_reply_update,
+    is_placeholder_assistant,
+    last_human_message,
+    messages_for_llm_prompt,
+    stamp_message_created_at,
+)
 from .state import MAX_RAW_MESSAGES, AgentState
 
 
@@ -65,7 +72,7 @@ def analyze_node(state: AgentState) -> dict:
     if not messages:
         return {"intent": "other", "rewrite_query": "", "iterations": 0}
 
-    last_message = messages[-1]
+    last_message = last_human_message(messages) or messages[-1]
     content = _extract_text_content(last_message)
     if not content:
         return {"intent": "other", "rewrite_query": "", "iterations": 0}
@@ -95,6 +102,18 @@ def analyze_node(state: AgentState) -> dict:
     return {"intent": intent, "rewrite_query": rewrite_query, "iterations": 0}
 
 
+def ensure_placeholder_node(state: AgentState) -> dict:
+    """分析完成后、生成前追加占位 AI（列表可见 loading 条）。"""
+    messages = state.get("messages") or []
+    if not messages:
+        return {}
+    if getattr(messages[-1], "type", "") == "human":
+        return {"messages": [stamp_message_created_at(AIMessage(content=""))]}
+    if is_placeholder_assistant(messages[-1]):
+        return {}
+    return {}
+
+
 # ========== 闲聊节点 ==========
 
 def _make_chat_node(system_prompt: str = ""):
@@ -117,8 +136,7 @@ def _make_chat_node(system_prompt: str = ""):
             parts.append(f"## 长期记忆\n{system_prompt}")
         full_system = "\n\n".join(parts)
 
-        # 只取最近消息（闲聊通常不需要很长的历史）
-        recent_messages = messages[-MAX_RAW_MESSAGES:]
+        recent_messages = messages_for_llm_prompt(messages, limit=MAX_RAW_MESSAGES)
         prompt_messages = [SystemMessage(content=full_system)] + recent_messages
 
         try:
@@ -128,7 +146,7 @@ def _make_chat_node(system_prompt: str = ""):
             response = AIMessage(content="抱歉，我暂时有点忙，请稍后再试~")
 
         print(f"[AGENT] 闲聊节点生成回复: {len(response.content)} 字")
-        return {"messages": [response]}
+        return build_assistant_reply_update(messages, response)
 
     return chat_node
 
@@ -181,10 +199,7 @@ def _make_agent_node(
             parts.append(f"## 长期记忆\n{system_prompt}")
         full_system = "\n\n".join(parts)
 
-        # 2. 只取最近 N 条消息传入 LLM（滑动窗口）
-        recent_messages = messages[-MAX_RAW_MESSAGES:]
-
-        # 3. 构建完整消息列表：system + 近期对话
+        recent_messages = messages_for_llm_prompt(messages, limit=MAX_RAW_MESSAGES)
         prompt_messages = [SystemMessage(content=full_system)] + recent_messages
 
         # 4. 调用 LLM（预绑定的工具实例或裸 LLM）
@@ -236,8 +251,7 @@ def _make_agent_node(
         else:
             print("[AGENT] LLM 未调用工具，直接生成回复")
 
-        # 6. 返回状态更新
-        return {"messages": [response]}
+        return build_assistant_reply_update(messages, response)
 
     return agent_node
 

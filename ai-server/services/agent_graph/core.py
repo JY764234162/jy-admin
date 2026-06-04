@@ -20,7 +20,7 @@ import asyncio
 import json
 from typing import AsyncIterator
 
-from langchain_core.messages import HumanMessage
+from langchain_core.messages import AIMessage, HumanMessage
 from langgraph.graph import END, StateGraph
 
 from services.chat_attachments import build_human_message_content
@@ -29,10 +29,12 @@ from services.storage.checkpoint_store import get_async_saver
 
 from .nodes import (
     analyze_node,
+    ensure_placeholder_node,
     summarize_node,
     _make_chat_node,
     _make_agent_node,
 )
+from .message_helpers import stamp_message_created_at
 from .router import _make_agent_router, _make_analyze_router
 from .state import AgentState
 from .tools_node import make_tools, _make_tool_node
@@ -89,28 +91,34 @@ def _build_graph(
     builder.add_node("analyze", analyze_node)
     builder.set_entry_point("analyze")
 
-    # 3.2 条件边：根据意图分流
-    analyze_routing_map = {"chat": "chat", "agent": "agent"}
-    builder.add_conditional_edges("analyze", analyze_router, analyze_routing_map)
+    # 3.2 占位 AI（刷新列表可见「生成中」条）
+    builder.add_node("ensure_placeholder", ensure_placeholder_node)
+    builder.add_edge("analyze", "ensure_placeholder")
 
-    # 3.3 闲聊节点（不走工具）
+    # 3.3 条件边：根据意图分流
+    analyze_routing_map = {"chat": "chat", "agent": "agent"}
+    builder.add_conditional_edges(
+        "ensure_placeholder", analyze_router, analyze_routing_map
+    )
+
+    # 3.4 闲聊节点（不走工具）
     builder.add_node("chat", chat_node)
     builder.add_edge("chat", END)
 
-    # 3.4 Agent 节点（带工具的 ReAct 循环）
+    # 3.5 Agent 节点（带工具的 ReAct 循环）
     builder.add_node("agent", agent_node)
 
-    # 3.5 工具节点（如果有工具）
+    # 3.6 工具节点（如果有工具）
     if tools:
         tool_node = _make_tool_node(tools)
         builder.add_node("tools", tool_node)
         builder.add_edge("tools", "agent")  # 工具执行完后回到 agent 继续思考
 
-    # 3.6 摘要节点
+    # 3.7 摘要节点
     builder.add_node("summarize", summarize_node)
     builder.add_edge("summarize", END)  # 摘要完成后结束
 
-    # 3.7 Agent 后的统一条件边
+    # 3.8 Agent 后的统一条件边
     routing_map = {"summarize": "summarize", END: END}
     if tools:
         routing_map["tools"] = "tools"
@@ -123,7 +131,7 @@ def _build_graph(
     return builder.compile(checkpointer=checkpointer)
 
 
-async def _get_graph(
+async def get_graph(
     user_id: str, enable_knowledge: bool, enable_search: bool, system_prompt: str = ""
 ):
     """获取或编译 Graph 实例（按参数缓存；使用 AsyncPostgresSaver 供 astream 使用）。"""
@@ -143,6 +151,10 @@ async def _get_graph(
     return _graph_cache[key]
 
 
+# 兼容旧调用
+_get_graph = get_graph
+
+
 # ========== 流式遍历 Graph ==========
 
 
@@ -150,11 +162,16 @@ async def persist_human_turn(
     graph,
     config: dict,
     human_message: HumanMessage,
+    *,
+    with_placeholder: bool = False,
 ) -> None:
-    """将用户消息立即写入 checkpoint（刷新列表可见），并标记从入口重新执行。"""
+    """将用户消息写入 checkpoint；可选同时写入占位 AI（单次 update，避免 Ambiguous update）。"""
+    payload: list = [stamp_message_created_at(human_message)]
+    if with_placeholder:
+        payload.append(stamp_message_created_at(AIMessage(content="")))
     await graph.aupdate_state(
         config,
-        {"messages": [human_message], "iterations": 0},
+        {"messages": payload, "iterations": 0},
         as_node="__start__",
     )
 
@@ -233,7 +250,7 @@ def build_user_human_message(
     return HumanMessage(content=content)
 
 
-async def prepare_human_turn(
+async def prepare_turn(
     *,
     message: str,
     thread_id: str,
@@ -244,7 +261,7 @@ async def prepare_human_turn(
     enable_knowledge: bool = True,
     enable_search: bool = False,
 ) -> None:
-    """在流式开始前将用户消息写入 checkpoint（刷新消息列表可立即看到）。"""
+    """流式开始前写入用户消息 + 占位 AI（analyze 仍读最后一条 human）。"""
     graph = await _get_graph(
         user_id=user_id,
         enable_knowledge=enable_knowledge,
@@ -257,7 +274,31 @@ async def prepare_human_turn(
         attachments_list=attachments_list,
         text_supplements=text_supplements,
     )
-    await persist_human_turn(graph, config, human_message)
+    await persist_human_turn(graph, config, human_message, with_placeholder=True)
+
+
+async def prepare_human_turn(
+    *,
+    message: str,
+    thread_id: str,
+    user_id: str = "",
+    memory_context: str = "",
+    attachments_list: list | None = None,
+    text_supplements: list[tuple[str, str]] | None = None,
+    enable_knowledge: bool = True,
+    enable_search: bool = False,
+) -> None:
+    """兼容旧调用：等同 prepare_turn。"""
+    await prepare_turn(
+        message=message,
+        thread_id=thread_id,
+        user_id=user_id,
+        memory_context=memory_context,
+        attachments_list=attachments_list,
+        text_supplements=text_supplements,
+        enable_knowledge=enable_knowledge,
+        enable_search=enable_search,
+    )
 
 
 async def stream_agent(
