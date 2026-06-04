@@ -1,6 +1,24 @@
-import { memo, type CSSProperties } from "react";
+import { memo, type AnchorHTMLAttributes, type CSSProperties, type ReactNode } from "react";
 import MDEditor from "@uiw/react-md-editor";
 import styles from "./index.module.css";
+
+type MarkdownAnchorProps = AnchorHTMLAttributes<HTMLAnchorElement> & {
+  children?: ReactNode;
+  node?: unknown;
+};
+
+/** AI 回复中的外链在新标签页打开，避免 SPA 内跳转 */
+function MarkdownExternalLink({ node: _node, children, href, ...rest }: MarkdownAnchorProps) {
+  return (
+    <a href={href} target="_blank" rel="noopener noreferrer" {...rest}>
+      {children}
+    </a>
+  );
+}
+
+const markdownLinkComponents = {
+  a: MarkdownExternalLink,
+};
 
 /**
  * 按"块"切分 markdown 文本
@@ -61,7 +79,11 @@ const innerMarkdownStyle: CSSProperties = {
  */
 const InnerMarkdown = memo(
   ({ source }: { source: string }) => (
-    <MDEditor.Markdown source={source}  style={innerMarkdownStyle} />
+    <MDEditor.Markdown
+      source={source}
+      style={innerMarkdownStyle}
+      components={markdownLinkComponents}
+    />
   ),
   (prev, next) => prev.source === next.source
 );
