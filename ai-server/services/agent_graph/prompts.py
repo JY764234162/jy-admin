@@ -29,6 +29,7 @@ def build_system_prompt(enable_knowledge: bool = True, enable_search: bool = Fal
         tool_rules.extend([
             "- 问题涉及时效性（'今天''最近''最新''新闻''天气''股价'等）→ **必须**调用 `tavilysearch`，禁止凭记忆回答",
             "- 历史消息中的旧搜索结果可能已过期，涉及时效性问题必须重新调用工具",
+            "- 使用 `tavilysearch` 后：按返回的 index 序号列出网页摘要；若有 images，逐条写出「图片N：description」并用 Markdown 图片语法附上 url",
         ])
     else:
         tool_rules.append(
