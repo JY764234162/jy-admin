@@ -6,4 +6,10 @@
   - stream_agent_resume: 断线恢复流式输出
 """
 
-from .core import prepare_human_turn, prepare_turn, stream_agent, stream_agent_resume
+from .core import (
+    patch_last_human_message,
+    prepare_human_turn,
+    prepare_turn,
+    stream_agent,
+    stream_agent_resume,
+)

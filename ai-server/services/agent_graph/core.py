@@ -22,6 +22,7 @@ from typing import AsyncIterator
 
 from langchain_core.messages import AIMessage, HumanMessage
 from langgraph.graph import END, StateGraph
+from langgraph.graph.message import RemoveMessage
 
 from services.chat_attachments import build_human_message_content
 from services.llm.response_filter import sanitize_response
@@ -34,7 +35,7 @@ from .nodes import (
     _make_chat_node,
     _make_agent_node,
 )
-from .message_helpers import stamp_message_created_at
+from .message_helpers import last_human_message, stamp_message_created_at
 from .router import _make_agent_router, _make_analyze_router
 from .state import AgentState
 from .tools_node import make_tools, _make_tool_node
@@ -275,6 +276,51 @@ async def prepare_turn(
         text_supplements=text_supplements,
     )
     await persist_human_turn(graph, config, human_message, with_placeholder=True)
+
+
+async def patch_last_human_message(
+    *,
+    message: str,
+    thread_id: str,
+    user_id: str = "",
+    memory_context: str = "",
+    attachments_list: list | None = None,
+    text_supplements: list[tuple[str, str]] | None = None,
+    enable_knowledge: bool = True,
+    enable_search: bool = False,
+) -> None:
+    """补全末条用户消息（如 txt 附件正文），保留原 created_at。"""
+    graph = await _get_graph(
+        user_id=user_id,
+        enable_knowledge=enable_knowledge,
+        enable_search=enable_search,
+        system_prompt=memory_context,
+    )
+    config = {"configurable": {"thread_id": thread_id}}
+    state = await graph.aget_state(config)
+    messages = state.values.get("messages", []) if state else []
+    last_human = last_human_message(messages)
+    if not last_human or not getattr(last_human, "id", None):
+        return
+
+    new_human = build_user_human_message(
+        message,
+        attachments_list=attachments_list,
+        text_supplements=text_supplements,
+    )
+    prev_kwargs = dict(getattr(last_human, "additional_kwargs", None) or {})
+    if prev_kwargs.get("created_at"):
+        new_kwargs = dict(getattr(new_human, "additional_kwargs", None) or {})
+        new_kwargs["created_at"] = prev_kwargs["created_at"]
+        new_human = new_human.model_copy(update={"additional_kwargs": new_kwargs})
+    else:
+        new_human = stamp_message_created_at(new_human)
+
+    await graph.aupdate_state(
+        config,
+        {"messages": [RemoveMessage(id=last_human.id), new_human]},
+        as_node="__start__",
+    )
 
 
 async def prepare_human_turn(
