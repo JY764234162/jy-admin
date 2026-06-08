@@ -8,6 +8,9 @@
       - 摘要生成（summarize_node + _generate_summary）
 """
 
+import json
+import re
+
 from langchain_core.messages import AIMessage, HumanMessage, SystemMessage
 from langchain_core.runnables import RunnableConfig
 from pydantic import BaseModel, Field
@@ -38,6 +41,7 @@ class AnalyzeResult(BaseModel):
         description="用户意图：chat(闲聊) / knowledge(知识库) / search(联网搜索) / mixed(混合) / other(其他)",
     )
     rewrite_query: str = Field(
+        default="",
         description="改写后的检索查询（仅 knowledge/mixed 时有效，其他情况为空字符串）",
     )
 
@@ -55,6 +59,39 @@ def _extract_text_content(message) -> str:
         ]
         content = " ".join(text_parts) or str(content)
     return content
+
+
+def _extract_json_from_text(text: str) -> str:
+    """从文本中提取 JSON 字符串（兼容 markdown 代码块包裹）。"""
+    text = text.strip()
+    if not text:
+        return ""
+
+    # 优先匹配 ```json ... ``` 代码块
+    code_block_match = re.search(
+        r"```(?:json)?\s*\n?\s*(\{[\s\S]*?\})\s*\n?\s*```", text, re.DOTALL
+    )
+    if code_block_match:
+        return code_block_match.group(1).strip()
+
+    # 再尝试匹配直接的 JSON 对象
+    json_match = re.search(r"\{[\s\S]*?\}", text, re.DOTALL)
+    if json_match:
+        return json_match.group(0).strip()
+
+    return text
+
+
+def _extract_input_value_from_error(error_text: str) -> str:
+    """从 LangChain structured_output 异常文本中提取 input_value。"""
+    # 匹配 input_value='...' 或 input_value="..."（可能跨多行）
+    match = re.search(r'''input_value=(["'])([\s\S]*?)\1''', error_text, re.DOTALL)
+    if match:
+        raw = match.group(2)
+        # 处理 Python repr 中的转义字符
+        raw = raw.replace("\\n", "\n").replace("\\t", "\t").replace("\\'", "'").replace('\\"', '"')
+        return raw
+    return ""
 
 
 def analyze_node(state: AgentState) -> dict:
@@ -77,20 +114,31 @@ def analyze_node(state: AgentState) -> dict:
     if not content:
         return {"intent": "other", "rewrite_query": "", "iterations": 0}
 
-    prompt = f"{ANALYZE_SYSTEM_PROMPT}\n\n用户消息：{content}"
+    prompt = (
+        f"{ANALYZE_SYSTEM_PROMPT}\n\n"
+        f"请严格返回以下 JSON 格式，不要添加 markdown 代码块或其他说明：\n"
+        f'{{"intent": "chat|knowledge|search|mixed|other", "rewrite_query": "改写后的查询或空字符串"}}\n\n'
+        f"用户消息：{content}"
+    )
 
     try:
-        # 使用 Pydantic 结构化输出，强制 LLM 返回符合 AnalyzeResult  schema 的 JSON
-        # 底层利用 OpenAI 兼容接口的 function calling / JSON mode，比 prompt 约束更可靠
-        structured_llm = llm.with_structured_output(AnalyzeResult)
-        result: AnalyzeResult = structured_llm.invoke(
+        raw_response = llm.invoke(
             [HumanMessage(content=prompt)],
             config=RunnableConfig(callbacks=[]),
         )
+        resp_text = str(raw_response.content) if raw_response.content else ""
+        json_text = _extract_json_from_text(resp_text)
+
+        if not json_text:
+            raise ValueError(f"无法从 LLM 响应中提取 JSON: {resp_text[:200]}")
+
+        parsed = json.loads(json_text)
+        result = AnalyzeResult.model_validate(parsed)
         intent = result.intent.strip().lower()
         rewrite_query = result.rewrite_query.strip()
+        print(f"[AGENT] 分析成功: intent={intent}")
     except Exception as e:
-        print(f"[AGENT] 分析异常: {e}")
+        print(f"[AGENT] 分析异常，回退到 other: {e}")
         intent = "other"
         rewrite_query = ""
 

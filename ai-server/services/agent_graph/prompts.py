@@ -19,10 +19,13 @@ def build_system_prompt(enable_knowledge: bool = True, enable_search: bool = Fal
 
     if enable_knowledge:
         tools_desc.extend([
-            "- **search_knowledge**：查询用户上传的文档内容，返回相关片段和来源",
-            "- **list_knowledge**：列出用户知识库中的所有文档名称",
+            "- **search_knowledge**：搜索知识库中的文档内容，返回相关片段和来源",
+            "- **list_knowledge**：获取用户知识库中所有已上传文档的完整列表（文件名、类型、切片数、上传时间）",
         ])
-        tool_rules.append("- 问题涉及文档内容或知识库 → **必须**调用 `search_knowledge`")
+        tool_rules.extend([
+            "- 用户询问'知识库有哪些文档'、'上传了什么文件'、'列出我的文档'、'知识库里有什么' → **必须**调用 `list_knowledge`",
+            "- 问题涉及文档具体内容或需要检索知识库 → **必须**调用 `search_knowledge`",
+        ])
 
     if enable_search:
         tools_desc.append("- **tavilysearch**：联网搜索互联网上的最新信息")

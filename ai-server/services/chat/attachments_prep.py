@@ -26,9 +26,11 @@ def prepare_memory_and_attachments(
     user_message: str, user_id: str, attachments_list: list
 ) -> tuple[str, list[tuple[str, str]]]:
     """长期记忆检索 + txt 附件拉取。"""
-    memory_context = semantic_memory.format_memory_context(
-        query=user_message, user_id=user_id
-    )
+    # TODO: 长期记忆暂时关闭，避免记忆污染（工具结果被当作事实保存）
+    # memory_context = semantic_memory.format_memory_context(
+    #     query=user_message, user_id=user_id
+    # )
+    memory_context = ""
     text_supplements: list[tuple[str, str]] = []
 
     try:

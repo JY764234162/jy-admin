@@ -57,14 +57,15 @@ async def run_chat_background(
             enable_search=enable_search,
         )
 
-        if full_response.strip() and user_message.strip():
-            await asyncio.to_thread(
-                semantic_memory.save_interaction,
-                user_message,
-                full_response,
-                str(conversation_id),
-                str(user_id),
-            )
+        # TODO: 长期记忆暂时关闭，避免记忆污染（工具结果被当作事实保存）
+        # if full_response.strip() and user_message.strip():
+        #     await asyncio.to_thread(
+        #         semantic_memory.save_interaction,
+        #         user_message,
+        #         full_response,
+        #         str(conversation_id),
+        #         str(user_id),
+        #     )
     except asyncio.CancelledError:
         buf = get_buffer(thread_id)
         if buf:
