@@ -1,4 +1,4 @@
-import camelCase from "lodash/camelCase";
+import { camelCase } from "lodash-es";
 import xmldom from "xmldom";
 import xpath, { SelectedValue } from "xpath";
 

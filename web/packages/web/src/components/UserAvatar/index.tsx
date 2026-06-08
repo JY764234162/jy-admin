@@ -6,7 +6,7 @@ import { localStg } from "@/utils/storage";
 import { getImageUrl } from "@/utils/image";
 import { loginApi } from "@/api";
 import { userSlice } from "@/store/slice/user";
-import { delay } from "lodash";
+import { delay } from "lodash-es";
 
 
 export const UserAvatar = () => {
