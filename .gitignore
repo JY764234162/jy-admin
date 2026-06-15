@@ -23,6 +23,7 @@ certs/
 
 # Claude
 .claude/
+.worktrees/
 
 # TypeScript
 **/tsconfig.tsbuildinfo
