@@ -1,7 +1,9 @@
-"""Agent 消息辅助：占位 AI、LLM 上下文裁剪、状态更新。"""
+"""Agent 消息辅助：占位 AI、LLM 上下文裁剪、状态更新、文本/JSON 提取。"""
 
 from __future__ import annotations
 
+import json
+import re
 from datetime import datetime, timezone
 
 from langchain_core.messages import AIMessage, BaseMessage, HumanMessage
@@ -87,3 +89,61 @@ def build_assistant_reply_update(
             "messages": [RemoveMessage(id=messages[-1].id), response],
         }
     return {"messages": [response]}
+
+
+def extract_text_content(message) -> str:
+    """从消息中提取纯文本内容（支持多模态消息）。"""
+    content = message.content if hasattr(message, "content") else str(message)
+    if isinstance(content, list):
+        text_parts = [
+            item.get("text", "")
+            for item in content
+            if isinstance(item, dict) and item.get("type") == "text"
+        ]
+        content = " ".join(text_parts) or str(content)
+    return content
+
+
+def extract_json_from_text(text: str) -> str:
+    """从文本中提取 JSON 字符串（兼容 markdown 代码块包裹）。
+
+    支持嵌套 JSON 对象，通过尝试从第一个 '{' 开始解析来找到最外层的 JSON。
+    """
+    text = text.strip()
+    if not text:
+        return ""
+
+    # 优先匹配 ```json ... ``` 代码块
+    code_block_match = re.search(
+        r"```(?:json)?\s*\n?\s*(\{[\s\S]*?\})\s*\n?\s*```", text, re.DOTALL
+    )
+    if code_block_match:
+        candidate = code_block_match.group(1).strip()
+        try:
+            json.loads(candidate)
+            return candidate
+        except json.JSONDecodeError:
+            pass  # 代码块内的内容不是合法 JSON，继续尝试其他方式
+
+    # 尝试从第一个 '{' 开始找到最外层的 JSON 对象
+    start_idx = text.find("{")
+    if start_idx == -1:
+        return text
+
+    # 通过括号计数找到匹配的结束 '}'
+    brace_count = 0
+    for i in range(start_idx, len(text)):
+        if text[i] == "{":
+            brace_count += 1
+        elif text[i] == "}":
+            brace_count -= 1
+            if brace_count == 0:
+                candidate = text[start_idx : i + 1]
+                try:
+                    json.loads(candidate)
+                    return candidate
+                except json.JSONDecodeError:
+                    pass
+
+    # 兜底：返回从第一个 '{' 到文本末尾
+    return text[start_idx:]

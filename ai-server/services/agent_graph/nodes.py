@@ -25,6 +25,8 @@ from .prompts import (
 )
 from .message_helpers import (
     build_assistant_reply_update,
+    extract_json_from_text,
+    extract_text_content,
     is_placeholder_assistant,
     last_human_message,
     messages_for_llm_prompt,
@@ -47,39 +49,6 @@ class AnalyzeResult(BaseModel):
 
 
 # ========== 意图识别 + 查询改写合并节点 ==========
-
-def _extract_text_content(message) -> str:
-    """从消息中提取纯文本内容（支持多模态消息）。"""
-    content = message.content if hasattr(message, "content") else str(message)
-    if isinstance(content, list):
-        text_parts = [
-            item.get("text", "")
-            for item in content
-            if isinstance(item, dict) and item.get("type") == "text"
-        ]
-        content = " ".join(text_parts) or str(content)
-    return content
-
-
-def _extract_json_from_text(text: str) -> str:
-    """从文本中提取 JSON 字符串（兼容 markdown 代码块包裹）。"""
-    text = text.strip()
-    if not text:
-        return ""
-
-    # 优先匹配 ```json ... ``` 代码块
-    code_block_match = re.search(
-        r"```(?:json)?\s*\n?\s*(\{[\s\S]*?\})\s*\n?\s*```", text, re.DOTALL
-    )
-    if code_block_match:
-        return code_block_match.group(1).strip()
-
-    # 再尝试匹配直接的 JSON 对象
-    json_match = re.search(r"\{[\s\S]*?\}", text, re.DOTALL)
-    if json_match:
-        return json_match.group(0).strip()
-
-    return text
 
 
 def _extract_input_value_from_error(error_text: str) -> str:
@@ -110,7 +79,7 @@ def analyze_node(state: AgentState) -> dict:
         return {"intent": "other", "rewrite_query": "", "iterations": 0}
 
     last_message = last_human_message(messages) or messages[-1]
-    content = _extract_text_content(last_message)
+    content = extract_text_content(last_message)
     if not content:
         return {"intent": "other", "rewrite_query": "", "iterations": 0}
 
@@ -127,7 +96,7 @@ def analyze_node(state: AgentState) -> dict:
             config=RunnableConfig(callbacks=[]),
         )
         resp_text = str(raw_response.content) if raw_response.content else ""
-        json_text = _extract_json_from_text(resp_text)
+        json_text = extract_json_from_text(resp_text)
 
         if not json_text:
             raise ValueError(f"无法从 LLM 响应中提取 JSON: {resp_text[:200]}")
