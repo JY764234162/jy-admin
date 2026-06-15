@@ -32,8 +32,13 @@ from .nodes import (
     analyze_node,
     ensure_placeholder_node,
     summarize_node,
-    _make_chat_node,
-    _make_agent_node,
+)
+from .workers import (
+    _make_chat_worker,
+    _make_direct_worker,
+    _make_knowledge_worker,
+    _make_search_worker,
+    _make_synthesis_worker,
 )
 from .message_helpers import last_human_message, stamp_message_created_at
 from .router import _make_agent_router, _make_analyze_router
@@ -81,8 +86,8 @@ def _build_graph(
 
     # 2. 创建各节点（闭包捕获配置）
     analyze_router = _make_analyze_router()
-    chat_node = _make_chat_node(system_prompt)
-    agent_node = _make_agent_node(enable_knowledge, enable_search, system_prompt, tools)
+    chat_node = _make_chat_worker(system_prompt)
+    agent_node = _make_direct_worker(system_prompt, tools, enable_knowledge, enable_search)
     agent_router = _make_agent_router(tools)
 
     # 3. 构图

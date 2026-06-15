@@ -3,9 +3,8 @@
 职责：实现 Graph 中每个节点的具体逻辑，包括：
       - 意图识别（intent_node）
       - 查询改写（query_rewrite_node）
-      - 闲聊生成（chat_node）
-      - Agent 推理（agent_node）
       - 摘要生成（summarize_node + _generate_summary）
+      - 占位 AI 追加（ensure_placeholder_node）
 """
 
 import json
@@ -19,9 +18,7 @@ from services.llm.llm import llm, summary_llm
 
 from .prompts import (
     ANALYZE_SYSTEM_PROMPT,
-    CHAT_SYSTEM_PROMPT,
     SUMMARY_SYSTEM_PROMPT,
-    build_system_prompt,
 )
 from .message_helpers import (
     build_assistant_reply_update,
@@ -29,7 +26,6 @@ from .message_helpers import (
     extract_text_content,
     is_placeholder_assistant,
     last_human_message,
-    messages_for_llm_prompt,
     stamp_message_created_at,
 )
 from .state import MAX_RAW_MESSAGES, AgentState
@@ -129,148 +125,6 @@ def ensure_placeholder_node(state: AgentState) -> dict:
     if is_placeholder_assistant(messages[-1]):
         return {}
     return {}
-
-
-# ========== 闲聊节点 ==========
-
-def _make_chat_node(system_prompt: str = ""):
-    """创建闲聊专用节点的工厂。
-
-    闲聊不走工具路径，直接调用裸 LLM 生成回复，节省 token 和延迟。
-    """
-
-    def chat_node(state: AgentState) -> dict:
-        """闲聊节点：不绑定工具，直接生成友好回复。"""
-        messages = state["messages"]
-        summary = state.get("summary", "")
-
-        # 组装 system prompt
-        parts = []
-        if summary:
-            parts.append(f"## 历史摘要\n{summary}")
-        parts.append(CHAT_SYSTEM_PROMPT)
-        if system_prompt:
-            parts.append(f"## 长期记忆\n{system_prompt}")
-        full_system = "\n\n".join(parts)
-
-        recent_messages = messages_for_llm_prompt(messages, limit=MAX_RAW_MESSAGES)
-        prompt_messages = [SystemMessage(content=full_system)] + recent_messages
-
-        try:
-            response = llm.invoke(prompt_messages)
-        except Exception as e:
-            print(f"[AGENT] 闲聊节点异常: {e}")
-            response = AIMessage(content="抱歉，我暂时有点忙，请稍后再试~")
-
-        print(f"[AGENT] 闲聊节点生成回复: {len(response.content)} 字")
-        return build_assistant_reply_update(messages, response)
-
-    return chat_node
-
-
-# ========== Agent 推理节点 ==========
-
-def _make_agent_node(
-    enable_knowledge: bool, enable_search: bool, system_prompt: str, tools: list
-):
-    """创建 agent 节点的工厂函数。
-
-    使用闭包捕获构建时的配置参数（工具列表、提示词等），
-    避免每次节点执行时重复计算。
-    """
-    # 预构建基础 system prompt（只需计算一次）
-    base_prompt = build_system_prompt(enable_knowledge, enable_search)
-
-    # 预绑定工具（只需绑定一次）
-    llm_with_tools = llm.bind_tools(tools) if tools else None
-
-    def agent_node(state: AgentState) -> dict:
-        """Agent 节点：动态构建 prompt 并调用 LLM。
-
-        每次执行时按以下顺序动态拼接 system prompt：
-          1. 基础系统提示词（工具说明、回答规则）
-          2. 查询改写建议（如果 state.rewrite_query 存在）
-          3. 长期记忆（外部传入的 system_prompt 参数）
-          4. 会话摘要（由 summarize 节点自动生成，可能为空）
-          5. 最近 N 条原始消息（避免上下文溢出）
-        """
-        messages = state["messages"]
-        summary = state.get("summary", "")
-        rewrite_query = state.get("rewrite_query", "")
-
-        # 1. 组装完整 system prompt
-        parts = []
-        if summary:
-            parts.append(f"## 历史摘要\n{summary}")
-        parts.append(base_prompt)
-
-        # 注入查询改写建议（如果有）
-        if rewrite_query:
-            parts.append(
-                f"## 查询优化建议\n"
-                f"为获取更准确的检索结果，建议以以下语义进行搜索：'{rewrite_query}'\n"
-                f"请在调用 search_knowledge 时参考此改写。"
-            )
-
-        if system_prompt:
-            parts.append(f"## 长期记忆\n{system_prompt}")
-        full_system = "\n\n".join(parts)
-
-        recent_messages = messages_for_llm_prompt(messages, limit=MAX_RAW_MESSAGES)
-        prompt_messages = [SystemMessage(content=full_system)] + recent_messages
-
-        # 4. 调用 LLM（预绑定的工具实例或裸 LLM）
-        def _invoke_llm(msgs, use_tools=True):
-            if use_tools and llm_with_tools:
-                return llm_with_tools.invoke(msgs)
-            return llm.invoke(msgs)
-
-        try:
-            response = _invoke_llm(prompt_messages, use_tools=True)
-        except Exception as e:
-            error_msg = str(e)
-            print(f"[AGENT] LLM 调用异常: {error_msg}")
-            # Fallback 1：bind_tools 失败，尝试裸 LLM
-            if llm_with_tools:
-                try:
-                    print("[AGENT] Fallback 1: 尝试裸 LLM...")
-                    response = _invoke_llm(prompt_messages, use_tools=False)
-                    print("[AGENT] Fallback 1 成功")
-                except Exception as e2:
-                    print(f"[AGENT] Fallback 1 失败: {e2}")
-                    # Fallback 2：移除 ToolMessage 后重试
-                    try:
-                        from langchain_core.messages import ToolMessage
-
-                        msgs_without_tools = [
-                            m for m in prompt_messages if not isinstance(m, ToolMessage)
-                        ]
-                        if len(msgs_without_tools) < len(prompt_messages):
-                            print("[AGENT] Fallback 2: 移除 ToolMessage 后重试...")
-                            response = llm.invoke(msgs_without_tools)
-                            print("[AGENT] Fallback 2 成功")
-                        else:
-                            raise RuntimeError("无 ToolMessage 可移除")
-                    except Exception as e3:
-                        print(f"[AGENT] Fallback 2 失败: {e3}")
-                        response = AIMessage(
-                            content="抱歉，生成回复时遇到内容安全限制，请换个方式提问或稍后重试。"
-                        )
-            else:
-                response = AIMessage(content="抱歉，服务暂时异常，请稍后重试。")
-
-        # 5. 打印工具调用决策
-        tool_calls = getattr(response, "tool_calls", None)
-        if tool_calls:
-            called = [tc.get("name") for tc in tool_calls if tc]
-            available = [t.name for t in tools]
-            print(f"[AGENT] LLM 决定调用工具: {called}")
-        else:
-            print("[AGENT] LLM 未调用工具，直接生成回复")
-
-        return build_assistant_reply_update(messages, response)
-
-    return agent_node
 
 
 # ========== 摘要节点 ==========
