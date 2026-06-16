@@ -37,6 +37,39 @@ def ensure_placeholder_node(state: AgentState) -> dict:
     return {}
 
 
+# ========== 状态清理节点 ==========
+
+
+def cleanup_node(state: AgentState) -> dict:
+    """清理节点：每轮结束后清除中间状态，保留跨轮持久字段。
+
+    清除的字段（中间状态）：
+      - plan, current_step_index, step_results
+      - knowledge_results, search_results, synthesis_context
+      - quality_passed, quality_feedback
+      - intents, primary_intent, intent_confidence
+      - task_complexity, suggested_plan
+
+    保留的字段（持久状态）：
+      - messages, summary, intent, iterations, rewrite_query
+    """
+    return {
+        "plan": [],
+        "current_step_index": 0,
+        "step_results": [],
+        "knowledge_results": "",
+        "search_results": "",
+        "synthesis_context": "",
+        "quality_passed": False,
+        "quality_feedback": "",
+        "intents": [],
+        "primary_intent": "",
+        "intent_confidence": 0.0,
+        "task_complexity": "simple",
+        "suggested_plan": [],
+    }
+
+
 # ========== 摘要节点 ==========
 
 

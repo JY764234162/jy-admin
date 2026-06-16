@@ -32,6 +32,7 @@ from services.llm.response_filter import sanitize_response
 from services.storage.checkpoint_store import get_async_saver
 
 from .nodes import (
+    cleanup_node,
     ensure_placeholder_node,
     summarize_node,
 )
@@ -164,18 +165,21 @@ def _build_graph(
     # 3.11 摘要节点
     builder.add_node("summarize", summarize_node)
 
+    # 3.12 清理节点
+    builder.add_node("cleanup", cleanup_node)
+
     # ========== 边连接 ==========
 
-    # chat_worker / direct_worker → maybe_summarize_router
+    # chat_worker / direct_worker → maybe_summarize_router → cleanup → END
     builder.add_conditional_edges(
         "chat_worker",
         _make_maybe_summarize_router(),
-        {"summarize": "summarize", END: END},
+        {"summarize": "summarize", END: "cleanup"},
     )
     builder.add_conditional_edges(
         "direct_worker",
         _make_maybe_summarize_router(),
-        {"summarize": "summarize", END: END},
+        {"summarize": "summarize", END: "cleanup"},
     )
 
     # planner_node → plan_executor
@@ -202,25 +206,26 @@ def _build_graph(
         "quality_check", quality_router, quality_routing_map
     )
 
-    # 质量检查通过后 → maybe_summarize_router
+    # 质量检查通过后 → maybe_summarize_router → cleanup → END
     builder.add_node("maybe_summarize_after_quality", lambda state: {})
     builder.add_conditional_edges(
         "maybe_summarize_after_quality",
         _make_maybe_summarize_router(),
-        {"summarize": "summarize", END: END},
+        {"summarize": "summarize", END: "cleanup"},
     )
 
     # plan_refinement → refinement_router
     refinement_routing_map = {
         "plan_executor": "plan_executor",
-        END: END,
+        END: "cleanup",
     }
     builder.add_conditional_edges(
         "plan_refinement", refinement_router, refinement_routing_map
     )
 
-    # summarize → END
-    builder.add_edge("summarize", END)
+    # summarize → cleanup → END
+    builder.add_edge("summarize", "cleanup")
+    builder.add_edge("cleanup", END)
 
     # 4. 编译，附加 checkpoint（对话记忆持久化）
     if checkpointer is None:

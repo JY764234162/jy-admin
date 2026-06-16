@@ -63,6 +63,8 @@ class AgentState(TypedDict):
       synthesis_context: 综合上下文。
       quality_passed: 质量检查是否通过。
       quality_feedback: 质量检查反馈。
+      task_complexity: 任务复杂度评估（simple/complex）。
+      suggested_plan: Supervisor 建议的计划步骤列表。
     """
     messages: Annotated[list, add_messages]
     summary: str
@@ -81,3 +83,5 @@ class AgentState(TypedDict):
     synthesis_context: str
     quality_passed: bool
     quality_feedback: str
+    task_complexity: str
+    suggested_plan: list[str]

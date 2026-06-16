@@ -141,6 +141,8 @@ def test_agent_state_new_fields():
         synthesis_context="",
         quality_passed=True,
         quality_feedback="",
+        task_complexity="complex",
+        suggested_plan=["搜索", "查询知识库", "综合"],
     )
 
     assert state["intents"][0].intent == "search"
@@ -155,3 +157,5 @@ def test_agent_state_new_fields():
     assert state["synthesis_context"] == ""
     assert state["quality_passed"] is True
     assert state["quality_feedback"] == ""
+    assert state["task_complexity"] == "complex"
+    assert state["suggested_plan"] == ["搜索", "查询知识库", "综合"]

@@ -166,7 +166,8 @@ class TestGraphCompilation:
         assert "quality_check" in graph.nodes
         assert "plan_refinement" in graph.nodes
         assert "summarize" in graph.nodes
-        assert "ensure_placeholder" in graph.nodes
+        assert "cleanup" in graph.nodes
+        assert "maybe_summarize_after_quality" in graph.nodes
 
 
 # ========== Routing tests (using mocked nodes) ==========
@@ -235,6 +236,20 @@ class TestGraphRouting:
         assert any(
             getattr(msg, "type", "") in ("ai", "assistant") for msg in messages
         )
+
+        # Verify cleanup_node cleared intermediate state
+        assert result.get("plan") == []
+        assert result.get("current_step_index") == 0
+        assert result.get("step_results") == []
+        assert result.get("quality_passed") is False
+        assert result.get("quality_feedback") == ""
+        assert result.get("intents") == []
+        assert result.get("primary_intent") == ""
+        assert result.get("intent_confidence") == 0.0
+        assert result.get("task_complexity") == "simple"
+        assert result.get("suggested_plan") == []
+        # Persistent fields should be preserved
+        assert len(result.get("messages", [])) > 0
 
     @patch("services.agent_graph.core.get_async_saver")
     @patch("services.agent_graph.core.make_tools")
