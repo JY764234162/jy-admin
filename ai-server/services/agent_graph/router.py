@@ -1,7 +1,9 @@
 """所有 LangGraph 条件路由函数。
 
-职责：根据当前 state 决定 Graph 的下一步走向，
-      包括分析后路由（analyze_router）和 Agent 后路由（agent_router）。
+职责：根据当前 state 决定 Graph 的下一步走向。
+
+注意：旧路由函数 _make_analyze_router 和 _make_agent_router 已被 supervisor_router、
+plan_executor_router、quality_router、refinement_router 替代，保留在此仅作向后兼容参考。
 """
 
 from langgraph.graph import END
@@ -9,14 +11,16 @@ from langgraph.graph import END
 from .state import MAX_ITERATIONS, MAX_RAW_MESSAGES, AgentState
 
 
-# ========== 分析后路由 ==========
+# ========== 旧分析后路由（已废弃，保留参考） ==========
 
 def _make_analyze_router():
-    """创建分析后路由函数的工厂。
+    """【已废弃】创建分析后路由函数的工厂。
 
-    analyze_node 同时完成了意图识别 + 查询改写，路由逻辑简化：
+    原 analyze_node 同时完成了意图识别 + 查询改写，路由逻辑简化：
       - chat  → chat_node（不走工具，直接闲聊回复）
       - 其他  → agent_node（带工具的 ReAct 循环）
+
+    现已被 supervisor_router 替代，supervisor 支持多意图识别和复杂度评估。
     """
 
     def analyze_router(state: AgentState) -> str:
@@ -32,10 +36,13 @@ def _make_analyze_router():
     return analyze_router
 
 
-# ========== Agent 后路由 ==========
+# ========== 旧 Agent 后路由（已废弃，保留参考） ==========
 
 def _make_agent_router(tools: list):
-    """创建 agent 路由函数的工厂（捕获 tools 列表用于日志对比）。"""
+    """【已废弃】创建 agent 路由函数的工厂（捕获 tools 列表用于日志对比）。
+
+    原 agent 节点后的统一路由函数，现已被 plan_executor_router 和 quality_router 替代。
+    """
     all_tool_names = [t.name for t in tools]
 
     def agent_router(state: AgentState) -> str:

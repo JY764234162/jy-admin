@@ -1,6 +1,6 @@
 """Agent 流式 SSE 输出 —— 主入口。
 
-【架构说明：LangGraph StateGraph + 自动摘要机制 + 意图路由】
+【架构说明：LangGraph StateGraph + 自动摘要机制 + 多意图路由】
 --------------------------------------------------------------------------------
 本文件是 Agent 的核心入口，职责单一：
   1. 组装 StateGraph（调用各子模块的节点/路由/工具工厂函数）
@@ -10,8 +10,11 @@
 具体节点实现见：
   - state.py      → AgentState 定义
   - prompts.py    → 所有 system prompt 模板
-  - nodes.py      → analyze_node, chat_node, agent_node, summarize_node
-  - router.py     → analyze_router, agent_router
+  - nodes.py      → summarize_node, ensure_placeholder_node
+  - supervisor/   → supervisor_node, supervisor_router
+  - planner/      → planner_node, plan_executor, plan_executor_router
+  - quality/      → quality_check_node, plan_refinement_node, quality_router, refinement_router
+  - workers/      → chat_worker, direct_worker, knowledge_worker, search_worker, synthesis_worker
   - tools_node.py → make_tools, _make_tool_node
 --------------------------------------------------------------------------------
 """
@@ -29,7 +32,6 @@ from services.llm.response_filter import sanitize_response
 from services.storage.checkpoint_store import get_async_saver
 
 from .nodes import (
-    analyze_node,
     ensure_placeholder_node,
     summarize_node,
 )
@@ -41,9 +43,33 @@ from .workers import (
     _make_synthesis_worker,
 )
 from .message_helpers import last_human_message, stamp_message_created_at
-from .router import _make_agent_router, _make_analyze_router
-from .state import AgentState
+from .state import AgentState, MAX_RAW_MESSAGES
 from .tools_node import make_tools, _make_tool_node
+
+from .supervisor.node import supervisor_node
+from .supervisor.router import supervisor_router
+from .planner.node import planner_node
+from .planner.executor import _make_plan_executor, plan_executor_router
+from .quality.node import quality_check_node, plan_refinement_node, quality_router, refinement_router
+
+
+# ========== 摘要条件路由 ==========
+
+
+def _make_maybe_summarize_router():
+    """创建 maybe_summarize 路由函数。
+
+    检查消息数量是否超过 MAX_RAW_MESSAGES，超过则路由到 summarize 节点，否则直接 END。
+    """
+
+    def maybe_summarize_router(state: AgentState) -> str:
+        msg_count = len(state.get("messages", []))
+        if msg_count > MAX_RAW_MESSAGES:
+            print(f"[AGENT] 路由 → summarize: 消息数 {msg_count} > 阈值 {MAX_RAW_MESSAGES}")
+            return "summarize"
+        return END
+
+    return maybe_summarize_router
 
 
 # ========== SSE 辅助函数 ==========
@@ -66,13 +92,16 @@ def _build_graph(
     system_prompt: str = "",
     checkpointer=None,
 ):
-    """构建并编译 StateGraph（含分析节点 + 自动摘要机制）。
+    """构建并编译 StateGraph（含 supervisor 节点 + 自动摘要机制）。
 
     与标准 StateGraph 的区别：
-      - 增加 analyze_node，一次 LLM 调用完成意图识别 + 查询改写
-      - 增加 chat_node 处理纯闲聊（不走工具）
-      - agent 节点使用滑动窗口，只传入近期消息到 LLM
-      - 增加迭代保护（MAX_ITERATIONS），防止工具调用无限循环
+      - 增加 supervisor_node，一次 LLM 调用完成多意图识别 + 复杂度评估
+      - 增加 chat_worker 处理纯闲聊（不走工具）
+      - 增加 direct_worker 处理单意图简单任务
+      - 增加 planner_node + plan_executor 处理复杂/多意图任务
+      - 增加 quality_check_node + plan_refinement_node 质量检查与计划重 refinement
+      - 增加 synthesis_worker 综合结果生成最终回复
+      - 保留 summarize_node 自动摘要机制
     """
     # 1. 创建工具列表
     tools = make_tools(
@@ -85,51 +114,113 @@ def _build_graph(
     )
 
     # 2. 创建各节点（闭包捕获配置）
-    analyze_router = _make_analyze_router()
     chat_node = _make_chat_worker(system_prompt)
-    agent_node = _make_direct_worker(system_prompt, tools, enable_knowledge, enable_search)
-    agent_router = _make_agent_router(tools)
+    direct_node = _make_direct_worker(system_prompt, tools, enable_knowledge, enable_search)
+    plan_executor = _make_plan_executor(tools, system_prompt, enable_knowledge, enable_search)
+    synthesis_node = _make_synthesis_worker(system_prompt)
 
     # 3. 构图
     builder = StateGraph(AgentState)
 
-    # 3.1 入口节点：分析（意图识别 + 查询改写）
-    builder.add_node("analyze", analyze_node)
-    builder.set_entry_point("analyze")
+    # 3.1 入口节点：supervisor（多意图识别 + 复杂度评估）
+    builder.add_node("supervisor", supervisor_node)
+    builder.set_entry_point("supervisor")
 
     # 3.2 占位 AI（刷新列表可见「生成中」条）
     builder.add_node("ensure_placeholder", ensure_placeholder_node)
-    builder.add_edge("analyze", "ensure_placeholder")
+    builder.add_edge("supervisor", "ensure_placeholder")
 
-    # 3.3 条件边：根据意图分流
-    analyze_routing_map = {"chat": "chat", "agent": "agent"}
+    # 3.3 条件边：根据 supervisor 分析结果分流
+    supervisor_routing_map = {
+        "chat_worker": "chat_worker",
+        "direct_worker": "direct_worker",
+        "planner_node": "planner_node",
+    }
     builder.add_conditional_edges(
-        "ensure_placeholder", analyze_router, analyze_routing_map
+        "ensure_placeholder", supervisor_router, supervisor_routing_map
     )
 
     # 3.4 闲聊节点（不走工具）
-    builder.add_node("chat", chat_node)
-    builder.add_edge("chat", END)
+    builder.add_node("chat_worker", chat_node)
 
-    # 3.5 Agent 节点（带工具的 ReAct 循环）
-    builder.add_node("agent", agent_node)
+    # 3.5 直接执行节点（单意图简单任务）
+    builder.add_node("direct_worker", direct_node)
 
-    # 3.6 工具节点（如果有工具）
-    if tools:
-        tool_node = _make_tool_node(tools)
-        builder.add_node("tools", tool_node)
-        builder.add_edge("tools", "agent")  # 工具执行完后回到 agent 继续思考
+    # 3.6 计划节点（生成执行计划）
+    builder.add_node("planner_node", planner_node)
 
-    # 3.7 摘要节点
+    # 3.7 计划执行节点（执行计划中的步骤）
+    builder.add_node("plan_executor", plan_executor)
+
+    # 3.8 综合节点（整合结果生成最终回复）
+    builder.add_node("synthesis_worker", synthesis_node)
+
+    # 3.9 质量检查节点
+    builder.add_node("quality_check", quality_check_node)
+
+    # 3.10 计划重 refinement 节点
+    builder.add_node("plan_refinement", plan_refinement_node)
+
+    # 3.11 摘要节点
     builder.add_node("summarize", summarize_node)
-    builder.add_edge("summarize", END)  # 摘要完成后结束
 
-    # 3.8 Agent 后的统一条件边
-    routing_map = {"summarize": "summarize", END: END}
-    if tools:
-        routing_map["tools"] = "tools"
+    # ========== 边连接 ==========
 
-    builder.add_conditional_edges("agent", agent_router, routing_map)
+    # chat_worker / direct_worker → maybe_summarize_router
+    builder.add_conditional_edges(
+        "chat_worker",
+        _make_maybe_summarize_router(),
+        {"summarize": "summarize", END: END},
+    )
+    builder.add_conditional_edges(
+        "direct_worker",
+        _make_maybe_summarize_router(),
+        {"summarize": "summarize", END: END},
+    )
+
+    # planner_node → plan_executor
+    builder.add_edge("planner_node", "plan_executor")
+
+    # plan_executor → plan_executor_router
+    plan_executor_routing_map = {
+        "plan_executor": "plan_executor",
+        "synthesis_worker": "synthesis_worker",
+    }
+    builder.add_conditional_edges(
+        "plan_executor", plan_executor_router, plan_executor_routing_map
+    )
+
+    # synthesis_worker → quality_check
+    builder.add_edge("synthesis_worker", "quality_check")
+
+    # quality_check → quality_router (注意：quality_router 返回 END 时进入 maybe_summarize)
+    quality_routing_map = {
+        END: "maybe_summarize_after_quality",
+        "plan_refinement": "plan_refinement",
+    }
+    builder.add_conditional_edges(
+        "quality_check", quality_router, quality_routing_map
+    )
+
+    # 质量检查通过后 → maybe_summarize_router
+    builder.add_node("maybe_summarize_after_quality", lambda state: {})
+    builder.add_conditional_edges(
+        "maybe_summarize_after_quality",
+        _make_maybe_summarize_router(),
+        {"summarize": "summarize", END: END},
+    )
+
+    # plan_refinement → refinement_router
+    refinement_routing_map = {
+        "plan_executor": "plan_executor",
+        END: END,
+    }
+    builder.add_conditional_edges(
+        "plan_refinement", refinement_router, refinement_routing_map
+    )
+
+    # summarize → END
+    builder.add_edge("summarize", END)
 
     # 4. 编译，附加 checkpoint（对话记忆持久化）
     if checkpointer is None:
