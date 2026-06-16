@@ -6,6 +6,7 @@
 """
 
 import json
+import logging
 
 from langchain_core.messages import HumanMessage
 from pydantic import BaseModel, Field
@@ -15,6 +16,8 @@ from services.llm.llm import llm
 from ..message_helpers import extract_json_from_text, extract_text_content, last_human_message
 from ..prompts import QUALITY_CHECK_PROMPT, PLAN_REFINEMENT_PROMPT
 from ..state import AgentState, PlanStep
+
+logger = logging.getLogger(__name__)
 
 
 class QualityCheckResult(BaseModel):
@@ -84,7 +87,7 @@ def quality_check_node(state: AgentState) -> dict:
         passed = result.passed
         feedback = result.feedback
     except Exception as e:
-        print(f"[QUALITY] 结构化输出失败，尝试 JSON 解析回退: {e}")
+        logger.warning("[QUALITY] 结构化输出失败，尝试 JSON 解析回退: %s", e)
         try:
             raw_response = llm.invoke([HumanMessage(content=prompt)])
             resp_text = str(raw_response.content) if raw_response.content else ""
@@ -97,11 +100,11 @@ def quality_check_node(state: AgentState) -> dict:
             else:
                 raise ValueError(f"无法从 LLM 响应中提取 JSON: {resp_text[:200]}")
         except Exception as e2:
-            print(f"[QUALITY] 质量检查异常，回退到通过: {e2}")
+            logger.error("[QUALITY] 质量检查异常，回退到通过: %s", e2)
             passed = True
             feedback = ""
 
-    print(f"[QUALITY] 检查结果: passed={passed}, feedback={feedback[:100] if feedback else ''}")
+    logger.info("[QUALITY] 检查结果: passed=%s, feedback=%s", passed, feedback[:100] if feedback else "")
     return {"quality_passed": passed, "quality_feedback": feedback}
 
 
@@ -149,7 +152,7 @@ def plan_refinement_node(state: AgentState) -> dict:
             raise ValueError("LLM 返回了空计划")
 
         new_count = plan_refinement_count + 1
-        print(f"[REFINEMENT] 计划重 refinement #{new_count} 完成，新计划 {len(new_plan)} 步")
+        logger.info("[REFINEMENT] 计划重 refinement #%s 完成，新计划 %s 步", new_count, len(new_plan))
         return {
             "plan": new_plan,
             "current_step_index": 0,
@@ -157,7 +160,7 @@ def plan_refinement_node(state: AgentState) -> dict:
             "plan_refinement_count": new_count,
         }
     except Exception as e:
-        print(f"[REFINEMENT] 计划重 refinement 异常，跳过: {e}")
+        logger.error("[REFINEMENT] 计划重 refinement 异常，跳过: %s", e)
         return {}
 
 
