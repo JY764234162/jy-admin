@@ -126,6 +126,7 @@ def _make_plan_executor(
         plan = state.get("plan", [])
         step_results = list(state.get("step_results", []))
         current_index = state.get("current_step_index", 0)
+        new_refinement_count = state.get("plan_refinement_count", 0) + 1
 
         if not plan or current_index >= len(plan):
             logger.info("[EXECUTOR] 所有步骤已执行完毕")
@@ -133,6 +134,7 @@ def _make_plan_executor(
                 "messages": [],
                 "step_results": step_results,
                 "current_step_index": current_index,
+                "plan_refinement_count": new_refinement_count,
             }
 
         step_idx, step = _find_next_executable_step(state)
@@ -142,6 +144,7 @@ def _make_plan_executor(
                 "messages": [],
                 "step_results": step_results,
                 "current_step_index": current_index,
+                "plan_refinement_count": new_refinement_count,
             }
 
         worker_name = step.worker
@@ -182,6 +185,7 @@ def _make_plan_executor(
                 "messages": [],
                 "step_results": step_results,
                 "current_step_index": step_idx + 1,
+                "plan_refinement_count": new_refinement_count,
             }
 
         worker = factory()
@@ -202,6 +206,7 @@ def _make_plan_executor(
                 "messages": [],
                 "step_results": step_results,
                 "current_step_index": step_idx + 1,
+                "plan_refinement_count": new_refinement_count,
             }
 
         # 提取 worker 输出
@@ -232,6 +237,7 @@ def _make_plan_executor(
         result = dict(worker_result)
         result["step_results"] = step_results
         result["current_step_index"] = step_idx + 1
+        result["plan_refinement_count"] = new_refinement_count
         return result
 
     return plan_executor

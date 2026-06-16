@@ -58,9 +58,10 @@ def planner_node(state: AgentState) -> dict:
     解析失败或 LLM 异常时回退到单步 synthesis_worker 兜底计划。
     """
     messages = state["messages"]
+    primary_intent = state.get("primary_intent", "other")
     if not messages:
         return {
-            "plan": _build_fallback_plan(""),
+            "plan": _build_fallback_plan("", primary_intent),
             "current_step_index": 0,
             "step_results": [],
         }
