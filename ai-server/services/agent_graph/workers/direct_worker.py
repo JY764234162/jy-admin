@@ -4,6 +4,8 @@
       执行一次工具调用后返回最终回复。
 """
 
+import logging
+
 from langchain_core.messages import AIMessage, SystemMessage, ToolMessage
 
 from services.llm.llm import llm
@@ -11,6 +13,8 @@ from services.llm.llm import llm
 from ..message_helpers import build_assistant_reply_update, messages_for_llm_prompt
 from ..prompts import DIRECT_WORKER_PROMPT
 from ..state import MAX_RAW_MESSAGES, AgentState
+
+logger = logging.getLogger(__name__)
 
 
 def _make_direct_worker(
@@ -64,24 +68,29 @@ def _make_direct_worker(
                 response = llm_with_tools.invoke(prompt_messages)
             else:
                 response = llm.invoke(prompt_messages)
-        except Exception as e:
-            print(f"[AGENT] 直接 worker LLM 调用异常: {e}")
+        except Exception:
+            logger.error("直接 worker LLM 调用异常", exc_info=True)
             response = AIMessage(content="抱歉，服务暂时异常，请稍后重试。")
             return build_assistant_reply_update(messages, response)
 
         # 检查是否有工具调用
         tool_calls = getattr(response, "tool_calls", None) or []
         if not tool_calls:
-            print("[AGENT] 直接 worker 未调用工具，直接生成回复")
+            logger.info("直接 worker 未调用工具，直接生成回复")
             return build_assistant_reply_update(messages, response)
 
         # 执行工具调用（只执行第一个）
+        if len(tool_calls) > 1:
+            logger.warning(
+                "直接 worker 收到 %d 个 tool_calls，仅执行第一个", len(tool_calls)
+            )
+
         tool_call = tool_calls[0]
         tool_name = tool_call.get("name", "")
         tool_args = tool_call.get("args", {})
         tool_id = tool_call.get("id", "unknown")
 
-        print(f"[AGENT] 直接 worker 调用工具: {tool_name}")
+        logger.info("直接 worker 调用工具: %s", tool_name)
 
         # 找到对应的工具并执行
         tool_result = None
@@ -89,8 +98,9 @@ def _make_direct_worker(
             if tool.name == tool_name:
                 try:
                     tool_result = tool.invoke(tool_args)
-                except Exception as e:
-                    tool_result = f"工具执行失败：{str(e)}"
+                except Exception:
+                    logger.error("工具执行失败: %s", tool_name, exc_info=True)
+                    tool_result = f"工具执行失败：{tool_name}"
                 break
 
         if tool_result is None:
@@ -106,8 +116,8 @@ def _make_direct_worker(
                 final_response = llm_with_tools.invoke(prompt_messages_with_result)
             else:
                 final_response = llm.invoke(prompt_messages_with_result)
-        except Exception as e:
-            print(f"[AGENT] 直接 worker 最终调用异常: {e}")
+        except Exception:
+            logger.error("直接 worker 最终调用异常", exc_info=True)
             final_response = AIMessage(content="抱歉，处理工具结果时遇到异常，请稍后重试。")
 
         # 如果最终响应仍然包含工具调用，直接返回文本回复
@@ -116,7 +126,7 @@ def _make_direct_worker(
             # 强制返回纯文本，避免循环
             final_response = AIMessage(content=str(tool_result))
 
-        print(f"[AGENT] 直接 worker 完成: {len(final_response.content)} 字")
+        logger.info("直接 worker 完成: %s 字", len(final_response.content))
         return build_assistant_reply_update(messages, final_response)
 
     return direct_worker

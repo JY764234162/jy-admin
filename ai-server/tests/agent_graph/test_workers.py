@@ -262,11 +262,9 @@ class TestKnowledgeWorker:
 
         tools = [mock_knowledge_tool, mock_list_tool]
         worker = _make_knowledge_worker(
-            system_prompt="", user_id="user123", enable_knowledge=True
+            system_prompt="", tools=tools, enable_knowledge=True
         )
-        # Patch make_tools to return our mocked tools
-        with patch("services.agent_graph.workers.knowledge_worker.make_tools", return_value=tools):
-            result = worker(knowledge_intent_state)
+        result = worker(knowledge_intent_state)
 
         # Verify knowledge_results is written
         assert "knowledge_results" in result
@@ -278,7 +276,7 @@ class TestKnowledgeWorker:
         from services.agent_graph.workers.knowledge_worker import _make_knowledge_worker
 
         worker = _make_knowledge_worker(
-            system_prompt="", user_id="user123", enable_knowledge=False
+            system_prompt="", tools=[], enable_knowledge=False
         )
         result = worker(knowledge_intent_state)
 
@@ -306,13 +304,12 @@ class TestKnowledgeWorker:
 
         tools = [mock_knowledge_tool]
         worker = _make_knowledge_worker(
-            system_prompt="", user_id="user123", enable_knowledge=True
+            system_prompt="", tools=tools, enable_knowledge=True
         )
-        with patch("services.agent_graph.workers.knowledge_worker.make_tools", return_value=tools):
-            result = worker(knowledge_intent_state)
+        result = worker(knowledge_intent_state)
 
-        # Should have called invoke at most 2 times (initial + 1 retry)
-        assert mock_llm.bind_tools.return_value.invoke.call_count <= 2
+        # Should have called invoke exactly 2 times (initial + 1 retry)
+        assert mock_llm.bind_tools.return_value.invoke.call_count == 2
 
 
 # ========== search_worker tests ==========
@@ -337,10 +334,9 @@ class TestSearchWorker:
 
         tools = [mock_search_tool]
         worker = _make_search_worker(
-            system_prompt="", user_id="user123", enable_search=True
+            system_prompt="", tools=tools, enable_search=True
         )
-        with patch("services.agent_graph.workers.search_worker.make_tools", return_value=tools):
-            result = worker(search_intent_state)
+        result = worker(search_intent_state)
 
         assert "search_results" in result
         assert "今天新闻" in result["search_results"]
@@ -351,7 +347,7 @@ class TestSearchWorker:
         from services.agent_graph.workers.search_worker import _make_search_worker
 
         worker = _make_search_worker(
-            system_prompt="", user_id="user123", enable_search=False
+            system_prompt="", tools=[], enable_search=False
         )
         result = worker(search_intent_state)
 
@@ -378,12 +374,11 @@ class TestSearchWorker:
 
         tools = [mock_search_tool]
         worker = _make_search_worker(
-            system_prompt="", user_id="user123", enable_search=True
+            system_prompt="", tools=tools, enable_search=True
         )
-        with patch("services.agent_graph.workers.search_worker.make_tools", return_value=tools):
-            result = worker(search_intent_state)
+        result = worker(search_intent_state)
 
-        assert mock_llm.bind_tools.return_value.invoke.call_count <= 2
+        assert mock_llm.bind_tools.return_value.invoke.call_count == 2
 
 
 # ========== synthesis_worker tests ==========
