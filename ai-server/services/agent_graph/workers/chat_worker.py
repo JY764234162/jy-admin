@@ -12,6 +12,7 @@ from services.llm.llm import llm
 from ..message_helpers import build_assistant_reply_update, messages_for_llm_prompt
 from ..prompts import CHAT_WORKER_PROMPT
 from ..state import MAX_RAW_MESSAGES, AgentState
+from ..tracing import get_runnable_config
 
 logger = logging.getLogger(__name__)
 
@@ -40,7 +41,7 @@ def _make_chat_worker(system_prompt: str = ""):
         prompt_messages = [SystemMessage(content=full_system)] + recent_messages
 
         try:
-            response = llm.invoke(prompt_messages)
+            response = llm.invoke(prompt_messages, config=get_runnable_config())
         except Exception:
             logger.error("闲聊 worker 异常", exc_info=True)
             response = AIMessage(content="抱歉，我暂时有点忙，请稍后再试~")

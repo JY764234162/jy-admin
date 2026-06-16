@@ -58,6 +58,7 @@ class AgentState(TypedDict):
       current_step_index: 当前执行步骤索引。
       step_results:   步骤执行结果列表。
       plan_refinement_count: 计划重 refinement 次数。
+      plan_execution_count:  计划步骤执行次数（用于限制执行循环）。
       knowledge_results: 知识库检索结果。
       search_results: 网络搜索结果。
       synthesis_context: 综合上下文。
@@ -78,6 +79,7 @@ class AgentState(TypedDict):
     current_step_index: int
     step_results: list[StepResult]
     plan_refinement_count: int
+    plan_execution_count: int
     knowledge_results: str
     search_results: str
     synthesis_context: str

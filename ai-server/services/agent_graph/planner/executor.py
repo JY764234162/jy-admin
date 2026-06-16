@@ -126,7 +126,7 @@ def _make_plan_executor(
         plan = state.get("plan", [])
         step_results = list(state.get("step_results", []))
         current_index = state.get("current_step_index", 0)
-        new_refinement_count = state.get("plan_refinement_count", 0) + 1
+        new_execution_count = state.get("plan_execution_count", 0) + 1
 
         if not plan or current_index >= len(plan):
             logger.info("[EXECUTOR] 所有步骤已执行完毕")
@@ -134,7 +134,7 @@ def _make_plan_executor(
                 "messages": [],
                 "step_results": step_results,
                 "current_step_index": current_index,
-                "plan_refinement_count": new_refinement_count,
+                "plan_execution_count": new_execution_count,
             }
 
         step_idx, step = _find_next_executable_step(state)
@@ -144,14 +144,19 @@ def _make_plan_executor(
                 "messages": [],
                 "step_results": step_results,
                 "current_step_index": current_index,
-                "plan_refinement_count": new_refinement_count,
+                "plan_execution_count": new_execution_count,
             }
 
         worker_name = step.worker
         step_id = step.step_id
         input_query = step.input_query
 
-        logger.info(f"[EXECUTOR] 执行步骤 {step_id}: {worker_name}")
+        logger.info(
+            "[EXECUTOR] 执行步骤 %s: %s",
+            step_id,
+            worker_name,
+            extra={"node": "plan_executor", "step_id": step_id, "worker": worker_name},
+        )
 
         # 准备 worker 输入状态
         # 对于 chat_worker 和 synthesis_worker，将 input_query 作为最后一条人类消息
@@ -185,7 +190,7 @@ def _make_plan_executor(
                 "messages": [],
                 "step_results": step_results,
                 "current_step_index": step_idx + 1,
-                "plan_refinement_count": new_refinement_count,
+                "plan_execution_count": new_execution_count,
             }
 
         worker = factory()
@@ -206,7 +211,7 @@ def _make_plan_executor(
                 "messages": [],
                 "step_results": step_results,
                 "current_step_index": step_idx + 1,
-                "plan_refinement_count": new_refinement_count,
+                "plan_execution_count": new_execution_count,
             }
 
         # 提取 worker 输出
@@ -231,13 +236,18 @@ def _make_plan_executor(
         )
         step_results.append(step_result)
 
-        logger.info(f"[EXECUTOR] 步骤 {step_id} 完成: {output_text[:50]}...")
+        logger.info(
+            "[EXECUTOR] 步骤 %s 完成: %s...",
+            step_id,
+            output_text[:50],
+            extra={"node": "plan_executor", "step_id": step_id, "worker": worker_name, "status": "success"},
+        )
 
         # 合并 worker 的 messages 更新 + 状态更新
         result = dict(worker_result)
         result["step_results"] = step_results
         result["current_step_index"] = step_idx + 1
-        result["plan_refinement_count"] = new_refinement_count
+        result["plan_execution_count"] = new_execution_count
         return result
 
     return plan_executor
@@ -251,7 +261,7 @@ def plan_executor_router(state: AgentState) -> str:
     """
     plan = state.get("plan", [])
     current_index = state.get("current_step_index", 0)
-    plan_refinement_count = state.get("plan_refinement_count", 0)
+    plan_execution_count = state.get("plan_execution_count", 0)
 
     if not plan:
         return "synthesis_worker"
@@ -260,7 +270,7 @@ def plan_executor_router(state: AgentState) -> str:
         return "synthesis_worker"
 
     # 安全限制：如果执行循环超过阈值，强制结束
-    if plan_refinement_count >= 5:
+    if plan_execution_count >= 10:
         logger.warning("[ROUTER] 计划执行循环超过限制，强制进入 synthesis_worker")
         return "synthesis_worker"
 

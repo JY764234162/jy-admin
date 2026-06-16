@@ -136,6 +136,7 @@ def test_agent_state_new_fields():
         current_step_index=0,
         step_results=[step_result],
         plan_refinement_count=0,
+        plan_execution_count=0,
         knowledge_results="",
         search_results="",
         synthesis_context="",
@@ -152,6 +153,7 @@ def test_agent_state_new_fields():
     assert state["current_step_index"] == 0
     assert state["step_results"][0].status == "success"
     assert state["plan_refinement_count"] == 0
+    assert state["plan_execution_count"] == 0
     assert state["knowledge_results"] == ""
     assert state["search_results"] == ""
     assert state["synthesis_context"] == ""

@@ -16,6 +16,7 @@ from services.llm.llm import llm
 from ..message_helpers import extract_json_from_text, extract_text_content, last_human_message
 from ..prompts import QUALITY_CHECK_PROMPT, PLAN_REFINEMENT_PROMPT
 from ..state import AgentState, PlanStep
+from ..tracing import get_runnable_config
 
 logger = logging.getLogger(__name__)
 
@@ -83,13 +84,13 @@ def quality_check_node(state: AgentState) -> dict:
     try:
         # 尝试使用结构化输出
         structured_llm = llm.with_structured_output(QualityCheckResult)
-        result = structured_llm.invoke([HumanMessage(content=prompt)])
+        result = structured_llm.invoke([HumanMessage(content=prompt)], config=get_runnable_config())
         passed = result.passed
         feedback = result.feedback
     except Exception as e:
         logger.warning("[QUALITY] 结构化输出失败，尝试 JSON 解析回退: %s", e)
         try:
-            raw_response = llm.invoke([HumanMessage(content=prompt)])
+            raw_response = llm.invoke([HumanMessage(content=prompt)], config=get_runnable_config())
             resp_text = str(raw_response.content) if raw_response.content else ""
             json_text = extract_json_from_text(resp_text)
 
@@ -104,7 +105,12 @@ def quality_check_node(state: AgentState) -> dict:
             passed = True
             feedback = ""
 
-    logger.info("[QUALITY] 检查结果: passed=%s, feedback=%s", passed, feedback[:100] if feedback else "")
+    logger.info(
+        "[QUALITY] 检查结果: passed=%s, feedback=%s",
+        passed,
+        feedback[:100] if feedback else "",
+        extra={"node": "quality_check_node", "passed": passed},
+    )
     return {"quality_passed": passed, "quality_feedback": feedback}
 
 
@@ -144,7 +150,7 @@ def plan_refinement_node(state: AgentState) -> dict:
 
     try:
         structured_llm = llm.with_structured_output(_PlanRefinementResult)
-        result = structured_llm.invoke([HumanMessage(content=prompt)])
+        result = structured_llm.invoke([HumanMessage(content=prompt)], config=get_runnable_config())
         new_plan = result.plan
 
         # 如果返回空计划，回退到默认计划

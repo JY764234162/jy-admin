@@ -248,6 +248,7 @@ class TestGraphRouting:
         assert result.get("intent_confidence") == 0.0
         assert result.get("task_complexity") == "simple"
         assert result.get("suggested_plan") == []
+        assert result.get("plan_execution_count") == 0
         # Persistent fields should be preserved
         assert len(result.get("messages", [])) > 0
 

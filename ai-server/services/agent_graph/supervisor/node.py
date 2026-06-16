@@ -1,10 +1,8 @@
-"""Supervisor 节点：多意图识别 + 任务复杂度评估 + 计划建议。"""
-
+import logging
 import json
 from typing import Literal
 
 from langchain_core.messages import HumanMessage
-from langchain_core.runnables import RunnableConfig
 from pydantic import BaseModel, Field
 
 from services.llm.llm import llm
@@ -12,6 +10,9 @@ from services.llm.llm import llm
 from ..message_helpers import extract_json_from_text, extract_text_content, last_human_message
 from ..prompts import SUPERVISOR_SYSTEM_PROMPT
 from ..state import AgentState, IntentItem
+from ..tracing import get_runnable_config
+
+logger = logging.getLogger(__name__)
 
 
 class IntentAnalysis(BaseModel):
@@ -81,7 +82,7 @@ def supervisor_node(state: AgentState) -> dict:
     try:
         raw_response = llm.invoke(
             [HumanMessage(content=prompt)],
-            config=RunnableConfig(callbacks=[]),
+            config=get_runnable_config(),
         )
         resp_text = str(raw_response.content) if raw_response.content else ""
         json_text = extract_json_from_text(resp_text)
@@ -101,10 +102,20 @@ def supervisor_node(state: AgentState) -> dict:
                 break
         # 如果 intents 为空，默认 0.0
 
-        print(f"[SUPERVISOR] 分析成功: primary_intent={primary_intent}, "
-              f"complexity={analysis.task_complexity}, intents={len(analysis.intents)}")
+        logger.info(
+            "[SUPERVISOR] 分析成功: primary_intent=%s, complexity=%s, intents=%d",
+            primary_intent,
+            analysis.task_complexity,
+            len(analysis.intents),
+            extra={
+                "node": "supervisor_node",
+                "primary_intent": primary_intent,
+                "task_complexity": analysis.task_complexity,
+                "intents_count": len(analysis.intents),
+            },
+        )
     except Exception as e:
-        print(f"[SUPERVISOR] 分析异常，回退到 other: {e}")
+        logger.error("[SUPERVISOR] 分析异常，回退到 other: %s", e, extra={"node": "supervisor_node", "error": str(e)})
         primary_intent = "other"
         intent_confidence = 0.0
         analysis = IntentAnalysis(

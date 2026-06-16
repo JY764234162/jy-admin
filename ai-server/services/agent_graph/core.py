@@ -23,6 +23,8 @@ import asyncio
 import json
 from typing import AsyncIterator
 
+import logging
+
 from langchain_core.messages import AIMessage, HumanMessage
 from langgraph.graph import END, StateGraph
 from langgraph.graph.message import RemoveMessage
@@ -30,6 +32,8 @@ from langgraph.graph.message import RemoveMessage
 from services.chat_attachments import build_human_message_content
 from services.llm.response_filter import sanitize_response
 from services.storage.checkpoint_store import get_async_saver
+
+logger = logging.getLogger(__name__)
 
 from .nodes import (
     cleanup_node,
@@ -66,7 +70,12 @@ def _make_maybe_summarize_router():
     def maybe_summarize_router(state: AgentState) -> str:
         msg_count = len(state.get("messages", []))
         if msg_count > MAX_RAW_MESSAGES:
-            print(f"[AGENT] 路由 → summarize: 消息数 {msg_count} > 阈值 {MAX_RAW_MESSAGES}")
+            logger.info(
+                "[AGENT] 路由 → summarize: 消息数 %s > 阈值 %s",
+                msg_count,
+                MAX_RAW_MESSAGES,
+                extra={"node": "maybe_summarize_router", "msg_count": msg_count, "threshold": MAX_RAW_MESSAGES},
+            )
             return "summarize"
         return END
 
@@ -109,9 +118,19 @@ def _build_graph(
         user_id=user_id, enable_knowledge=enable_knowledge, enable_search=enable_search
     )
     tool_names = [t.name for t in tools]
-    print(
-        f"[AGENT] 构建 Graph: user_id={user_id}, tools={tool_names}, "
-        f"enable_knowledge={enable_knowledge}, enable_search={enable_search}"
+    logger.info(
+        "[AGENT] 构建 Graph: user_id=%s, tools=%s, enable_knowledge=%s, enable_search=%s",
+        user_id,
+        tool_names,
+        enable_knowledge,
+        enable_search,
+        extra={
+            "node": "_build_graph",
+            "user_id": user_id,
+            "tools": tool_names,
+            "enable_knowledge": enable_knowledge,
+            "enable_search": enable_search,
+        },
     )
 
     # 2. 创建各节点（闭包捕获配置）

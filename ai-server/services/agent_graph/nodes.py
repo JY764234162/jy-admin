@@ -20,6 +20,7 @@ from .message_helpers import (
     stamp_message_created_at,
 )
 from .state import MAX_RAW_MESSAGES, AgentState
+from .tracing import get_runnable_config
 
 
 # ========== 占位 AI 节点 ==========
@@ -67,6 +68,7 @@ def cleanup_node(state: AgentState) -> dict:
         "intent_confidence": 0.0,
         "task_complexity": "simple",
         "suggested_plan": [],
+        "plan_execution_count": 0,
     }
 
 
@@ -132,6 +134,6 @@ def _generate_summary(messages: list, existing_summary: str = "") -> str:
     # 调用非流式 LLM 生成摘要
     response = summary_llm.invoke(
         [HumanMessage(content=prompt)],
-        config=RunnableConfig(callbacks=[]),
+        config=get_runnable_config(),
     )
     return response.content.strip()

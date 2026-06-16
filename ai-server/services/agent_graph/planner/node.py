@@ -15,6 +15,7 @@ from services.llm.llm import llm
 from ..message_helpers import extract_json_from_text, extract_text_content, last_human_message
 from ..prompts import PLANNER_SYSTEM_PROMPT
 from ..state import AgentState, PlanStep
+from ..tracing import get_runnable_config
 
 logger = logging.getLogger(__name__)
 
@@ -101,7 +102,7 @@ def planner_node(state: AgentState) -> dict:
     try:
         # 优先尝试结构化输出
         structured_llm = llm.with_structured_output(PlanResult)
-        raw_response = structured_llm.invoke([HumanMessage(content=prompt)])
+        raw_response = structured_llm.invoke([HumanMessage(content=prompt)], config=get_runnable_config())
 
         if raw_response and hasattr(raw_response, "plan") and raw_response.plan:
             plan_steps = raw_response.plan
@@ -112,7 +113,7 @@ def planner_node(state: AgentState) -> dict:
         logger.warning(f"[PLANNER] 结构化输出失败，尝试 JSON 解析: {e}")
 
         try:
-            raw_response = llm.invoke([HumanMessage(content=prompt)])
+            raw_response = llm.invoke([HumanMessage(content=prompt)], config=get_runnable_config())
             resp_text = str(raw_response.content) if hasattr(raw_response, "content") else str(raw_response)
             json_text = extract_json_from_text(resp_text)
 
@@ -131,7 +132,11 @@ def planner_node(state: AgentState) -> dict:
     if not plan_steps:
         plan_steps = _build_fallback_plan(content, primary_intent)
 
-    logger.info(f"[PLANNER] 生成计划: {len(plan_steps)} 步")
+    logger.info(
+        "[PLANNER] 生成计划: %s 步",
+        len(plan_steps),
+        extra={"node": "planner_node", "plan_step_count": len(plan_steps)},
+    )
     for step in plan_steps:
         logger.info(f"  - {step.step_id}: {step.worker} (depends_on={step.depends_on})")
 

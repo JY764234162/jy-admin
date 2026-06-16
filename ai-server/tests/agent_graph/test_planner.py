@@ -168,6 +168,7 @@ class TestPlanExecutor:
         assert result["step_results"][0].step_id == "step_1"
         assert result["step_results"][0].status == "success"
         assert result["current_step_index"] == 1
+        assert result["plan_execution_count"] == 1
         assert "messages" in result
 
     @patch("services.agent_graph.planner.executor._make_knowledge_worker")
@@ -194,6 +195,7 @@ class TestPlanExecutor:
         assert result["step_results"][1].step_id == "step_2"
         assert result["step_results"][1].status == "success"
         assert result["current_step_index"] == 2
+        assert result["plan_execution_count"] == 1
 
     @patch("services.agent_graph.planner.executor._make_synthesis_worker")
     def test_executes_synthesis_when_ready(self, mock_make_synthesis, plan_state):
@@ -220,6 +222,7 @@ class TestPlanExecutor:
         assert result["step_results"][2].step_id == "step_3"
         assert result["step_results"][2].status == "success"
         assert result["current_step_index"] == 3
+        assert result["plan_execution_count"] == 1
 
     @patch("services.agent_graph.planner.executor._make_search_worker")
     def test_handles_failed_step(self, mock_make_search, plan_state):
@@ -239,6 +242,7 @@ class TestPlanExecutor:
         assert result["step_results"][0].status == "failed"
         assert "Worker error" in result["step_results"][0].output
         assert result["current_step_index"] == 1
+        assert result["plan_execution_count"] == 1
 
     def test_handles_unknown_worker(self, plan_state):
         """plan_executor marks step as failed for unknown worker type."""
@@ -255,6 +259,7 @@ class TestPlanExecutor:
         assert result["step_results"][0].status == "failed"
         assert "unknown_worker" in result["step_results"][0].output
         assert result["current_step_index"] == 1
+        assert result["plan_execution_count"] == 1
 
 
 # ========== plan_executor_router tests ==========
@@ -312,10 +317,10 @@ class TestPlanExecutorRouter:
         assert result == "synthesis_worker"
 
     def test_returns_synthesis_worker_on_loop_limit(self, plan_state):
-        """plan_executor_router returns 'synthesis_worker' when plan_refinement_count exceeds limit."""
+        """plan_executor_router returns 'synthesis_worker' when plan_execution_count exceeds limit."""
         from services.agent_graph.planner.executor import plan_executor_router
 
-        plan_state["plan_refinement_count"] = 5
+        plan_state["plan_execution_count"] = 10
 
         result = plan_executor_router(plan_state)
         assert result == "synthesis_worker"
