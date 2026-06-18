@@ -7,10 +7,11 @@
 import logging
 
 from langchain_core.messages import AIMessage, SystemMessage
+from langchain_core.runnables import RunnableConfig
 
 from services.llm.llm import llm
 
-from ..message_helpers import build_assistant_reply_update, messages_for_llm_prompt
+from ..message_helpers import build_assistant_reply_update, format_current_datetime_context, messages_for_llm_prompt
 from ..prompts import SEARCH_WORKER_PROMPT
 from ..state import MAX_RAW_MESSAGES, AgentState
 from .utils import run_single_tool_loop
@@ -21,7 +22,7 @@ logger = logging.getLogger(__name__)
 def _make_search_worker(system_prompt: str, tools: list, enable_search: bool):
     """创建联网搜索 worker 的工厂。"""
 
-    def search_worker(state: AgentState) -> dict:
+    def search_worker(state: AgentState, config: RunnableConfig | None = None) -> dict:
         """搜索 worker：使用 tavilysearch 工具执行搜索。"""
         if not enable_search:
             return {
@@ -50,6 +51,7 @@ def _make_search_worker(system_prompt: str, tools: list, enable_search: bool):
         parts = []
         if summary:
             parts.append(f"## 历史摘要\n{summary}")
+        parts.append(format_current_datetime_context())
         parts.append(SEARCH_WORKER_PROMPT)
         if rewrite_query:
             parts.append(
@@ -70,6 +72,7 @@ def _make_search_worker(system_prompt: str, tools: list, enable_search: bool):
             prompt_messages=prompt_messages,
             selected_tools=search_tools,
             max_iterations=2,
+            config=config,
         )
 
         # 优先使用原始工具结果文本

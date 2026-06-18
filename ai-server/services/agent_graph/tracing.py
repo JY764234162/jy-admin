@@ -38,13 +38,27 @@ def _is_tracing_enabled() -> bool:
     return (LANGSMITH_TRACING or tracing_env) and bool(LANGSMITH_API_KEY)
 
 
-def get_runnable_config() -> RunnableConfig:
+def get_runnable_config(parent_config: RunnableConfig | None = None) -> RunnableConfig:
     """Return a RunnableConfig with LangSmith tracer when enabled.
 
+    如果提供了 parent_config（通常来自 LangGraph 的流式/调用上下文），会保留其 callbacks
+    并追加 LangSmith tracer，确保流式 token 与 tracing 不互相覆盖。
+
+    Args:
+        parent_config: 父 RunnableConfig，保留其 callbacks 和其他字段。
+
     Returns:
-        RunnableConfig with callbacks list (empty or containing LangSmith tracer).
+        RunnableConfig with merged callbacks list.
     """
     callbacks: list = []
+    if parent_config and parent_config.get("callbacks"):
+        parent_callbacks = parent_config["callbacks"]
+        if isinstance(parent_callbacks, list):
+            callbacks.extend(parent_callbacks)
+        else:
+            # CallbackManager 或 BaseCallbackManager：提取 handlers 避免 TypeError
+            callbacks.extend(getattr(parent_callbacks, "handlers", []) or [])
+
     if _is_tracing_enabled():
         try:
             # langchain >= 0.3 exposes LangChainTracer in langchain_core.tracers
@@ -58,7 +72,13 @@ def get_runnable_config() -> RunnableConfig:
             logger.debug("LangSmith tracer enabled for project '%s'", LANGSMITH_PROJECT)
         except Exception as exc:
             logger.warning("Failed to initialize LangSmith tracer: %s", exc)
-    return RunnableConfig(callbacks=callbacks)
+
+    config = RunnableConfig(callbacks=callbacks)
+    if parent_config:
+        for key, value in parent_config.items():
+            if key != "callbacks":
+                config[key] = value
+    return config
 
 
 def trace_node(name: str) -> Callable:

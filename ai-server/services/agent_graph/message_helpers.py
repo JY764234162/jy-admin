@@ -16,6 +16,26 @@ def _utc_now_iso() -> str:
     return datetime.now(timezone.utc).isoformat()
 
 
+_WEEKDAY_NAMES = ["周一", "周二", "周三", "周四", "周五", "周六", "周日"]
+
+
+def format_current_datetime_context() -> str:
+    """生成当前系统时间的上下文字符串，供注入到 system prompt。
+
+    LLM 没有实时时间概念，依赖训练数据的 knowledge cutoff。通过在每个 system prompt
+    中显式注入当前时间，确保"今天""最近""最新"等时效性查询能基于真实日期进行改写和回答。
+    """
+    now = datetime.now()
+    weekday = _WEEKDAY_NAMES[now.weekday()]
+    return (
+        f"## 当前时间\n"
+        f"今天是 {now.year} 年 {now.month} 月 {now.day} 日（{weekday}），"
+        f"当前时间 {now.strftime('%H:%M:%S')}。"
+        f"回答涉及时效性的问题（如今天、最近、最新）时，请以当前时间为准，"
+        f"不要依赖自身训练数据中的知识截止时间。"
+    )
+
+
 def stamp_message_created_at(msg: BaseMessage) -> BaseMessage:
     """写入消息时打上 created_at（存入 additional_kwargs，供列表接口展示）。"""
     kwargs = dict(getattr(msg, "additional_kwargs", None) or {})

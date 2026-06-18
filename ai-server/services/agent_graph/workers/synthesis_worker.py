@@ -7,10 +7,11 @@
 import logging
 
 from langchain_core.messages import AIMessage, SystemMessage
+from langchain_core.runnables import RunnableConfig
 
 from services.llm.llm import llm
 
-from ..message_helpers import build_assistant_reply_update, messages_for_llm_prompt
+from ..message_helpers import build_assistant_reply_update, format_current_datetime_context, messages_for_llm_prompt
 from ..prompts import SYNTHESIS_WORKER_PROMPT
 from ..state import MAX_RAW_MESSAGES, AgentState
 from ..tracing import get_runnable_config
@@ -24,7 +25,7 @@ def _make_synthesis_worker(system_prompt: str = ""):
     读取 state 中的各类结果，生成整合后的最终回复。
     """
 
-    def synthesis_worker(state: AgentState) -> dict:
+    def synthesis_worker(state: AgentState, config: RunnableConfig | None = None) -> dict:
         """综合 worker：整合所有结果生成最终回复。"""
         messages = state["messages"]
         summary = state.get("summary", "")
@@ -36,6 +37,7 @@ def _make_synthesis_worker(system_prompt: str = ""):
         parts = []
         if summary:
             parts.append(f"## 历史摘要\n{summary}")
+        parts.append(format_current_datetime_context())
         parts.append(SYNTHESIS_WORKER_PROMPT)
 
         # 注入可用结果
@@ -67,7 +69,7 @@ def _make_synthesis_worker(system_prompt: str = ""):
         prompt_messages = [SystemMessage(content=full_system)] + recent_messages
 
         try:
-            response = llm.invoke(prompt_messages, config=get_runnable_config())
+            response = llm.invoke(prompt_messages, config=get_runnable_config(config))
         except Exception:
             logger.error("综合 worker 异常", exc_info=True)
             response = AIMessage(content="抱歉，整合结果时遇到异常，请稍后重试。")

@@ -37,6 +37,28 @@ def test_get_runnable_config_no_tracing_by_default(monkeypatch):
     assert config.get("callbacks") == []
 
 
+def test_get_runnable_config_preserves_parent_callbacks(monkeypatch):
+    """Parent RunnableConfig callbacks (including streaming callbacks) should be preserved."""
+    monkeypatch.setenv("LANGSMITH_TRACING", "false")
+    monkeypatch.setenv("LANGCHAIN_TRACING_V2", "false")
+    monkeypatch.delenv("LANGSMITH_API_KEY", raising=False)
+    import services.agent_graph.tracing as tracing_mod
+    monkeypatch.setattr(tracing_mod, "LANGSMITH_TRACING", False)
+    monkeypatch.setattr(tracing_mod, "LANGSMITH_API_KEY", "")
+
+    from langchain_core.callbacks.base import BaseCallbackHandler
+    from langchain_core.runnables import RunnableConfig
+
+    class DummyHandler(BaseCallbackHandler):
+        pass
+
+    parent = RunnableConfig(callbacks=[DummyHandler()])
+    config = get_runnable_config(parent)
+    assert len(config["callbacks"]) == 1
+    assert isinstance(config["callbacks"][0], DummyHandler)
+    assert config.get("metadata") is None or config.get("metadata") == parent.get("metadata")
+
+
 # ========== trace_node decorator / context manager tests ==========
 
 

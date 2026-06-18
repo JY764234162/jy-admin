@@ -3,11 +3,12 @@ import json
 from typing import Literal
 
 from langchain_core.messages import HumanMessage
+from langchain_core.runnables import RunnableConfig
 from pydantic import BaseModel, Field
 
 from services.llm.llm import llm
 
-from ..message_helpers import extract_json_from_text, extract_text_content, last_human_message
+from ..message_helpers import extract_json_from_text, extract_text_content, format_current_datetime_context, last_human_message
 from ..prompts import SUPERVISOR_SYSTEM_PROMPT
 from ..state import AgentState, IntentItem
 from ..tracing import get_runnable_config
@@ -35,7 +36,7 @@ class IntentAnalysis(BaseModel):
     )
 
 
-def supervisor_node(state: AgentState) -> dict:
+def supervisor_node(state: AgentState, config: RunnableConfig | None = None) -> dict:
     """Supervisor 节点：多意图识别 + 任务复杂度评估 + 计划建议。
 
     1. 从最后一条人类消息中提取文本。
@@ -71,6 +72,7 @@ def supervisor_node(state: AgentState) -> dict:
 
     prompt = (
         f"{SUPERVISOR_SYSTEM_PROMPT}\n\n"
+        f"{format_current_datetime_context()}\n\n"
         f"请严格返回以下 JSON 格式，不要添加 markdown 代码块或其他说明：\n"
         f'{{{{"primary_intent": "chat|knowledge|search|mixed|compare|summarize|explain|code|calculation|translation|other", '
         f'"intents": [{{"intent": "...", "confidence": 0.0, "reasoning": "...", "suggested_worker": "..."}}], '
@@ -82,7 +84,7 @@ def supervisor_node(state: AgentState) -> dict:
     try:
         raw_response = llm.invoke(
             [HumanMessage(content=prompt)],
-            config=get_runnable_config(),
+            config=get_runnable_config(config),
         )
         resp_text = str(raw_response.content) if raw_response.content else ""
         json_text = extract_json_from_text(resp_text)

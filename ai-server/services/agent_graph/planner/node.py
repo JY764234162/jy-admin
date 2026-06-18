@@ -8,11 +8,12 @@ import logging
 from typing import Optional
 
 from langchain_core.messages import HumanMessage
+from langchain_core.runnables import RunnableConfig
 from pydantic import BaseModel, Field
 
 from services.llm.llm import llm
 
-from ..message_helpers import extract_json_from_text, extract_text_content, last_human_message
+from ..message_helpers import extract_json_from_text, extract_text_content, format_current_datetime_context, last_human_message
 from ..prompts import PLANNER_SYSTEM_PROMPT
 from ..state import AgentState, PlanStep
 from ..tracing import get_runnable_config
@@ -48,7 +49,7 @@ def _build_fallback_plan(user_query: str, primary_intent: str = "other") -> list
     ]
 
 
-def planner_node(state: AgentState) -> dict:
+def planner_node(state: AgentState, config: RunnableConfig | None = None) -> dict:
     """Planner 节点：生成结构化执行计划。
 
     1. 读取 state["intents"], state["primary_intent"], state["task_complexity"], state["suggested_plan"]。
@@ -89,6 +90,7 @@ def planner_node(state: AgentState) -> dict:
 
     prompt = (
         f"{PLANNER_SYSTEM_PROMPT}\n\n"
+        f"{format_current_datetime_context()}\n\n"
         f"## 任务上下文\n"
         f"- 主意图：{primary_intent}\n"
         f"- 复杂度：{task_complexity}\n"
@@ -102,7 +104,7 @@ def planner_node(state: AgentState) -> dict:
     try:
         # 优先尝试结构化输出
         structured_llm = llm.with_structured_output(PlanResult)
-        raw_response = structured_llm.invoke([HumanMessage(content=prompt)], config=get_runnable_config())
+        raw_response = structured_llm.invoke([HumanMessage(content=prompt)], config=get_runnable_config(config))
 
         if raw_response and hasattr(raw_response, "plan") and raw_response.plan:
             plan_steps = raw_response.plan
@@ -113,7 +115,7 @@ def planner_node(state: AgentState) -> dict:
         logger.warning(f"[PLANNER] 结构化输出失败，尝试 JSON 解析: {e}")
 
         try:
-            raw_response = llm.invoke([HumanMessage(content=prompt)], config=get_runnable_config())
+            raw_response = llm.invoke([HumanMessage(content=prompt)], config=get_runnable_config(config))
             resp_text = str(raw_response.content) if hasattr(raw_response, "content") else str(raw_response)
             json_text = extract_json_from_text(resp_text)
 

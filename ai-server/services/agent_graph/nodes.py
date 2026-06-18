@@ -75,7 +75,7 @@ def cleanup_node(state: AgentState) -> dict:
 # ========== 摘要节点 ==========
 
 
-def summarize_node(state: AgentState) -> dict:
+def summarize_node(state: AgentState, config: RunnableConfig | None = None) -> dict:
     """摘要节点：对超出的历史消息生成摘要。
 
     触发条件：checkpoint 中的 messages 数量超过 MAX_RAW_MESSAGES
@@ -93,7 +93,7 @@ def summarize_node(state: AgentState) -> dict:
     to_summarize = messages[:-MAX_RAW_MESSAGES]
 
     # 生成新摘要
-    summary = _generate_summary(to_summarize, existing_summary)
+    summary = _generate_summary(to_summarize, existing_summary, config)
 
     print(f"[AGENT] 生成摘要: {len(to_summarize)} 条消息 → {len(summary)} 字摘要")
 
@@ -101,7 +101,7 @@ def summarize_node(state: AgentState) -> dict:
     return {"summary": summary}
 
 
-def _generate_summary(messages: list, existing_summary: str = "") -> str:
+def _generate_summary(messages: list, existing_summary: str = "", config: RunnableConfig | None = None) -> str:
     """调用 LLM 生成对话摘要。
 
     Args:
@@ -134,6 +134,6 @@ def _generate_summary(messages: list, existing_summary: str = "") -> str:
     # 调用非流式 LLM 生成摘要
     response = summary_llm.invoke(
         [HumanMessage(content=prompt)],
-        config=get_runnable_config(),
+        config=get_runnable_config(config),
     )
     return response.content.strip()

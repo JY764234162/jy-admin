@@ -7,10 +7,11 @@
 import logging
 
 from langchain_core.messages import AIMessage, SystemMessage, ToolMessage
+from langchain_core.runnables import RunnableConfig
 
 from services.llm.llm import llm
 
-from ..message_helpers import build_assistant_reply_update, messages_for_llm_prompt
+from ..message_helpers import build_assistant_reply_update, format_current_datetime_context, messages_for_llm_prompt
 from ..prompts import DIRECT_WORKER_PROMPT
 from ..state import MAX_RAW_MESSAGES, AgentState
 from ..tracing import get_runnable_config
@@ -29,7 +30,7 @@ def _make_direct_worker(
       - other / fallback → 不绑定工具，直接回复
     """
 
-    def direct_worker(state: AgentState) -> dict:
+    def direct_worker(state: AgentState, config: RunnableConfig | None = None) -> dict:
         """直接执行 worker：根据意图选择单一工具并执行。"""
         messages = state["messages"]
         summary = state.get("summary", "")
@@ -47,6 +48,7 @@ def _make_direct_worker(
         parts = []
         if summary:
             parts.append(f"## 历史摘要\n{summary}")
+        parts.append(format_current_datetime_context())
         parts.append(DIRECT_WORKER_PROMPT)
         if rewrite_query:
             parts.append(
@@ -66,9 +68,9 @@ def _make_direct_worker(
 
         try:
             if llm_with_tools:
-                response = llm_with_tools.invoke(prompt_messages, config=get_runnable_config())
+                response = llm_with_tools.invoke(prompt_messages, config=get_runnable_config(config))
             else:
-                response = llm.invoke(prompt_messages, config=get_runnable_config())
+                response = llm.invoke(prompt_messages, config=get_runnable_config(config))
         except Exception:
             logger.error("直接 worker LLM 调用异常", exc_info=True)
             response = AIMessage(content="抱歉，服务暂时异常，请稍后重试。")
@@ -98,7 +100,7 @@ def _make_direct_worker(
         for tool in selected_tools:
             if tool.name == tool_name:
                 try:
-                    tool_result = tool.invoke(tool_args)
+                    tool_result = tool.invoke(tool_args, config=config)
                 except Exception:
                     logger.error("工具执行失败: %s", tool_name, exc_info=True)
                     tool_result = f"工具执行失败：{tool_name}"
@@ -114,9 +116,9 @@ def _make_direct_worker(
         # 最终 LLM 调用，生成带工具结果的回复
         try:
             if llm_with_tools:
-                final_response = llm_with_tools.invoke(prompt_messages_with_result, config=get_runnable_config())
+                final_response = llm_with_tools.invoke(prompt_messages_with_result, config=get_runnable_config(config))
             else:
-                final_response = llm.invoke(prompt_messages_with_result, config=get_runnable_config())
+                final_response = llm.invoke(prompt_messages_with_result, config=get_runnable_config(config))
         except Exception:
             logger.error("直接 worker 最终调用异常", exc_info=True)
             final_response = AIMessage(content="抱歉，处理工具结果时遇到异常，请稍后重试。")

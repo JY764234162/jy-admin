@@ -4,6 +4,7 @@ import logging
 from typing import Optional
 
 from langchain_core.messages import AIMessage, ToolMessage
+from langchain_core.runnables import RunnableConfig
 
 logger = logging.getLogger(__name__)
 
@@ -13,6 +14,7 @@ def run_single_tool_loop(
     prompt_messages: list,
     selected_tools: list,
     max_iterations: int = 2,
+    config: RunnableConfig | None = None,
 ) -> tuple[AIMessage, str]:
     """Run a simple ReAct loop: LLM -> first tool call -> LLM with result.
 
@@ -21,6 +23,7 @@ def run_single_tool_loop(
         prompt_messages: Initial prompt messages (system + user).
         selected_tools: List of actual tool callables to execute.
         max_iterations: Maximum loop iterations (default 2).
+        config: Optional RunnableConfig, used to propagate streaming callbacks.
 
     Returns:
         Tuple of (final AIMessage, concatenated raw tool results text).
@@ -30,7 +33,7 @@ def run_single_tool_loop(
 
     for iteration in range(max_iterations):
         try:
-            response = llm_with_tools.invoke(prompt_messages)
+            response = llm_with_tools.invoke(prompt_messages, config=config)
         except Exception:
             logger.error("LLM invoke error in tool loop", exc_info=True)
             return AIMessage(content="抱歉，调用模型时遇到异常，请稍后重试。"), ""
@@ -51,7 +54,7 @@ def run_single_tool_loop(
         for tool in selected_tools:
             if tool.name == tool_name:
                 try:
-                    tool_result = tool.invoke(tool_args)
+                    tool_result = tool.invoke(tool_args, config=config)
                 except Exception:
                     logger.error("Tool execution failed: %s", tool_name, exc_info=True)
                     tool_result = f"工具执行失败：{tool_name}"

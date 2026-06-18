@@ -9,11 +9,12 @@ import json
 import logging
 
 from langchain_core.messages import HumanMessage
+from langchain_core.runnables import RunnableConfig
 from pydantic import BaseModel, Field
 
 from services.llm.llm import llm
 
-from ..message_helpers import extract_json_from_text, extract_text_content, last_human_message
+from ..message_helpers import extract_json_from_text, extract_text_content, format_current_datetime_context, last_human_message
 from ..prompts import QUALITY_CHECK_PROMPT, PLAN_REFINEMENT_PROMPT
 from ..state import AgentState, PlanStep
 from ..tracing import get_runnable_config
@@ -45,7 +46,7 @@ class _PlanRefinementResult(BaseModel):
 END = "__end__"
 
 
-def quality_check_node(state: AgentState) -> dict:
+def quality_check_node(state: AgentState, config: RunnableConfig | None = None) -> dict:
     """质量检查节点：评估最终回复是否完整回答用户问题。
 
     1. 读取最后一条 assistant 消息（综合结果）和原始用户查询。
@@ -75,6 +76,7 @@ def quality_check_node(state: AgentState) -> dict:
 
     prompt = (
         f"{QUALITY_CHECK_PROMPT}\n\n"
+        f"{format_current_datetime_context()}\n\n"
         f"请严格返回以下 JSON 格式，不要添加 markdown 代码块或其他说明：\n"
         f'{{"passed": true/false, "feedback": "原因或空字符串"}}\n\n'
         f"用户原始问题：{user_query}\n\n"
@@ -84,13 +86,13 @@ def quality_check_node(state: AgentState) -> dict:
     try:
         # 尝试使用结构化输出
         structured_llm = llm.with_structured_output(QualityCheckResult)
-        result = structured_llm.invoke([HumanMessage(content=prompt)], config=get_runnable_config())
+        result = structured_llm.invoke([HumanMessage(content=prompt)], config=get_runnable_config(config))
         passed = result.passed
         feedback = result.feedback
     except Exception as e:
         logger.warning("[QUALITY] 结构化输出失败，尝试 JSON 解析回退: %s", e)
         try:
-            raw_response = llm.invoke([HumanMessage(content=prompt)], config=get_runnable_config())
+            raw_response = llm.invoke([HumanMessage(content=prompt)], config=get_runnable_config(config))
             resp_text = str(raw_response.content) if raw_response.content else ""
             json_text = extract_json_from_text(resp_text)
 
@@ -114,7 +116,7 @@ def quality_check_node(state: AgentState) -> dict:
     return {"quality_passed": passed, "quality_feedback": feedback}
 
 
-def plan_refinement_node(state: AgentState) -> dict:
+def plan_refinement_node(state: AgentState, config: RunnableConfig | None = None) -> dict:
     """计划重 refinement 节点：根据质量反馈修订执行计划。
 
     1. 检查 quality_passed 和 plan_refinement_count。
@@ -139,6 +141,7 @@ def plan_refinement_node(state: AgentState) -> dict:
 
     prompt = (
         f"{PLAN_REFINEMENT_PROMPT}\n\n"
+        f"{format_current_datetime_context()}\n\n"
         f"请严格返回以下 JSON 格式，不要添加 markdown 代码块或其他说明：\n"
         f'{{"plan": [\n'
         f'  {{"step_id": "step_1", "worker": "search_worker|knowledge_worker|chat_worker|synthesis_worker", '
@@ -150,7 +153,7 @@ def plan_refinement_node(state: AgentState) -> dict:
 
     try:
         structured_llm = llm.with_structured_output(_PlanRefinementResult)
-        result = structured_llm.invoke([HumanMessage(content=prompt)], config=get_runnable_config())
+        result = structured_llm.invoke([HumanMessage(content=prompt)], config=get_runnable_config(config))
         new_plan = result.plan
 
         # 如果返回空计划，回退到默认计划

@@ -7,10 +7,11 @@
 import logging
 
 from langchain_core.messages import AIMessage, SystemMessage
+from langchain_core.runnables import RunnableConfig
 
 from services.llm.llm import llm
 
-from ..message_helpers import build_assistant_reply_update, messages_for_llm_prompt
+from ..message_helpers import build_assistant_reply_update, format_current_datetime_context, messages_for_llm_prompt
 from ..prompts import KNOWLEDGE_WORKER_PROMPT
 from ..state import MAX_RAW_MESSAGES, AgentState
 from .utils import run_single_tool_loop
@@ -21,7 +22,7 @@ logger = logging.getLogger(__name__)
 def _make_knowledge_worker(system_prompt: str, tools: list, enable_knowledge: bool):
     """创建知识库查询 worker 的工厂。"""
 
-    def knowledge_worker(state: AgentState) -> dict:
+    def knowledge_worker(state: AgentState, config: RunnableConfig | None = None) -> dict:
         """知识库 worker：使用知识库工具执行查询。"""
         if not enable_knowledge:
             return {
@@ -50,6 +51,7 @@ def _make_knowledge_worker(system_prompt: str, tools: list, enable_knowledge: bo
         parts = []
         if summary:
             parts.append(f"## 历史摘要\n{summary}")
+        parts.append(format_current_datetime_context())
         parts.append(KNOWLEDGE_WORKER_PROMPT)
         if rewrite_query:
             parts.append(
@@ -70,6 +72,7 @@ def _make_knowledge_worker(system_prompt: str, tools: list, enable_knowledge: bo
             prompt_messages=prompt_messages,
             selected_tools=knowledge_tools,
             max_iterations=2,
+            config=config,
         )
 
         # 优先使用原始工具结果文本
