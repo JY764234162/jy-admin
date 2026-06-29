@@ -1,0 +1,94 @@
+{
+  "permissions": {
+    "allow": [
+      "Read",
+      "Write",
+      "Edit",
+      "Glob(*)",
+      "Grep(*)",
+      "WebSearch",
+      "WebFetch(*)",
+
+      "Bash(git *)",
+
+      "Bash(ls *)",
+      "Bash(find *)",
+      "Bash(grep *)",
+      "Bash(grep - *)",
+      "Bash(cat *)",
+      "Bash(head *)",
+      "Bash(tail *)",
+      "Bash(wc *)",
+      "Bash(sort *)",
+      "Bash(uniq *)",
+      "Bash(echo *)",
+      "Bash(date)",
+      "Bash(date *)",
+
+      "Bash(ps *)",
+      "Bash(netstat *)",
+      "Bash(lsof *)",
+      "Bash(pgrep *)",
+
+      "Bash(docker ps*)",
+      "Bash(docker logs*)",
+      "Bash(docker info*)",
+      "Bash(docker version*)",
+      "Bash(docker stats*)",
+      "Bash(docker inspect*)",
+
+      "Bash(nginx -t *)"
+    ],
+    "ask": [
+      "Bash(git rm*)",
+      "Bash(git clean*)",
+      "Bash(rm *)",
+      "Bash(rm - *)",
+      "Bash(rmdir *)",
+      "Bash(trash *)",
+
+      "Bash(sed *)",
+      "Bash(awk *)",
+      "Bash(xargs *)",
+      "Bash(chmod *)",
+      "Bash(mkdir *)",
+      "Bash(touch *)",
+      "Bash(cp *)",
+      "Bash(mv *)",
+      "Bash(tar *)",
+      "Bash(zip *)",
+      "Bash(unzip *)",
+
+      "Bash(python *)",
+      "Bash(python3 *)",
+      "Bash(uv *)",
+      "Bash(pnpm *)",
+      "Bash(go *)",
+
+      "Bash(docker exec*)",
+      "Bash(docker run*)",
+      "Bash(docker start*)",
+      "Bash(docker stop*)",
+      "Bash(docker build*)",
+      "Bash(docker compose*)",
+      "Bash(docker network*)",
+      "Bash(docker rm*)",
+      "Bash(docker volume rm*)",
+      "Bash(docker image rm*)",
+
+      "Bash(curl *)",
+      "Bash(ssh *)",
+      "Bash(scp *)",
+      "Bash(kill *)",
+      "Bash(pkill *)",
+      "Bash(timeout *)",
+      "Bash(time *)",
+      "Bash(openssl *)",
+      "Bash(xxd *)"
+    ],
+    "additionalDirectories": [
+      "/Users/jiangyi/Desktop/study/jy-admin",
+      "/private/tmp"
+    ]
+  }
+}

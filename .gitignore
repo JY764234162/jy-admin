@@ -22,7 +22,8 @@ certs/
 *.pyc
 
 # Claude
-.claude/
+.claude/settings.local.json
+
 .worktrees/
 
 # TypeScript
